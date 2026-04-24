@@ -24,4 +24,8 @@
     <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="FrigateRelay.Host.Tests" />
+  </ItemGroup>
+
 </Project>
