@@ -49,10 +49,8 @@ jobs:
       - name: Build
         run: dotnet build FrigateRelay.sln -c Release --no-restore
 
-      - name: Test — FrigateRelay.Abstractions.Tests
+      - name: Test — all test projects
         shell: bash
-        run: dotnet run --project tests/FrigateRelay.Abstractions.Tests -c Release --no-build
-
-      - name: Test — FrigateRelay.Host.Tests
-        shell: bash
-        run: dotnet run --project tests/FrigateRelay.Host.Tests -c Release --no-build
+        # Shared script discovers tests/*.Tests/*.Tests.csproj automatically.
+        # Adding a new test project requires no workflow edits.
+        run: bash .github/scripts/run-tests.sh

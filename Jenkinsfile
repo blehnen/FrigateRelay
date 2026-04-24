@@ -40,24 +40,12 @@ pipeline {
 
                 sh 'dotnet build FrigateRelay.sln -c Release --no-restore'
 
-                // Abstractions test project — MTP coverage flags.
-                // The -- separator passes arguments to the test executable, not to dotnet run.
-                sh '''
-                    dotnet run --project tests/FrigateRelay.Abstractions.Tests \
-                        -c Release --no-build -- \
-                        --coverage \
-                        --coverage-output-format cobertura \
-                        --coverage-output coverage/abstractions-tests/FrigateRelay.Abstractions.Tests.cobertura.xml
-                '''
-
-                // Host test project — MTP coverage flags.
-                sh '''
-                    dotnet run --project tests/FrigateRelay.Host.Tests \
-                        -c Release --no-build -- \
-                        --coverage \
-                        --coverage-output-format cobertura \
-                        --coverage-output coverage/host-tests/FrigateRelay.Host.Tests.cobertura.xml
-                '''
+                // Delegates to the shared run-tests.sh script (Phase 3). The script
+                // auto-discovers every tests/*.Tests/*.Tests.csproj and calls each via
+                // `dotnet run` with MTP coverage flags. Output lands at
+                //   coverage/<TestProjectName>/coverage.cobertura.xml
+                // so adding a new test project requires no Jenkinsfile edit.
+                sh 'bash .github/scripts/run-tests.sh --coverage'
             }
 
             post {
@@ -65,7 +53,7 @@ pipeline {
                     // Archive raw cobertura XML so it survives the workspace cleanup below.
                     // allowEmptyArchive: false — a missing XML means the coverage run silently
                     // failed; treat that as a pipeline error rather than swallowing it.
-                    archiveArtifacts artifacts: 'coverage/**/*.cobertura.xml',
+                    archiveArtifacts artifacts: 'coverage/**/coverage.cobertura.xml',
                                      allowEmptyArchive: false,
                                      fingerprint: true
 
@@ -76,7 +64,7 @@ pipeline {
                     // Fallback for Jenkins instances still on the legacy Cobertura plugin:
                     // coberturaPublisher(coberturaReportFile: 'coverage/**/*.cobertura.xml')
                     recordCoverage(
-                        tools: [[parser: 'COBERTURA', pattern: 'coverage/**/*.cobertura.xml']],
+                        tools: [[parser: 'COBERTURA', pattern: 'coverage/**/coverage.cobertura.xml']],
                         id:   'cobertura',
                         name: 'FrigateRelay Coverage'
                     )
