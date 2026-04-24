@@ -1,0 +1,58 @@
+# CI workflow — FrigateRelay
+#
+# D1: GitHub Actions is the PR gate (build + unit tests only).
+#     Coverage collection is Jenkins-side (see Jenkinsfile) — not here.
+# D2: .NET 10 SDK blocks the VSTest target for Microsoft.Testing.Platform
+#     projects (https://aka.ms/dotnet-test-mtp-error). Test projects have
+#     OutputType=Exe and are invoked via `dotnet run --project ... --no-build`.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore FrigateRelay.sln
+
+      - name: Build
+        run: dotnet build FrigateRelay.sln -c Release --no-restore
+
+      - name: Test — FrigateRelay.Abstractions.Tests
+        shell: bash
+        run: dotnet run --project tests/FrigateRelay.Abstractions.Tests -c Release --no-build
+
+      - name: Test — FrigateRelay.Host.Tests
+        shell: bash
+        run: dotnet run --project tests/FrigateRelay.Host.Tests -c Release --no-build
