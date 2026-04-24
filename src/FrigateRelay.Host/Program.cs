@@ -26,24 +26,24 @@ var builder = Host.CreateApplicationBuilder(args);
 // Only #3 needs an explicit AddJsonFile call; the rest are provided by CreateApplicationBuilder.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
 
-// --- Plugin registrar discovery (composition time, before Build()) ---
-// Construct the shared context once; all registrars receive the same instance.
+// Construct the shared registrar context — all registrars receive the same instance.
+// In Phase 1 no concrete plugins exist; the list is empty. Phase 3+ plugins add their
+// IPluginRegistrar instances here (or via a future AddPluginRegistrar helper).
 var registrationContext = new PluginRegistrationContext(builder.Services, builder.Configuration);
-
-// In Phase 1 no concrete plugins exist; the list is empty.
-// Phase 3+ plugins add their IPluginRegistrar here (or via a dedicated AddPluginRegistrar helper).
 IEnumerable<IPluginRegistrar> registrars = [];
 
-// Create a bootstrap logger for the pre-Build() registration phase.
-// Use a category name string since PluginRegistrarRunner is a static class
-// and cannot be used as a type argument.
-using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
-var bootstrapLogger = bootstrapLoggerFactory.CreateLogger("FrigateRelay.Host.PluginRegistrarRunner");
-
-PluginRegistrarRunner.RunAll(registrars, registrationContext, bootstrapLogger);
-
-// --- Host services ---
 builder.Services.AddHostedService<PlaceholderWorker>();
 
 var app = builder.Build();
+
+// Run registrars AFTER Build() so we can pull ILogger from the built host's DI
+// instead of spinning a throwaway LoggerFactory. Registration mutates
+// builder.Services (captured by reference in registrationContext); this still
+// happens before RunAsync starts the host loop, so hosted services see the full
+// service graph.
+PluginRegistrarRunner.RunAll(
+    registrars,
+    registrationContext,
+    app.Services.GetRequiredService<ILogger<IPluginRegistrar>>());
+
 await app.RunAsync();

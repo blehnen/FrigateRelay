@@ -446,4 +446,4 @@ coverage.cobertura.xml
 .idea/
 
 # Local developer overrides (never commit secrets)
-appsettings.Local.json
+**/appsettings.Local.json

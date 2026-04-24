@@ -36,30 +36,46 @@ docker/                                 # Dockerfile + compose example
 
 ## Commands
 
-All commands assume `FrigateRelay.sln` at repo root (scaffolded in Phase 1).
+All commands assume `FrigateRelay.sln` at repo root.
 
 ```bash
 # Build (warnings-as-errors; must be clean on Windows and Linux)
 dotnet build FrigateRelay.sln -c Release
 
-# Test (whole solution)
-dotnet test -c Release --no-build
+# Tests — NOT via `dotnet test`. On .NET 10 SDK, `dotnet test` is blocked for
+# Microsoft.Testing.Platform (the MSTest v3 runner) via the VSTest target
+# (https://aka.ms/dotnet-test-mtp-error). Test projects have OutputType=Exe
+# and are invoked as an exe via `dotnet run`:
+dotnet run --project tests/FrigateRelay.Abstractions.Tests -c Release
+dotnet run --project tests/FrigateRelay.Host.Tests -c Release
 
-# Test a single project
-dotnet test tests/FrigateRelay.Host.Tests -c Release
+# Single test by name (MTP filter syntax)
+dotnet run --project tests/FrigateRelay.Host.Tests -c Release -- --filter-query "/*/*/PluginRegistrarRunnerTests/RunAll_EmptyRegistrars_DoesNothing"
 
-# Test a single test by name (MSTest v3 / Microsoft.Testing.Platform)
-dotnet test tests/FrigateRelay.Host.Tests --filter "FullyQualifiedName~MqttToBlueIris_HappyPath"
+# List transitive dependencies (note the argument order — the csproj path goes
+# BEFORE the `package` verb on .NET 10; the pre-10 `--project <path>` form
+# prints help and exits 0):
+dotnet list src/FrigateRelay.Abstractions/FrigateRelay.Abstractions.csproj package --include-transitive
 
 # Run the host locally (expects appsettings.Local.json or env-var overrides for secrets)
-dotnet run --project src/FrigateRelay.Host
+dotnet run --project src/FrigateRelay.Host -c Release
+
+# Graceful shutdown smoke on Linux / WSL — `timeout --signal=SIGINT` does NOT
+# reliably propagate to the Host exe through the `dotnet run` wrapper. Use
+# pgrep + explicit kill -INT against the child exe pid:
+#
+#   dotnet run --project src/FrigateRelay.Host -c Release --no-build > /tmp/host.log 2>&1 &
+#   sleep 3
+#   kill -INT "$(pgrep -f 'FrigateRelay.Host/bin/Release/net10.0/FrigateRelay.Host$' | head -1)"
+#   wait
+#   # expect exit 0 and "Application is shutting down..." in /tmp/host.log
 
 # Docker build (Phase 10+)
 docker build -f docker/Dockerfile .
 docker compose -f docker/docker-compose.example.yml up
 ```
 
-Integration tests use Testcontainers.NET — Docker must be running.
+Integration tests (Phase 4+) use Testcontainers.NET — Docker must be running.
 
 ## Architecture invariants (non-negotiable)
 
@@ -80,6 +96,13 @@ These encode the PROJECT.md decisions. Violating any of them is a regression fro
 - **Observability stack is Microsoft.Extensions.Logging + Serilog sinks + OpenTelemetry (OTLP).** **Do not** introduce `App.Metrics`, `OpenTracing`, or `Jaeger.*` — they are explicitly excluded. `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` must be empty. Use `ILogger.LogError(ex, "message")` — not the `_logger.Error(ex.Message, ex)` anti-pattern from the legacy code.
 - **Metrics/spans are named.** `ActivitySource "FrigateRelay"`, `Meter "FrigateRelay"`. Counters use the `frigaterelay.*` prefix (see ROADMAP Phase 9 for the exact list). Activity propagates across the channel hop via the `DispatchItem`.
 - **`EventContext` is source-agnostic and immutable.** Frigate-specific types never leak past the `IEventSource` boundary.
+
+## Conventions (discovered and locked in during Phase 1)
+
+- **`[SetsRequiredMembers]` on ctors with `required init` properties.** When a class has both a constructor AND `required init` properties, mark the ctor `[System.Diagnostics.CodeAnalysis.SetsRequiredMembers]` so callers can use the ctor standalone. Without it, callers must use object-initializer syntax even when the ctor sets every required member — making the ctor effectively vestigial. Precedent: `PluginRegistrationContext.cs` in `FrigateRelay.Abstractions`.
+- **Test log assertions use an in-test `CapturingLogger<T> : ILogger<T>`, not NSubstitute on `ILogger<T>`.** NSubstitute on the generic `Log<TState>(...)` method is fragile around `TState` matching (`Arg.Any<object>()` often silently fails to bind to the generic slot). A tiny capturing implementation that stores `(level, eventId, formatter(state, exception))` tuples produces cleaner tests and better failure messages with zero new deps. Precedent: `tests/FrigateRelay.Host.Tests/PlaceholderWorkerTests.cs`.
+- **`<InternalsVisibleTo>` MSBuild item for test-only internals access.** Prefer the csproj item `<InternalsVisibleTo Include="FrigateRelay.X.Tests" />` over a source-level `[assembly: InternalsVisibleTo(...)]` attribute — the MSBuild form is declarative, removable, and keeps test boundaries in config rather than polluting the public-surface source tree. Precedent: `src/FrigateRelay.Host/FrigateRelay.Host.csproj`.
+- **Test names use underscores (`Method_Condition_Expected`).** `CA1707` is silenced for `tests/**.cs` via `.editorconfig` — do not re-enable it per-project. This is the DAMP convention for tests and produces readable failure output.
 
 ## Testing
 

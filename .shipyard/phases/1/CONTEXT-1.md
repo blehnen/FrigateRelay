@@ -60,7 +60,7 @@ return Verdict.Fail("confidence below 0.75");
 }
 ```
 
-(Exact GA version to be filled in by the architect at generation time — latest `10.0.x` band available on 2026-04-24.)
+**Correction (2026-04-24, post-build-W1):** RESEARCH.md originally claimed `10.0.203` was the latest GA. That feature band has not actually shipped — Microsoft's current latest is in the **100 band** (`10.0.107` observed on this machine after `apt-get install dotnet-sdk-10.0`). The pin floor is `10.0.100` rather than `10.0.203`; `rollForward: latestFeature` handles future 200-band releases automatically with no config change required.
 
 **Rejected:**
 - *Pin exact + `rollForward: disable`* — contributors must match the SDK build byte-for-byte; too much friction for a hobby-scale OSS project.

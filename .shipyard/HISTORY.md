@@ -70,3 +70,21 @@
 - Verifier (spec-compliance): **READY** — all Phase 1 ROADMAP deliverables owned by exactly one plan, 4 CONTEXT decisions honored, 13 planned tests exceed the ≥6 gate. Report: `.shipyard/phases/1/VERIFICATION.md`.
 - Verifier (feasibility critique): **READY** — no cross-wave forward references, verify commands valid on Linux + Windows, three minor risks flagged (NSubstitute.Analyzers + WAE warnings, `appsettings.Local.json` copy behavior, Windows SIGINT parity) all with documented mitigations. Report: `.shipyard/phases/1/CRITIQUE.md`.
 - Zero revision cycles needed.
+- [2026-04-24T18:10:36Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-24 — Phase 1 built (`/shipyard:build 1`)
+
+- **Waves executed sequentially** — all plans 1 plan per wave (linear chain).
+- **Wave 1 (PLAN-1.1)** — builder agent (Sonnet 4.6) delivered 3 atomic commits (`b480f12` → `5de3227`) clean. Reviewer: **PASS**. SDK pin corrected from fabricated `10.0.203` to real `10.0.100` + `rollForward: latestFeature` (user installed `10.0.107` via `apt`; original RESEARCH.md claim was wrong). Caveats captured: `dotnet new sln --format sln` required vs new `.slnx` default; empty-solution NuGet warning expected until Wave 2.
+- **Wave 2 (PLAN-2.1)** — builder truncated mid-task-3; orchestrator finished inline. 3 commits. Reviewer: **PASS**. Ripples surfaced: `[SetsRequiredMembers]` required on `PluginRegistrationContext` ctor; `.NET 10 dotnet test` blocked against MTP (use `dotnet run --project` against `OutputType=Exe` test exe); `dotnet list` flag order changed; test-project `[tests/**.cs]` editorconfig suppression for CA1707 + IDE0005.
+- **Wave 3 (PLAN-3.1)** — builder truncated after task 1; orchestrator finished task 2 but initially missed `PlaceholderWorkerTests.cs`. Reviewer caught gap → orchestrator gap-fix at `ef68446` added the missing test file (2 tests) + 3 explicit `Microsoft.Extensions.*` PackageReferences. Re-review: **PASS**. Phase 1 total: **17 tests pass**.
+- **Step 5 Phase verification** — COMPLETE. All 12 closeout criteria met.
+- **Step 5a Security audit** — PASS / Low risk. 0 critical/high/medium, 1 low (`.gitignore` `**/` prefix — applied), 2 info (CI deferred to Phase 2; FluentAssertions 6.12.2 license pin intended).
+- **Step 5b Simplification** — 1 medium (bootstrap `LoggerFactory` in `Program.cs` over-ceremony) — **applied**; 2 low (single-use `LoggerMessage.Define`, `CapturingLogger<T>` private-nested) — deferred.
+- **Step 5c Documentation** — 3 medium CLAUDE.md gaps — **all applied**: `.NET 10 dotnet test` caveat + new `## Conventions` section capturing `[SetsRequiredMembers]`, `CapturingLogger<T>`, `<InternalsVisibleTo>` MSBuild item, test-name underscore convention.
+- **Lessons-learned draft** (captured in SUMMARY files for ship-time):
+  - SDK-version research for unreleased feature bands is unreliable — cross-check `builds.dotnet.microsoft.com` release-metadata JSON before pinning.
+  - Verification must grep each plan's `files_touched:` frontmatter against `git log --name-only`, not just the ROADMAP test-count gate (the orchestrator shipped Wave 3 initially missing a whole test file because the phase-wide test count was already clear).
+  - Builder agents truncate on 30+ tool-use runs; consider a "checkpoint after each task + commit" style to make resumption cheap.
+  - WSL `timeout --signal=SIGINT` does not propagate through `dotnet run`; use `pgrep | kill -INT` or publish self-contained.
+- Checkpoint tags: `pre-build-phase-1`, `post-build-phase-1`.
