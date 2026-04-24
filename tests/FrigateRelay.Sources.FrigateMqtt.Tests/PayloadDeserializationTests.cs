@@ -363,11 +363,11 @@ public sealed class PayloadDeserializationTests
 
         evt.Should().NotBeNull();
         evt!.Type.Should().Be("new");
-        evt.After.Camera.Should().Be("front_door");
-        evt.After.Label.Should().Be("person");
-        evt.After.CurrentZones.Should().Equal("driveway");
-        evt.After.Stationary.Should().BeFalse();
-        evt.After.FalsePositive.Should().BeFalse();
+        evt.After!.Camera.Should().Be("front_door");
+        evt.After!.Label.Should().Be("person");
+        evt.After!.CurrentZones.Should().Equal("driveway");
+        evt.After!.Stationary.Should().BeFalse();
+        evt.After!.FalsePositive.Should().BeFalse();
     }
 
     /// <summary>
@@ -380,8 +380,8 @@ public sealed class PayloadDeserializationTests
 
         evt.Should().NotBeNull();
         evt!.Type.Should().Be("update");
-        evt.After.Stationary.Should().BeTrue();
-        evt.Before.Stationary.Should().BeFalse();
+        evt.After!.Stationary.Should().BeTrue();
+        evt.Before!.Stationary.Should().BeFalse();
     }
 
     /// <summary>
@@ -394,8 +394,8 @@ public sealed class PayloadDeserializationTests
 
         evt.Should().NotBeNull();
         evt!.Type.Should().Be("end");
-        evt.After.EndTime.Should().NotBeNull();
-        evt.After.EndTime.Should().BeApproximately(1714000060.5, 0.001);
+        evt.After!.EndTime.Should().NotBeNull();
+        evt.After!.EndTime.Should().BeApproximately(1714000060.5, 0.001);
     }
 
     /// <summary>
@@ -408,8 +408,8 @@ public sealed class PayloadDeserializationTests
         var evt = JsonSerializer.Deserialize<FrigateEvent>(SubLabelNullJson, FrigateJsonOptions.Default);
 
         evt.Should().NotBeNull();
-        evt!.After.SubLabel.Should().BeNull();
-        evt.Before.SubLabel.Should().BeNull();
+        evt!.After!.SubLabel.Should().BeNull();
+        evt.Before!.SubLabel.Should().BeNull();
     }
 
     /// <summary>
@@ -421,8 +421,8 @@ public sealed class PayloadDeserializationTests
         var evt = JsonSerializer.Deserialize<FrigateEvent>(ThumbnailOmittedJson, FrigateJsonOptions.Default);
 
         evt.Should().NotBeNull();
-        evt!.After.Thumbnail.Should().BeNull();
-        evt.Before.Thumbnail.Should().BeNull();
+        evt!.After!.Thumbnail.Should().BeNull();
+        evt.Before!.Thumbnail.Should().BeNull();
     }
 
     /// <summary>
@@ -434,9 +434,9 @@ public sealed class PayloadDeserializationTests
         var evt = JsonSerializer.Deserialize<FrigateEvent>(EmptyZonesJson, FrigateJsonOptions.Default);
 
         evt.Should().NotBeNull();
-        evt!.After.CurrentZones.Should().NotBeNull();
-        evt.After.CurrentZones.Should().BeEmpty();
-        evt.After.EnteredZones.Should().NotBeNull();
-        evt.After.EnteredZones.Should().BeEmpty();
+        evt!.After!.CurrentZones.Should().NotBeNull();
+        evt.After!.CurrentZones.Should().BeEmpty();
+        evt.After!.EnteredZones.Should().NotBeNull();
+        evt.After!.EnteredZones.Should().BeEmpty();
     }
 }

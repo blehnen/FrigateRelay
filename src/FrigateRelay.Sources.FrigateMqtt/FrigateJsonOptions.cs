@@ -13,11 +13,25 @@ internal static class FrigateJsonOptions
     /// <summary>
     /// The singleton options instance used for all Frigate payload serialization and deserialization.
     /// Settings: snake_case lower naming policy, case-insensitive property matching, ignore null on write.
+    /// <para>
+    /// Sealed via <see cref="JsonSerializerOptions.MakeReadOnly()"/> after construction so downstream
+    /// callers cannot silently mutate the shared instance.
+    /// </para>
     /// </summary>
-    internal static readonly JsonSerializerOptions Default = new()
+    internal static readonly JsonSerializerOptions Default = CreateReadOnly();
+
+    private static JsonSerializerOptions CreateReadOnly()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+        // populateMissingResolver: true lets MakeReadOnly auto-install a DefaultJsonTypeInfoResolver
+        // when none is configured. Without this, .NET 10 throws "JsonSerializerOptions instance must
+        // specify a TypeInfoResolver setting before being marked as read-only."
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
 }

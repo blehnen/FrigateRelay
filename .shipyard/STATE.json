@@ -1,7 +1,7 @@
 {
   "phase": 3,
-  "position": "Phase 3 planned, ready for build",
-  "status": "planned",
-  "message": "4 plans across 3 waves, 28 tests planned (≥15 gate). Post-revision: both abstractions removed, matcher/dedupe moved to Host. Both verifiers READY.",
+  "position": "Building phase 3 — wave 1 (parallel)",
+  "status": "building",
+  "message": "pre-build-phase-3 tagged. Baseline: 17 tests (10 Abstractions + 7 Host). Dispatching PLAN-1.1 (Frigate DTOs) and PLAN-1.2 (matcher + dedupe in Host) in parallel.",
   "updated_at": "2026-04-24T00:00:00Z"
 }

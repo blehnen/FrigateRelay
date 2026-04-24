@@ -29,6 +29,7 @@ namespace FrigateRelay.Host.Matching;
 public sealed class DedupeCache
 {
     private readonly IMemoryCache _cache;
+    private readonly object _writeLock = new();
 
     /// <summary>
     /// Initialises a new <see cref="DedupeCache"/> backed by the supplied <paramref name="cache"/>.
@@ -48,6 +49,12 @@ public sealed class DedupeCache
     /// currently in the cooldown window, and inserts an entry with the subscription's TTL so
     /// subsequent calls within the window return <see langword="false"/>.
     /// Returns <see langword="false"/> when the entry already exists (i.e. within the cooldown).
+    /// <para>
+    /// Atomic against concurrent callers: the check-and-insert pair runs under a single lock so
+    /// two concurrent events for the same (sub, camera, label) cannot both see a cache miss and
+    /// both return <see langword="true"/>. Event throughput is dozens/minute; lock contention is
+    /// negligible.
+    /// </para>
     /// </summary>
     /// <param name="sub">The matching subscription whose <see cref="SubscriptionOptions.CooldownSeconds"/> sets the TTL.</param>
     /// <param name="ctx">The event context providing <c>Camera</c> and <c>Label</c> for the key.</param>
@@ -55,14 +62,17 @@ public sealed class DedupeCache
     {
         var key = $"{sub.Name}|{ctx.Camera}|{ctx.Label}".ToLowerInvariant();
 
-        if (_cache.TryGetValue(key, out _))
-            return false;
-
-        var options = new MemoryCacheEntryOptions
+        lock (_writeLock)
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(sub.CooldownSeconds),
-        };
-        _cache.Set(key, true, options);
-        return true;
+            if (_cache.TryGetValue(key, out _))
+                return false;
+
+            var options = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(sub.CooldownSeconds),
+            };
+            _cache.Set(key, true, options);
+            return true;
+        }
     }
 }

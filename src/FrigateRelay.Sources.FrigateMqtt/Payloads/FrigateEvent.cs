@@ -17,12 +17,14 @@ internal sealed record FrigateEvent
     public required string Type { get; init; }
 
     /// <summary>
-    /// The state of the detected object before this event update.
+    /// The state of the detected object before this event update. Defensively nullable —
+    /// in practice Frigate populates this on every event, but a null-by-spec future wire
+    /// change would otherwise silently produce a NullReferenceException when the projector reads it.
     /// </summary>
-    public required FrigateEventObject Before { get; init; }
+    public FrigateEventObject? Before { get; init; }
 
     /// <summary>
-    /// The state of the detected object after this event update.
+    /// The state of the detected object after this event update. Defensively nullable, same rationale as <see cref="Before"/>.
     /// </summary>
-    public required FrigateEventObject After { get; init; }
+    public FrigateEventObject? After { get; init; }
 }
