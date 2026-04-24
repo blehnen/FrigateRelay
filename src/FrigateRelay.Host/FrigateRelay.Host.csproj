@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <RootNamespace>FrigateRelay.Host</RootNamespace>
+    <AssemblyName>FrigateRelay.Host</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>9a7f6e02-3c8b-4d2e-9b17-afb4c6e03a10</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- appsettings.Local.json is an optional developer-only override; never committed. -->
+    <Content Include="appsettings.Local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Local.json')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Worker SDK does not pull in Hosting transitively without this explicit reference. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
+    <!-- UserSecrets support is not transitively exposed by the Worker SDK; pull it explicitly. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
