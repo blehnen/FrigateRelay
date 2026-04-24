@@ -88,3 +88,21 @@
   - Builder agents truncate on 30+ tool-use runs; consider a "checkpoint after each task + commit" style to make resumption cheap.
   - WSL `timeout --signal=SIGINT` does not propagate through `dotnet run`; use `pgrep | kill -INT` or publish self-contained.
 - Checkpoint tags: `pre-build-phase-1`, `post-build-phase-1`.
+
+## 2026-04-24 — Phase 2 planned (`/shipyard:plan 2`)
+
+- **5 decisions captured** in `CONTEXT-2.md`:
+  - D1 — Mirror DotNetWorkQueue's CI topology (GH Actions `ci.yml` + `secret-scan.yml` + `dependabot.yml` for fast PR gating; `Jenkinsfile` for coverage on self-hosted Jenkins). User-confirmed after surveying DNWQ's actual 68-line `ci.yml` / 385-line `Jenkinsfile` split at `F:\Git\DotNetWorkQueue`.
+  - D2 — Test invocation is `dotnet run --project tests/<project> -c Release` in GH, same + `-- --coverage --coverage-output-format cobertura` on Jenkins (.NET 10 SDK blocks `dotnet test` against MTP).
+  - D3 — Defer graceful-shutdown smoke to Phase 4 Testcontainers integration tests. GH matrix Windows parity for a SIGINT dance isn't worth the complexity.
+  - D4 — Secret-scan tripwire has a self-test job against a committed fixture (`.github/secret-scan-fixture.txt`). Ongoing regex-drift detection without manual one-shot poison-branch verification.
+  - D5 — Dependabot covers `nuget` + `github-actions` ecosystems (not `docker` — Phase 10).
+- **Researcher** produced `RESEARCH.md` with MTP code-coverage CLI flags, `setup-dotnet@v4` + `global-json-file` cookbook, Dependabot v2 schema template, scripted Jenkinsfile skeleton adapted from DNWQ, 7-pattern secret-scan regex set with FP risk assessment, fixture draft, DNWQ-copy/don't-copy list. Flagged 6 open questions for the architect.
+- **Architect** resolved all 6 open questions inline and produced 4 plans across 3 waves:
+  - Wave 1: `PLAN-1.1` Dependabot; `PLAN-1.2` secret-scan workflow + fixture + self-test. Parallel-safe.
+  - Wave 2: `PLAN-2.1` GH Actions `ci.yml` (matrix ubuntu+windows, setup-dotnet@v4, build + `dotnet run` per test project, no coverage).
+  - Wave 3: `PLAN-3.1` `Jenkinsfile` (scripted, Docker `sdk:10.0`, MTP cobertura per project, workspace-local NuGet cache, modern Coverage plugin `recordCoverage`).
+- **Verifier (spec-compliance)**: **READY** — all ROADMAP Phase 2 deliverables owned, all 5 decisions honored, all plan structural rules met.
+- **Verifier (feasibility critique)**: **READY** with one caveat carried forward to PLAN-3.1 builder: MSTest 4.2.1's MTP code-coverage extension writes output XML to `TestResults/coverage/*.cobertura.xml` subdirectories of each test project's assembly output path — NOT the `--coverage-output` path the researcher initially assumed. Jenkinsfile archive glob needs to be `tests/**/TestResults/coverage/**/*.cobertura.xml` or a post-test copy step. Critic actually ran the MTP CLI on this machine to confirm.
+- Zero revision cycles needed.
+- Checkpoint tag: `post-plan-phase-2`.
