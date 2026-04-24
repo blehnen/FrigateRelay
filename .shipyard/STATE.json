@@ -1,7 +1,7 @@
 {
   "phase": 3,
-  "position": "Building phase 3 — wave 1 (parallel)",
-  "status": "building",
-  "message": "pre-build-phase-3 tagged. Baseline: 17 tests (10 Abstractions + 7 Host). Dispatching PLAN-1.1 (Frigate DTOs) and PLAN-1.2 (matcher + dedupe in Host) in parallel.",
+  "position": "Phase 3 build complete",
+  "status": "complete",
+  "message": "Frigate MQTT ingestion, matcher, dedupe, EventPump all landed. 44 tests (10+16+18), graceful shutdown OK. 4 phase-close gates clear; audit + simplifier + documenter findings deferred per user choice. Ready for /shipyard:plan 4.",
   "updated_at": "2026-04-24T00:00:00Z"
 }

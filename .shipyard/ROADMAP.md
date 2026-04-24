@@ -96,7 +96,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 3 — Frigate MQTT Ingestion and EventContext Projection
+## Phase 3 — Frigate MQTT Ingestion and EventContext Projection — **COMPLETE (2026-04-24)**
+
+**Status.** Frigate MQTT plugin shipped (MQTTnet v5, custom reconnect, channel bridge, per-client TLS). Host-side `EventPump` + `SubscriptionMatcher` + `DedupeCache` wired. CI consolidated via `.github/scripts/run-tests.sh` (discharges Phase 2 advisory). 44 tests pass. Graceful shutdown verified. Reports under `.shipyard/phases/3/`. Deviations from legacy: D1 fire-all-matching, D5 false_positive skip — both flagged for Phase 12 parity docs.
 
 **Goal.** Subscribe to `frigate/events`, project payloads into `EventContext`, apply subscription matching and per-camera+label dedupe. No downstream actions yet — events terminate at a logged "matched" message.
 

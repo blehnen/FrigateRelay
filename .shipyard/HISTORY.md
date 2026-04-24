@@ -146,3 +146,30 @@
 - Architect also consolidates CI: extracts `.github/scripts/run-tests.sh` used by both `ci.yml` and `Jenkinsfile` — addresses the Phase 2 advisory about hard-coded test-project lists now that Phase 3 adds a third test project.
 - Other architect decisions: single shared `FrigateEventObject` record (DRY per OQ3), union all four zone arrays into `EventContext.Zones` during projection (OQ4), `PlaceholderWorker` removed in favor of `EventPump`.
 - Checkpoint tag: `post-plan-phase-3`.
+
+## 2026-04-24 — Phase 3 built (`/shipyard:build 3`)
+
+- **Wave 1 (parallel)** — PLAN-1.1 Frigate DTOs (6 tests) + PLAN-1.2 matcher/dedupe in Host (9 tests). Both reviewed with Important findings applied in-place:
+  - PLAN-1.1 R1: `FrigateEvent.Before/After` required-non-nullable → defensive nullable; tests updated to `evt!.After!.X` pattern.
+  - PLAN-1.1 R2: `FrigateJsonOptions.Default` sealed via `MakeReadOnly(populateMissingResolver: true)` (plain `MakeReadOnly()` throws on .NET 10 without a TypeInfoResolver).
+  - PLAN-1.2 R1: `DedupeCache.TryEnter` TOCTOU race → single-lock serialisation.
+- **Wave 2 (PLAN-2.1)** — EventContextProjector (7 tests), FrigateMqttEventSource (5 tests), PluginRegistrar. Plain `IMqttClient` + custom 5s reconnect loop (MQTTnet v5 has no ManagedMqttClient). Channel<EventContext> unbounded bridge. Per-client TLS via `WithTlsOptions`.
+- **Wave 3 (PLAN-3.1)** — EventPump `BackgroundService` wiring `IEnumerable<IEventSource>`, DedupeCache, HostSubscriptionsOptions, Program.cs rewrite, PlaceholderWorker removal, `.github/scripts/run-tests.sh` consolidation (2 Host tests).
+- **Two real bugs found and fixed during Phase 3 build**:
+  - `PluginRegistrarRunner.RunAll` was moved AFTER `builder.Build()` by Phase 1's simplification. Registrars mutate `builder.Services`, which has no effect on an already-built provider. With Phase 1's empty registrar list this was latent; Phase 3's real registrar would have silently dropped plugin registration. **Fixed**: moved back to pre-Build with a minimal bootstrap LoggerFactory; inline comment warns future contributors.
+  - `FrigateMqttEventSource.DisposeAsync` threw `ObjectDisposedException` during host shutdown because the linked CTS was cancelled against an already-disposed source token. **Fixed**: `Interlocked.Exchange` idempotency guard + targeted `catch (ObjectDisposedException)` wrappers. Exposed by the graceful-shutdown smoke test, not by any unit test.
+- **Builder agent truncation** was pervasive in Phase 3 (Wave 1 ×2, Wave 2 ×1, Wave 3 partially). Orchestrator completed each task inline. Two Important reviewer findings were applied by the orchestrator. All 13 Phase-3 commits are atomic; git history is clean.
+- **44 tests pass** (10 Abstractions + 16 Host + 18 Sources.FrigateMqtt). Phase-3 new tests: 29 (≥15 gate; +93% cushion).
+- **Graceful shutdown smoke (no broker)**: exit 0; log shows "Application is shutting down..." → "Event pump stopped for source=FrigateMqtt" → "MQTT disconnected".
+- **CI shared `run-tests.sh` discharges Phase-2 advisory.** Script auto-discovers test projects; a future test project needs zero workflow edit. Canonical-path fallback copy handles the MTP `--coverage-output` WSL/container divergence.
+- **Phase 3 gate results**:
+  - Verifier: **COMPLETE** — all ROADMAP criteria met, all D1–D5 honored, zero Abstractions diff.
+  - Auditor: **PASS / Low** — 5 advisory notes (MQTT creds later, unbounded channel acceptable, CancellationToken.None usage intentional, NuGet lockfile suggestion, no CVEs in MQTTnet 5.1.0.1559).
+  - Simplifier: 3 Medium + 3 Low. User deferred both Med items (DisposeAsync triple catches, HostSubscriptionsOptions wrapper) — the wrapper is intentionally preserved for Phase 8 expansion.
+  - Documenter: 3 HIGH + 2 MEDIUM + 1 LOW CLAUDE.md gaps. User deferred all to **Phase 11 OSS polish**. SUMMARY-3.1 captures the facts for ship-time lessons extraction.
+- **Lessons-learned drafts** (for `/shipyard:ship`):
+  - Phase-1 simplifications can be latent bugs — the `RunAll`-after-`Build()` trap was invisible until Phase 3 added a real registrar. Inline comments about ordering invariants are cheap insurance.
+  - MQTT ecosystem moves fast — ROADMAP wrote "`ManagedMqttClient`" assuming MQTTnet v4; v5 removed it. Always cross-check ROADMAP product references at phase start.
+  - Environment divergence (WSL vs SDK container): `--coverage-output` is honored in one and not the other. Scripts that paper over this become the right shape.
+  - Graceful shutdown paths need real smoke tests — the `ObjectDisposedException` in `DisposeAsync` would never have been caught by unit tests; it took a `pgrep | kill -INT` end-to-end run to surface.
+- Checkpoint tags: `pre-build-phase-3`, `post-build-phase-3`.
