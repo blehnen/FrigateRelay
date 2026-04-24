@@ -433,3 +433,17 @@ FodyWeavers.xsd
 
 # Shipyard worktrees (isolated feature branches)
 .worktrees/
+
+# .NET build output (plain top-level)
+bin/
+obj/
+
+# Test results
+TestResults/
+coverage.cobertura.xml
+
+# JetBrains Rider / IntelliJ
+.idea/
+
+# Local developer overrides (never commit secrets)
+appsettings.Local.json
