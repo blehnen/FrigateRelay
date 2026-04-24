@@ -1,0 +1,53 @@
+# .github/dependabot.yml
+#
+# Dependabot version updates for FrigateRelay.
+#
+# Scope (D5 decision): nuget + github-actions ecosystems only.
+# docker ecosystem is intentionally excluded until Phase 10 adds the Dockerfile.
+#
+# MSTest.Sdk version is managed via global.json msbuild-sdks key; Dependabot
+# cannot currently update MSBuild SDK versions in global.json
+# (dependabot-core#12824 / dependabot-core#8615). Update MSTest.Sdk manually
+# when needed — see ROADMAP Phase 2 notes. This limitation does NOT apply to
+# the MSTest PackageReference (uses Microsoft.NET.Sdk, not MSTest.Sdk), which
+# Dependabot updates normally.
+#
+# FluentAssertions is pinned to <=6.12.2 (Apache-2.0). Version 7+ switched to
+# a commercial license; upgrading is prohibited by the MIT license constraint
+# in PROJECT.md. The ignore rule below prevents Dependabot from proposing any
+# upgrade to 7.0.0 or higher.
+version: 2
+updates:
+  # ── NuGet ────────────────────────────────────────────────────────────────────
+  # Updates PackageReference entries in all *.csproj files under the repo root.
+  # Does NOT use centralized Directory.Packages.props (not in use for this repo).
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Group lockstep families into one PR each to reduce noise.
+    groups:
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+      mstest:
+        patterns:
+          - "MSTest*"
+          - "Microsoft.Testing.*"
+    ignore:
+      # FluentAssertions 7+ is commercial-licensed; MIT constraint forbids upgrade.
+      # Pin to <=6.12.2 forever. See PROJECT.md Constraints section.
+      - dependency-name: "FluentAssertions"
+        versions: [">= 7.0.0"]
+
+  # ── GitHub Actions ───────────────────────────────────────────────────────────
+  # Updates uses: lines in .github/workflows/*.yml files.
+  # Dependabot searches /.github/workflows automatically when directory is "/".
+  # Workflows don't exist yet (PLAN-1.2 / PLAN-2.1 create them); Dependabot
+  # will go idle until workflow files arrive — this is expected behavior.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
