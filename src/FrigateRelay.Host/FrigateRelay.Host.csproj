@@ -18,6 +18,8 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
     <!-- UserSecrets support is not transitively exposed by the Worker SDK; pull it explicitly. -->
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.7" />
+    <!-- IMemoryCache / MemoryCache used by DedupeCache; keyed singleton wired by PLAN-3.1. -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
   </ItemGroup>
 
   <ItemGroup>
