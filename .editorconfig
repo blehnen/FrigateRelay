@@ -23,3 +23,11 @@ trim_trailing_whitespace = false
 # Drive unused-using cleanup across the solution
 [*.cs]
 dotnet_diagnostic.IDE0005.severity = warning
+
+# Test code relaxes naming + doc-file-dependent rules:
+#   CA1707 — DAMP-style underscore naming is the standard test convention.
+#   IDE0005 — requires GenerateDocumentationFile=true to run reliably; enabling
+#             XML doc files for test assemblies is not worth the noise.
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.IDE0005.severity = none

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,7 @@ public sealed class PluginRegistrationContext
     /// <summary>Initializes a new <see cref="PluginRegistrationContext"/> with the supplied service collection and configuration.</summary>
     /// <param name="services">The host's service collection. Must not be <see langword="null"/>.</param>
     /// <param name="configuration">The host's configuration. Must not be <see langword="null"/>.</param>
+    [SetsRequiredMembers]
     public PluginRegistrationContext(IServiceCollection services, IConfiguration configuration)
     {
         Services = services ?? throw new ArgumentNullException(nameof(services));
