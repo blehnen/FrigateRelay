@@ -113,9 +113,15 @@ These encode the PROJECT.md decisions. Violating any of them is a regression fro
 
 ## CI
 
-- `.github/workflows/build.yml` — matrix: `windows-latest` + `ubuntu-latest`. Runs restore, build `-c Release`, test with coverage + trx. Patterned on the author's `F:\Git\DotNetWorkQueue\.github\workflows` (consult when editing).
-- `.github/workflows/secret-scan.yml` — greps for secret shapes; any hit fails the job.
-- `.github/workflows/release.yml` — on tag `v*`, builds multi-arch (`linux/amd64`, `linux/arm64`) and pushes to `ghcr.io/<owner>/frigaterelay`.
+**Split architecture** (decision D1 from Phase 2 CONTEXT-2.md, mirrors DotNetWorkQueue's topology): GitHub Actions is the fast PR gate; Jenkins runs coverage. **Do not add coverage to `ci.yml`** — coverage lives in `Jenkinsfile` exclusively. A future agent adding `--coverage` flags to the GH workflow would silently duplicate Jenkins's job and break the intentional separation.
+
+- `.github/workflows/ci.yml` — PR gate. Matrix `[ubuntu-latest, windows-latest]`. `actions/setup-dotnet@v4` with `global-json-file: global.json`. Build + tests only (`dotnet run --project tests/<project> -c Release --no-build`); **no coverage, no TRX, no artifact upload**. `shell: bash` on test steps for Windows Git Bash consistency. Concurrency group cancels obsolete runs on force-push.
+- `.github/workflows/secret-scan.yml` — two jobs: `scan` greps the tree (excluding `.shipyard/`, `CLAUDE.md`, and the fixture file) for secret-shaped patterns; `tripwire-self-test` greps **only** `.github/secret-scan-fixture.txt` and fails if any pattern does NOT match — proves the regex set still detects the shapes it's supposed to. If you change a pattern in `.github/scripts/secret-scan.sh`, you MUST add a matching fixture line, or the tripwire will silently rot.
+- `.github/dependabot.yml` — nuget + github-actions, weekly Monday. FluentAssertions hard-pinned (`ignore: versions [">= 7.0.0"]`) — license-critical, do not remove. MSBuild SDKs are not watched (we use `Microsoft.NET.Sdk`, no `msbuild-sdks` block).
+- `Jenkinsfile` — coverage pipeline. Scripted. Docker agent `mcr.microsoft.com/dotnet/sdk:10.0` (tag-pinned — digest pin + Dependabot `docker` ecosystem deferred to Phase 10). Workspace-local NuGet cache (`--packages .nuget-cache`). MTP coverage extension: `dotnet run --project tests/<project> -c Release --no-build -- --coverage --coverage-output-format cobertura --coverage-output coverage/<project>.cobertura.xml`. **The explicit `--coverage-output <path>` flag IS honored inside the SDK container** (verified Phase 2) — archive with `coverage/**/*.cobertura.xml`, no `TestResults/` glob needed.
+- `.github/workflows/release.yml` — planned for Phase 10 (multi-arch Docker build + GHCR push on tag `v*`). Not present yet.
+
+**When adding a new test project**: append a `dotnet run --project ...` step to `ci.yml` AND a mirrored `sh 'dotnet run ... -- --coverage ...'` step to `Jenkinsfile`. Both files currently hard-code the two test projects. When a third project lands (Phase 3), the architect should consider extracting a shared `.github/scripts/run-tests.sh` script driven by `find tests/*.Tests` (Rule of Three — not worth it for two occurrences).
 
 ## Deliberately excluded
 

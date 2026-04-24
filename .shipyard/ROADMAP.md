@@ -70,7 +70,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 2 — CI Skeleton
+## Phase 2 — CI Skeleton — **COMPLETE (2026-04-24)**
+
+**Status.** 6 deliverables shipped: `.github/dependabot.yml`, `.github/workflows/ci.yml`, `.github/workflows/secret-scan.yml`, `.github/scripts/secret-scan.sh`, `.github/secret-scan-fixture.txt`, `Jenkinsfile`. All 4 reviewers PASS (PLAN-1.2 had 1 minor → fixed in `579126e`). Post-phase gates clear. Reports: `.shipyard/phases/2/{VERIFICATION.md, results/{AUDIT-2.md, SIMPLIFICATION-2.md, DOCUMENTATION-2.md, SUMMARY-*.md, REVIEW-*.md}}`.
 
 **Goal.** GitHub Actions pipeline that builds and tests on every push, matching the `DotNetWorkQueue` workflow pattern, plus a committed-secrets tripwire.
 

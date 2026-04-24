@@ -447,3 +447,6 @@ coverage.cobertura.xml
 
 # Local developer overrides (never commit secrets)
 **/appsettings.Local.json
+
+# Workspace-local NuGet cache (Jenkinsfile uses `dotnet restore --packages .nuget-cache`)
+.nuget-cache/

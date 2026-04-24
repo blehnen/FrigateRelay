@@ -44,8 +44,6 @@ updates:
   # ── GitHub Actions ───────────────────────────────────────────────────────────
   # Updates uses: lines in .github/workflows/*.yml files.
   # Dependabot searches /.github/workflows automatically when directory is "/".
-  # Workflows don't exist yet (PLAN-1.2 / PLAN-2.1 create them); Dependabot
-  # will go idle until workflow files arrive — this is expected behavior.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
