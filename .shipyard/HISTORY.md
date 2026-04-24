@@ -43,3 +43,30 @@
 - Git strategy is **manual**; repo is not a git repo. No commit created.
 - Deferred decisions surfaced (documented in ROADMAP Questions appendix): Alpine vs Debian-slim base image (decided in Phase 10); `/healthz` transport (minimal API vs raw TCP, decided in Phase 10).
 - Open workflow question: FrigateRelay greenfield will live in a separate folder (likely `/mnt/f/git/FrigateRelay/`). The physical target location will be decided at the first `/shipyard:plan` step.
+
+## 2026-04-24 — CLAUDE.md written (`/init`)
+
+- Root `CLAUDE.md` created, derived from `.shipyard/PROJECT.md` + `ROADMAP.md`. Captures architecture invariants, planned repo shape, commands, testing stack, and the "deliberately excluded" list (DotNetWorkQueue, App.Metrics, OpenTracing, SharpConfig, Topshelf, Newtonsoft.Json).
+- User appended a "Project Instructions" note pinning Context7 MCP for library/API docs lookups.
+
+## 2026-04-24 — Phase 1 planned (`/shipyard:plan 1`)
+
+- Working directory: `/mnt/f/git/FrigateRelay/` (git repo, branch `Initcheckin`). Physical target location resolved.
+- Discussion capture: 4 decisions recorded in `.shipyard/phases/1/CONTEXT-1.md`:
+  - **D1** — `PluginRegistrationContext` carries `IServiceCollection` + `IConfiguration`.
+  - **D2** — Phase 1 uses M.E.L. console provider only (Serilog + OTel deferred to Phase 9).
+  - **D3** — `Verdict` uses static factories (`Pass()` / `Pass(score)` / `Fail(reason)`) with non-public ctor.
+  - **D4** — `global.json` pins `10.0.203` with `rollForward: latestFeature`.
+- Researcher agent produced `.shipyard/phases/1/RESEARCH.md`: .NET 10.0.203 SDK (2026-04-21), MSTest 4.2.1 (2026-04-07), FluentAssertions 6.12.2 (license-safe, works on net10.0), NSubstitute 5.3.0. Flagged 4 open questions for the architect.
+- Architect resolved all 4 open questions inline in the plans:
+  - MSTest `PackageReference` (not `MSTest.Sdk` project SDK) — Dependabot can update PackageReferences but not `msbuild-sdks`.
+  - `TreatWarningsAsErrors` applied globally incl. tests; per-project `<NoWarn>` is the escape valve.
+  - `appsettings.Local.json` copied via explicit `<Content CopyToOutputDirectory="PreserveNewest" Condition="Exists(...)">`.
+  - `UserSecretsId` hard-coded to a stable GUID (`9a7f6e02-3c8b-4d2e-9b17-afb4c6e03a10`) for contributor consistency.
+- 3 plans written across 3 waves (linear chain, 1 plan per wave):
+  - **Wave 1 — PLAN-1.1** Repo Tooling and Empty Solution.
+  - **Wave 2 — PLAN-2.1** `FrigateRelay.Abstractions` and Contract-Shape Tests.
+  - **Wave 3 — PLAN-3.1** `FrigateRelay.Host`, Registrar Loop, and Host Tests.
+- Verifier (spec-compliance): **READY** — all Phase 1 ROADMAP deliverables owned by exactly one plan, 4 CONTEXT decisions honored, 13 planned tests exceed the ≥6 gate. Report: `.shipyard/phases/1/VERIFICATION.md`.
+- Verifier (feasibility critique): **READY** — no cross-wave forward references, verify commands valid on Linux + Windows, three minor risks flagged (NSubstitute.Analyzers + WAE warnings, `appsettings.Local.json` copy behavior, Windows SIGINT parity) all with documented mitigations. Report: `.shipyard/phases/1/CRITIQUE.md`.
+- Zero revision cycles needed.
