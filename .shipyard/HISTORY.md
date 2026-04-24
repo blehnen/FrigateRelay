@@ -122,3 +122,27 @@
   - **DotNetWorkQueue's CI split is a good template** (GH for PR gate, Jenkins for coverage). The structural pattern survives the .NET 8 → .NET 10 transition; only the test-invocation shape (`dotnet run` not `dotnet test`) needs adapting.
   - **Reviewer agent does not self-persist REVIEW-*.md files**; the orchestrator must write them from the inline report. Consider adjusting the reviewer agent's system prompt in Shipyard config (flagged in Phase 1 history, still unresolved).
 - Checkpoint tags: `pre-build-phase-2`, `post-build-phase-2`.
+
+## 2026-04-24 — Phase 3 planned (`/shipyard:plan 3`)
+
+- **Discussion capture** produced CONTEXT-3.md with 5 decisions, **updated mid-planning** after researcher findings:
+  - **D1** — Fire ALL matching subscriptions (deviates from legacy first-match-wins; flagged for Phase 12 parity docs).
+  - **D2** — Keep `string RawPayload` (no contract change — YAGNI).
+  - **D3** — **Revised** from "extract base64 thumbnail" to **no-op returning null**. Researcher found Frigate's `thumbnail` in `frigate/events` is always null per official docs; thumbnails are on separate per-camera MQTT topics. `SnapshotFetcher` on `EventContext` is flagged for simplifier review at Phase 5 (may be removed from contract).
+  - **D4** — Defer Testcontainers to Phase 4; Phase 3 is unit tests only.
+  - **D5** — **Added** a `false_positive` skip alongside the stationary guard. Small deviation from legacy; flagged for Phase 12 docs.
+  - Correction: `ManagedMqttClient` doesn't exist in MQTTnet v5 — use plain `IMqttClient` + custom 5s reconnect loop.
+- **Researcher** produced RESEARCH.md (638 lines): MQTTnet v5 cookbook (correct v5 APIs, TLS via `WithTlsOptions`), Frigate payload schema with annotated samples, DTO templates, `Channel<T>` push→pull pattern, .NET 10 keyed-singleton `IMemoryCache` (Option A), EventPump `BackgroundService` recommendation. Flagged 5 open questions (D3 reality check, false-positive filter, DTO record shape, zones aggregation, ManagedMqttClient correction).
+- **Architect** produced 4 plans; flagged self as potentially speculative about two new interfaces.
+- **Spec verifier**: PASS. **Critique verifier**: CAUTION — two new abstractions `ISubscriptionProvider` + `IEventMatchSink` in `FrigateRelay.Abstractions` judged as YAGNI over-abstraction.
+- **User chose revision cycle.** Architect rewrote all 4 plans:
+  - `FrigateRelay.Abstractions` receives **zero new types** — the assembly's surface does not widen in Phase 3.
+  - `SubscriptionMatcher`, `DedupeCache`, `SubscriptionOptions`, `HostSubscriptionsOptions` moved from plugin to `src/FrigateRelay.Host/Matching/` and `src/FrigateRelay.Host/Configuration/`. Matcher + dedupe are universal across any future `IEventSource` (camera/label/zone are on `EventContext` top-level).
+  - `FrigateMqttOptions` becomes transport-only (no `Subscriptions` member).
+  - `Subscriptions` config binds from a **top-level** section (matches Phase 8 Profiles+Subscriptions shape).
+  - `EventPump` takes 4 DI deps: `IEnumerable<IEventSource>`, `DedupeCache`, `IOptions<HostSubscriptionsOptions>`, `ILogger<EventPump>`. Calls static `SubscriptionMatcher` directly.
+- **Post-revision re-verification**: both verdicts READY. Residual concerns are mechanical (MQTTnet v5 method-signature validation at Wave 2 start; startup race documented as mitigated by unbounded channel).
+- **Test count plan**: PLAN-1.1=6, PLAN-1.2=9, PLAN-2.1=11, PLAN-3.1=2 → 28 total (≥15 gate, +87% cushion).
+- Architect also consolidates CI: extracts `.github/scripts/run-tests.sh` used by both `ci.yml` and `Jenkinsfile` — addresses the Phase 2 advisory about hard-coded test-project lists now that Phase 3 adds a third test project.
+- Other architect decisions: single shared `FrigateEventObject` record (DRY per OQ3), union all four zone arrays into `EventContext.Zones` during projection (OQ4), `PlaceholderWorker` removed in favor of `EventPump`.
+- Checkpoint tag: `post-plan-phase-3`.
