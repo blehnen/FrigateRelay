@@ -24,6 +24,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <!--
+      Program.cs (composition root) directly `new`s plugin registrars per Approach A (build-time DI).
+      The rest of the Host assembly (EventPump, SubscriptionMatcher, DedupeCache) depends only on
+      Abstractions. A future AssemblyLoadContext-based loader (Phase "B") would replace these
+      direct references with runtime discovery against a plugins/ folder.
+    -->
+    <ProjectReference Include="..\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

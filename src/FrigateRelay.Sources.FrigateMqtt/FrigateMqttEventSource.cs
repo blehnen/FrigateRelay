@@ -59,6 +59,7 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     private Task? _reconnectTask;
     private CancellationTokenSource? _loopCts;
     private int _started;
+    private int _disposed;
 
     /// <summary>Creates the event source with the supplied client, factory, options, and logger.</summary>
     public FrigateMqttEventSource(
@@ -185,19 +186,27 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     /// <summary>Test-accessible channel reader. Do NOT use in production code — use <see cref="ReadEventsAsync"/>.</summary>
     internal ChannelReader<EventContext> InternalReader => _channel.Reader;
 
-    /// <summary>Completes the channel writer and disconnects the MQTT client cleanly.</summary>
+    /// <summary>Completes the channel writer and disconnects the MQTT client cleanly. Idempotent.</summary>
     public async ValueTask DisposeAsync()
     {
-        if (_loopCts is { } cts)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        var cts = Interlocked.Exchange(ref _loopCts, null);
+        if (cts is not null)
         {
-            await cts.CancelAsync().ConfigureAwait(false);
+            try { await cts.CancelAsync().ConfigureAwait(false); }
+            catch (ObjectDisposedException) { /* source token already torn down by host shutdown */ }
+
             try
             {
                 if (_reconnectTask is { } t)
                     await t.ConfigureAwait(false);
             }
             catch (OperationCanceledException) { }
-            cts.Dispose();
+            catch (ObjectDisposedException) { }
+
+            try { cts.Dispose(); } catch (ObjectDisposedException) { }
         }
 
         _channel.Writer.TryComplete();

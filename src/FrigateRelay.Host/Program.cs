@@ -1,17 +1,8 @@
-// Design note — registrar discovery shape:
-// The plan considered two approaches:
-//   A) Reflect over ServiceDescriptors after each AddPluginRegistrar<T>() call and instantiate
-//      any ImplementationType via Activator.CreateInstance at composition time.
-//   B) Keep an explicit, typed list of IPluginRegistrar instances and pass them to
-//      PluginRegistrarRunner.RunAll() before builder.Build().
-//
-// Approach B is used here.  In Phase 1 there are no concrete plugins yet, so the list is empty;
-// future phases add their IPluginRegistrar instances to the list and the loop picks them up
-// automatically.  Approach B avoids runtime reflection over the ServiceDescriptor graph and is
-// fully AOT-compatible.
-
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host;
+using FrigateRelay.Host.Configuration;
+using FrigateRelay.Host.Matching;
+using Microsoft.Extensions.Caching.Memory;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -26,24 +17,31 @@ var builder = Host.CreateApplicationBuilder(args);
 // Only #3 needs an explicit AddJsonFile call; the rest are provided by CreateApplicationBuilder.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
 
-// Construct the shared registrar context — all registrars receive the same instance.
-// In Phase 1 no concrete plugins exist; the list is empty. Phase 3+ plugins add their
-// IPluginRegistrar instances here (or via a future AddPluginRegistrar helper).
-var registrationContext = new PluginRegistrationContext(builder.Services, builder.Configuration);
-IEnumerable<IPluginRegistrar> registrars = [];
+// ── Host-scope services (matcher uses no DI; register the cache, dedupe, options binding) ──
+// Top-level "Subscriptions" section binds to HostSubscriptionsOptions.Subscriptions.
+// This matches Phase 8's Profiles+Subscriptions shape (subscriptions are host-level, not plugin-level).
+builder.Services.AddOptions<HostSubscriptionsOptions>()
+    .Bind(builder.Configuration);
 
-builder.Services.AddHostedService<PlaceholderWorker>();
+builder.Services.AddSingleton<IMemoryCache>(new MemoryCache(new MemoryCacheOptions()));
+builder.Services.AddSingleton<DedupeCache>();
+builder.Services.AddHostedService<EventPump>();
+
+// ── Plugin registrars (Approach B: explicit list; no reflection) ──
+// Registrars MUST run BEFORE builder.Build() so their service additions reach the built provider.
+// For the bootstrap logger we use a minimal LoggerFactory — the built host's logging
+// isn't available yet. One allocation, disposed right after; acceptable ceremony.
+var registrationContext = new PluginRegistrationContext(builder.Services, builder.Configuration);
+IEnumerable<IPluginRegistrar> registrars =
+[
+    new FrigateRelay.Sources.FrigateMqtt.PluginRegistrar(),
+];
+
+using (var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole()))
+{
+    var bootstrapLogger = bootstrapLoggerFactory.CreateLogger<IPluginRegistrar>();
+    PluginRegistrarRunner.RunAll(registrars, registrationContext, bootstrapLogger);
+}
 
 var app = builder.Build();
-
-// Run registrars AFTER Build() so we can pull ILogger from the built host's DI
-// instead of spinning a throwaway LoggerFactory. Registration mutates
-// builder.Services (captured by reference in registrationContext); this still
-// happens before RunAsync starts the host loop, so hosted services see the full
-// service graph.
-PluginRegistrarRunner.RunAll(
-    registrars,
-    registrationContext,
-    app.Services.GetRequiredService<ILogger<IPluginRegistrar>>());
-
 await app.RunAsync();
