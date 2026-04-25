@@ -27,23 +27,38 @@ cd "$REPO_ROOT"
 
 CONFIG="${CONFIG:-Release}"
 COVERAGE=0
-if [[ "${1:-}" == "--coverage" ]]; then
-  COVERAGE=1
-fi
+SKIP_INTEGRATION=false
+PASS_THROUGH_ARGS=()
 
-# Discover *.Tests csproj files directly under tests/<Name>/. Depth 2 so
-# we don't recurse into bin/ or obj/.
-mapfile -t PROJECTS < <(find tests -maxdepth 2 -name '*.Tests.csproj' -type f | sort)
+for arg in "$@"; do
+  case "$arg" in
+    --coverage)         COVERAGE=1 ;;
+    --skip-integration) SKIP_INTEGRATION=true ;;
+    *)                  PASS_THROUGH_ARGS+=("$arg") ;;
+  esac
+done
+
+# Discover *Tests.csproj files directly under tests/<Name>/. Depth 2 so
+# we don't recurse into bin/ or obj/. Matches both *.Tests.csproj and
+# *.IntegrationTests.csproj conventions.
+mapfile -t PROJECTS < <(find tests -maxdepth 2 -name '*Tests.csproj' -type f | sort)
 
 if [[ ${#PROJECTS[@]} -eq 0 ]]; then
-  echo "run-tests.sh: no test projects found under tests/*.Tests/" >&2
+  echo "run-tests.sh: no test projects found under tests/" >&2
   exit 2
 fi
 
-echo "run-tests.sh: discovered ${#PROJECTS[@]} test project(s); coverage=$COVERAGE; config=$CONFIG"
+echo "run-tests.sh: discovered ${#PROJECTS[@]} test project(s); coverage=$COVERAGE; skip-integration=$SKIP_INTEGRATION; config=$CONFIG"
 
 for proj in "${PROJECTS[@]}"; do
   name=$(basename "$(dirname "$proj")")
+
+  if [[ "$SKIP_INTEGRATION" == "true" && "$proj" == *FrigateRelay.IntegrationTests* ]]; then
+    echo ""
+    echo "Skipping integration test project: $proj"
+    continue
+  fi
+
   echo ""
   echo "── ${name} ──"
 
@@ -68,6 +83,6 @@ for proj in "${PROJECTS[@]}"; do
       fi
     fi
   else
-    dotnet run --project "$proj" -c "$CONFIG" --no-build
+    dotnet run --project "$proj" -c "$CONFIG" --no-build "${PASS_THROUGH_ARGS[@]}"
   fi
 done

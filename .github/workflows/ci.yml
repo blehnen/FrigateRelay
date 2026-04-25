@@ -51,6 +51,11 @@ jobs:
 
       - name: Test — all test projects
         shell: bash
-        # Shared script discovers tests/*.Tests/*.Tests.csproj automatically.
-        # Adding a new test project requires no workflow edits.
-        run: bash .github/scripts/run-tests.sh
+        # Windows runners cannot launch Linux containers (Testcontainers requirement),
+        # so integration tests are skipped on windows-latest. Linux leg runs all tests.
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            bash .github/scripts/run-tests.sh --skip-integration
+          else
+            bash .github/scripts/run-tests.sh
+          fi

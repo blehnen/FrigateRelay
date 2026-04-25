@@ -32,6 +32,14 @@ pipeline {
                     image 'mcr.microsoft.com/dotnet/sdk:10.0'
                     // No args override: NuGet cache is workspace-local (--packages .nuget-cache).
                     // No external Docker volume required on the Jenkins agent host (OQ4).
+                    //
+                    // PRECONDITION (Phase 4 — Testcontainers): the Jenkins agent host must mount
+                    // /var/run/docker.sock into this Docker SDK container so Testcontainers can
+                    // launch sibling containers (Mosquitto for FrigateRelay.IntegrationTests).
+                    // Configure with the agent's `args` directive:
+                    //   args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    // Without this, the integration suite fails at container start with
+                    // "Cannot connect to the Docker daemon at unix:///var/run/docker.sock".
                 }
             }
 
