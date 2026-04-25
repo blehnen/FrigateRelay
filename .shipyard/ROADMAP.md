@@ -127,6 +127,8 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ## Phase 4 — Action Dispatcher + BlueIris (First Vertical Slice)
 
+**Status:** complete_with_gaps (2026-04-25) — all 4 ROADMAP success criteria PASS; 71/71 tests across 5 suites; integration test passes in 4.3s (<30s SLO). 8 minor gaps tracked in `.shipyard/ISSUES.md` (ID-2 through ID-9), none blocking Phase 5. ID-5 resolved post-build. Security audit verdict: low_risk (3 advisory items, no critical/high).
+
 **Goal.** Channel-backed `IActionDispatcher`, resilience policies, and the first `IActionPlugin` (`BlueIris`) wired end-to-end so one MQTT event triggers one HTTP GET.
 
 **Dependencies.** Phase 3.
