@@ -3,6 +3,7 @@ using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host;
 using FrigateRelay.Host.Configuration;
+using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -47,7 +48,7 @@ public sealed class EventPumpTests
         };
         var source = new FakeSource("FrigateMqtt", new[] { context });
 
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), logger);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         // StartAsync invokes ExecuteAsync; awaiting StopAsync then awaits the running task.
@@ -87,7 +88,7 @@ public sealed class EventPumpTests
             SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
         };
         var source = new FakeSource("FrigateMqtt", new[] { Make("e1"), Make("e2") });
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), logger);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await pump.StartAsync(cts.Token);
@@ -99,6 +100,12 @@ public sealed class EventPumpTests
             .Where(e => e.Level == LogLevel.Information && e.Message.Contains("Matched event"))
             .Should().HaveCount(1,
                 "two events for the same (sub, camera, label) inside the cooldown window — only one should fire");
+    }
+
+    private sealed class NoOpDispatcher : IActionDispatcher
+    {
+        public static readonly NoOpDispatcher Instance = new();
+        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, CancellationToken ct) => ValueTask.CompletedTask;
     }
 
     private sealed class FakeSource : IEventSource
