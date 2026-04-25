@@ -13,4 +13,13 @@ public sealed record DispatcherOptions
     /// Default: 256.
     /// </summary>
     public int DefaultQueueCapacity { get; init; } = 256;
+
+    /// <summary>
+    /// Per-plugin channel capacity overrides, keyed by plugin name (OrdinalIgnoreCase).
+    /// When a plugin's name appears here its channel is created with this capacity instead of
+    /// <see cref="DefaultQueueCapacity"/>. Plugin registrars populate this via
+    /// <c>IOptions&lt;DispatcherOptions&gt;</c> post-configuration.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> PerPluginQueueCapacity { get; init; } =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 }

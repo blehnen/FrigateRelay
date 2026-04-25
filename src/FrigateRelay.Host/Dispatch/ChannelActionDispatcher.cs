@@ -31,9 +31,15 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             new EventId(11, "PluginNotRegistered"),
             "EnqueueAsync called for plugin={PluginName} which is not registered in the dispatcher.");
 
+    private static readonly Action<ILogger, string, string, Exception?> LogRetryExhausted =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(101, "DispatchRetryExhausted"),
+            "Dropped event_id={EventId} action={Action} after retry exhaustion. Downstream may be unhealthy.");
+
     private readonly List<IActionPlugin> _plugins;
     private readonly ILogger<ChannelActionDispatcher> _logger;
-    private readonly int _capacity;
+    private readonly DispatcherOptions _dispatcherOpts;
 
     private Dictionary<IActionPlugin, Channel<DispatchItem>> _channels = new();
     private readonly Dictionary<string, IActionPlugin> _actionsByName =
@@ -54,7 +60,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     {
         _plugins = plugins.ToList();
         _logger = logger;
-        _capacity = options.Value.DefaultQueueCapacity;
+        _dispatcherOpts = options.Value;
     }
 
     /// <inheritdoc />
@@ -67,7 +73,9 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         {
             _actionsByName[plugin.Name] = plugin;
 
-            var capacity = _capacity;
+            var capacity = _dispatcherOpts.PerPluginQueueCapacity.TryGetValue(plugin.Name, out var c)
+                ? c
+                : _dispatcherOpts.DefaultQueueCapacity;
             var channelOptions = new BoundedChannelOptions(capacity)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
@@ -140,27 +148,43 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     /// <inheritdoc />
     public void Dispose() => _stoppingCts.Dispose();
 
-    private static async Task ConsumeAsync(
+    private async Task ConsumeAsync(
         IActionPlugin plugin,
         ChannelReader<DispatchItem> reader,
         CancellationToken ct)
     {
         await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
         {
+            // Restore the producer-side Activity so OTel sees the channel hop as one logical trace.
+            using var dispatchActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                "ActionDispatch",
+                ActivityKind.Internal,
+                parentContext: item.Activity?.Context ?? default);
+
+            dispatchActivity?.SetTag("action", plugin.Name);
+            dispatchActivity?.SetTag("event_id", item.Context.EventId);
+
             try
             {
-                // PLAN-2.1 fills in: wrap in the Polly resilience pipeline with 3x retry (3s/6s/9s)
-                // and emit frigaterelay.dispatch.exhausted + LogWarning on final failure.
+                // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
+                // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
                 await plugin.ExecuteAsync(item.Context, ct).ConfigureAwait(false);
+                dispatchActivity?.SetStatus(ActivityStatusCode.Ok);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Graceful shutdown — exit the loop.
+                // Graceful shutdown — do not log, do not increment counter.
+                dispatchActivity?.SetStatus(ActivityStatusCode.Error, "Cancelled");
                 return;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // PLAN-2.1: emit frigaterelay.dispatch.exhausted counter + structured warning here.
+                DispatcherDiagnostics.Exhausted.Add(1,
+                    new KeyValuePair<string, object?>("action", plugin.Name));
+
+                LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
+                dispatchActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
+                // Do NOT rethrow — a poison item must not kill the consumer task.
             }
         }
     }
