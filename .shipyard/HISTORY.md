@@ -173,3 +173,42 @@
   - Environment divergence (WSL vs SDK container): `--coverage-output` is honored in one and not the other. Scripts that paper over this become the right shape.
   - Graceful shutdown paths need real smoke tests — the `ObjectDisposedException` in `DisposeAsync` would never have been caught by unit tests; it took a `pgrep | kill -INT` end-to-end run to surface.
 - Checkpoint tags: `pre-build-phase-3`, `post-build-phase-3`.
+
+## 2026-04-25 — Phase 4 planning started (`/shipyard:plan 4`)
+
+- Discussion capture (`CONTEXT-4.md`) recorded **7 decisions** before research dispatch:
+  - **D1** — Channel topology: per `IActionPlugin` (not shared, not per-(sub, action)). 2 consumer tasks per channel.
+  - **D2** — Subscription→action wiring: new `Actions: ["BlueIris"]` array on `SubscriptionOptions`. Empty = no fire (fail-safe). Unknown name = startup fail-fast (matches PROJECT.md S2).
+  - **D3** — BlueIris URL template: `{placeholder}` syntax with fixed allowlist (`{camera}`, `{label}`, `{event_id}`, `{score}`, `{zone}`). Unknown placeholder = startup fail-fast. Values URL-encoded.
+  - **D4** — Validators: empty `IReadOnlyList<IValidationPlugin>` parameter on dispatcher NOW (smooths Phase-7 diff; behavior identical to "no validators" in v1).
+  - **D5** — Default channel capacity: 256 (configurable per plugin via `BlueIrisOptions.QueueCapacity`). `BoundedChannelFullMode.DropOldest`. `SingleWriter = true` (EventPump is sole producer).
+  - **D6** — Drop telemetry: BOTH `frigaterelay.dispatch.drops` Meter counter (tagged `action`) AND `LogWarning` carrying event_id + action + capacity. Roadmap mandates both.
+  - **D7** — Polly v8: `AddResilienceHandler` on the named `HttpClient` (Microsoft-blessed pattern, NOT inline `ResiliencePipelineBuilder` in dispatcher). `HttpRetryStrategyOptions.DelayGenerator` returns 3/6/9-second fixed delays. Per-plugin TLS opt-in via `ConfigurePrimaryHttpMessageHandler` + `SocketsHttpHandler.SslOptions.RemoteCertificateValidationCallback`, gated by `AllowInvalidCertificates` flag.
+- Phase 4 directory scaffolded (`plans/`, `results/`).
+- Next: researcher agent dispatch (M.E.Resilience HttpRetryStrategyOptions surface, Testcontainers Mosquitto, WireMock.Net stub patterns, IHttpClientFactory + per-plugin TLS handler, Channel<T> drop-oldest semantics).
+
+## 2026-04-25 — Phase 4 planned (`/shipyard:plan 4`)
+
+- **Researcher agent truncated twice** at ~35-tool-use cap without writing `RESEARCH.md` (same pattern as Phase 1 builder Wave 2/3 truncations). Orchestrator completed inline using Microsoft Learn MCP + Context7 MCP — same fallback pattern that finished prior phases.
+- **Three high-value research findings corrected CONTEXT-4.md drafts:**
+  - **`Channel.CreateBounded<T>` has a built-in `itemDropped: Action<T>?` callback** — no `TryWrite` wrapper needed. Drop telemetry is one closure capture instead of a synchronisation-prone polling pattern.
+  - **Polly v8 `DelayGenerator.AttemptNumber` is zero-indexed for the first retry** — formula `3 * (AttemptNumber + 1)` produces 3/6/9s exactly. Documented in PLAN-2.1 Task 2 as a regression test.
+  - **CI scripts auto-discover via `find tests/*.Tests/*.Tests.csproj`** — adding `tests/FrigateRelay.IntegrationTests/` requires zero `run-tests.sh` / `Jenkinsfile` edits. Only the GH Actions Windows leg needs a `--skip-integration` flag (Testcontainers cannot run Linux containers on `windows-latest`).
+- **Architect** (opus) wrote 6 plan files in 18 tool uses (clean, no truncation). Resolved both RESEARCH.md open questions inline:
+  - **Q1**: Read `EventContext.cs`, found no `Score` property → dropped `{score}` from D3 allowlist. Final allowlist is `{camera}, {label}, {event_id}, {zone}`. Encoded as regression test in PLAN-1.2 Task 3 (`Parse_WithScorePlaceholder_ThrowsBecauseScoreIsNotInAllowlist`).
+  - **Q2**: Confirmed `frigaterelay.dispatch.exhausted` (tagged `action`) for retry-exhaustion telemetry, emitted from the consumer `catch` block in PLAN-2.1 Task 1. Distinct from queue-overflow `frigaterelay.dispatch.drops`.
+- **Wave structure (6 plans, 18 tasks):**
+  - **Wave 1** (parallel): PLAN-1.1 IActionDispatcher + DispatchItem + ChannelActionDispatcher skeleton; PLAN-1.2 BlueIris csproj + BlueIrisOptions + BlueIrisUrlTemplate.
+  - **Wave 2** (parallel): PLAN-2.1 dispatcher consumer body + Polly retries + retry-exhaustion telemetry; PLAN-2.2 BlueIrisActionPlugin + registrar (HttpClient + AddResilienceHandler + per-plugin TLS).
+  - **Wave 3** (parallel): PLAN-3.1 SubscriptionOptions.Actions[] + EventPump dispatch wiring + Program.cs registrar + startup fail-fast on unknown action names; PLAN-3.2 IntegrationTests project + MqttToBlueIris_HappyPath (Testcontainers + WireMock) + CI Windows-skip flag + Jenkinsfile doc-comment.
+- **Verifier (spec compliance)**: **READY** — all 13 ROADMAP deliverables owned, all 7 D1–D7 decisions honored, all CLAUDE.md invariants enforced via grep verification commands. 2 non-blocking caveats: PLAN-3.1 should gate BlueIris registrar on `Configuration.GetSection("BlueIris").Exists()`; PLAN-3.2's HostBootstrap extraction is a small ordering ripple if 3.1 ships first.
+- **Verifier (feasibility critique)**: **READY** — all modify-target files exist, no same-wave forward refs, ≥6 dispatcher tests + 1 integration test gates met. Top mitigated risks: Polly AttemptNumber off-by-one (test-encoded), Testcontainers on Windows runner (`--skip-integration` flag), parallel sln edits (standard git merge).
+- Zero revision cycles needed.
+- **Cross-cutting decisions captured for builder:**
+  - `IActionDispatcher` lives in `src/FrigateRelay.Host/Dispatch/`, NOT `Abstractions` (host-internal seam; plugins consume via DI).
+  - `DispatchItem` is `readonly record struct` with EventContext + IActionPlugin + IReadOnlyList<IValidationPlugin> + Activity? (cheap enqueue, no GC pressure).
+  - `ChannelActionDispatcher` implements `IHostedService` directly (NOT `BackgroundService`) — channel construction in `StartAsync`, drain in `StopAsync` after `Writer.Complete()`.
+  - Per-plugin queue capacity is read host-side from `BlueIris:QueueCapacity`, NOT inside the BlueIris plugin assembly (keeps `FrigateRelay.Plugins.BlueIris` free of any `FrigateRelay.Host` reference).
+  - `tests/FrigateRelay.Plugins.BlueIris.Tests/` is a NEW test project (matches per-source-project precedent from Phase 3).
+- Next: `/shipyard:build 4`.
+
