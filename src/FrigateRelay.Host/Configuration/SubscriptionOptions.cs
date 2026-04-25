@@ -38,4 +38,11 @@ public sealed record SubscriptionOptions
     /// Defaults to 60 seconds.
     /// </summary>
     public int CooldownSeconds { get; init; } = 60;
+
+    /// <summary>
+    /// Gets the list of action plugin names that fire for this subscription. Empty (default)
+    /// means no actions fire — fail-safe per CONTEXT-4 D2. Unknown plugin names cause startup
+    /// failure (PROJECT.md S2). Plugin name match is case-insensitive ordinal.
+    /// </summary>
+    public IReadOnlyList<string> Actions { get; init; } = Array.Empty<string>();
 }

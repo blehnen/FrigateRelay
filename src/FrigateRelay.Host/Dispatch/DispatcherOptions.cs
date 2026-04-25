@@ -20,6 +20,6 @@ public sealed record DispatcherOptions
     /// <see cref="DefaultQueueCapacity"/>. Plugin registrars populate this via
     /// <c>IOptions&lt;DispatcherOptions&gt;</c> post-configuration.
     /// </summary>
-    public IReadOnlyDictionary<string, int> PerPluginQueueCapacity { get; init; } =
+    public IReadOnlyDictionary<string, int> PerPluginQueueCapacity { get; set; } =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 }

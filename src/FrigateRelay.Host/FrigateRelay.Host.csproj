@@ -31,10 +31,12 @@
       direct references with runtime discovery against a plugins/ folder.
     -->
     <ProjectReference Include="..\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.BlueIris\FrigateRelay.Plugins.BlueIris.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="FrigateRelay.Host.Tests" />
+    <InternalsVisibleTo Include="FrigateRelay.IntegrationTests" />
   </ItemGroup>
 
 </Project>

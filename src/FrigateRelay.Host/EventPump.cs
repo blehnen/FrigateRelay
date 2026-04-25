@@ -1,5 +1,6 @@
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
+using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
 using Microsoft.Extensions.Options;
 
@@ -7,18 +8,12 @@ namespace FrigateRelay.Host;
 
 /// <summary>
 /// Background service that pumps events from every registered <see cref="IEventSource"/>,
-/// runs subscription matching, filters via <see cref="DedupeCache"/>, and logs one matched-event
-/// line per (sub, event) pair that passes both the matcher and dedupe.
+/// runs subscription matching, filters via <see cref="DedupeCache"/>, and dispatches each
+/// matched (sub, event) pair to the named action plugins via <see cref="IActionDispatcher"/>.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Wave 3 host integration. No actions are fired — Phase 4 adds the action dispatcher. For now,
-/// matched events terminate at a structured log line so manual smoke tests can verify the pipeline.
-/// </para>
-/// <para>
 /// Each <see cref="IEventSource"/> runs on its own pump task so a slow or stuck source does not
 /// starve others. Task teardown follows the stopping token; shutdown is orderly.
-/// </para>
 /// </remarks>
 internal sealed class EventPump : BackgroundService
 {
@@ -40,20 +35,32 @@ internal sealed class EventPump : BackgroundService
             new EventId(3, "PumpFaulted"),
             "Event pump faulted for source={Source}: {Error}");
 
+    private static readonly Action<ILogger, string, string, string, Exception?> LogDispatchEnqueued =
+        LoggerMessage.Define<string, string, string>(
+            LogLevel.Debug,
+            new EventId(4, "DispatchEnqueued"),
+            "Enqueued action={Action} subscription={Subscription} event_id={EventId}");
+
     private readonly List<IEventSource> _sources;
     private readonly DedupeCache _dedupe;
     private readonly IOptionsMonitor<HostSubscriptionsOptions> _subsMonitor;
+    private readonly IActionDispatcher _dispatcher;
+    private readonly Dictionary<string, IActionPlugin> _actionsByName;
     private readonly ILogger<EventPump> _logger;
 
     public EventPump(
         IEnumerable<IEventSource> sources,
         DedupeCache dedupe,
         IOptionsMonitor<HostSubscriptionsOptions> subsMonitor,
+        IActionDispatcher dispatcher,
+        IEnumerable<IActionPlugin> actionPlugins,
         ILogger<EventPump> logger)
     {
         _sources = sources.ToList();
         _dedupe = dedupe;
         _subsMonitor = subsMonitor;
+        _dispatcher = dispatcher;
+        _actionsByName = actionPlugins.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
         _logger = logger;
     }
 
@@ -77,9 +84,18 @@ internal sealed class EventPump : BackgroundService
                 var matches = SubscriptionMatcher.Match(context, subs);
                 foreach (var sub in matches)
                 {
-                    if (_dedupe.TryEnter(sub, context))
+                    if (!_dedupe.TryEnter(sub, context)) continue;
+                    LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
+
+                    foreach (var actionName in sub.Actions)
                     {
-                        LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
+                        // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
+                        // against registered plugins at startup. An IndexerKeyNotFoundException here
+                        // indicates a startup-validation bug — throw rather than silently drop.
+                        var plugin = _actionsByName[actionName];
+                        await _dispatcher.EnqueueAsync(
+                            context, plugin, Array.Empty<IValidationPlugin>(), ct).ConfigureAwait(false);
+                        LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
                     }
                 }
             }
