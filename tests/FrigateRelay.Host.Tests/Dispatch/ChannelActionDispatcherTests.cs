@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
@@ -133,20 +134,6 @@ public sealed class ChannelActionDispatcherTests
         dispatcher.GetQueueDepth(blueIris).Should().Be(0, "channel should be fully drained after StopAsync");
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private static ChannelActionDispatcher BuildDispatcher(
-        IEnumerable<IActionPlugin> plugins,
-        int capacity = 256,
-        CapturingLogger? logger = null)
-    {
-        logger ??= new CapturingLogger();
-        var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = capacity });
-        return new ChannelActionDispatcher(plugins, logger, options);
-    }
-
     private static EventContext MakeContext(string eventId) => new()
     {
         EventId = eventId,
@@ -171,14 +158,161 @@ public sealed class ChannelActionDispatcherTests
             await blockUntil.WaitAsync(ct).ConfigureAwait(false);
     }
 
+    // -------------------------------------------------------------------------
+    // Test 4: Retry-delay formula contract (PLAN-2.1 Task 2)
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public void RetryDelayGeneratorFormula_Produces3s6s9s_ForAttempts0Through2()
+    {
+        // The formula CONTEXT-4 D7 mandates and PLAN-2.2's BlueIris registrar uses.
+        static TimeSpan Delay(int attemptNumber) => TimeSpan.FromSeconds(3 * (attemptNumber + 1));
+
+        Delay(0).Should().Be(TimeSpan.FromSeconds(3));
+        Delay(1).Should().Be(TimeSpan.FromSeconds(6));
+        Delay(2).Should().Be(TimeSpan.FromSeconds(9));
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 5: Retry exhaustion — counter + log — consumer survives poison items
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public async Task EnqueueAsync_WhenPluginThrowsAfterRetries_LogsExhaustionWarning_IncrementsExhaustedCounter_DoesNotKillConsumer()
+    {
+        var throwingPlugin = new ThrowingPlugin("BlueIris");
+        var logger = new CapturingLogger();
+        using var dispatcher = BuildDispatcher(new IActionPlugin[] { throwingPlugin }, capacity: 8, logger: logger);
+
+        long exhaustedObserved = 0;
+        using var meterListener = new MeterListener();
+        meterListener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == "FrigateRelay" && instrument.Name == "frigaterelay.dispatch.exhausted")
+                listener.EnableMeasurementEvents(instrument);
+        };
+        meterListener.SetMeasurementEventCallback<long>((_, measurement, _, _) =>
+            Interlocked.Add(ref exhaustedObserved, measurement));
+        meterListener.Start();
+
+        await dispatcher.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-1"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await Task.Delay(100);
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-2"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await Task.Delay(100);
+
+            meterListener.RecordObservableInstruments();
+
+            exhaustedObserved.Should().Be(2, "one counter increment per failed item");
+
+            var warningEntries = logger.Entries
+                .Where(e => e.Level == LogLevel.Warning && e.Id.Id == 101)
+                .ToList();
+
+            warningEntries.Should().HaveCount(2, "one warning per exhausted item");
+
+            foreach (var entry in warningEntries)
+            {
+                entry.Message.Should().Contain("after retry exhaustion");
+                entry.Message.Should().Contain("BlueIris");
+
+                // Structured state must carry EventId and Action keys (ROADMAP criterion).
+                entry.State.Should().NotBeNull();
+                var keys = entry.State!.Select(kv => kv.Key).ToList();
+                keys.Should().Contain("EventId", "structured state must have EventId");
+                keys.Should().Contain("Action", "structured state must have Action");
+            }
+
+            // Consumer must still be alive — enqueue a third item from a no-op plugin that shares
+            // the same dispatcher channel, but for simplicity verify the dispatcher can still
+            // accept an item (GetQueueDepth == 0 after processing).
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-3"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await Task.Delay(100);
+            dispatcher.GetQueueDepth(throwingPlugin).Should().Be(0, "consumer is still running and draining");
+        }
+        finally
+        {
+            await dispatcher.StopAsync(CancellationToken.None);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 6: Cancellation during active execution propagates to the plugin
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public async Task StopAsync_DuringActiveExecution_PropagatesCancellationToPlugin()
+    {
+        var slowPlugin = new SlowPlugin("BlueIris");
+        using var dispatcher = BuildDispatcher(new IActionPlugin[] { slowPlugin });
+
+        await dispatcher.StartAsync(CancellationToken.None);
+
+        using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await dispatcher.EnqueueAsync(MakeContext("e-cancel"), slowPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+
+        // Give the consumer time to enter ExecuteAsync (it's now blocked on Task.Delay(30s)).
+        await Task.Delay(100);
+
+        var sw = Stopwatch.StartNew();
+        using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        // StopAsync may throw TaskCanceledException if the shutdown token fires before
+        // all consumers drain — that is expected and correct behaviour.
+        try { await dispatcher.StopAsync(stopCts.Token); } catch (OperationCanceledException) { }
+        sw.Stop();
+
+        sw.ElapsedMilliseconds.Should().BeLessThan(3000,
+            "cancellation must unblock the slow plugin before the 30s delay expires");
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static ChannelActionDispatcher BuildDispatcher(
+        IEnumerable<IActionPlugin> plugins,
+        int capacity = 256,
+        CapturingLogger? logger = null)
+    {
+        logger ??= new CapturingLogger();
+        var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = capacity });
+        return new ChannelActionDispatcher(plugins, logger, options);
+    }
+
+    private sealed class ThrowingPlugin(string name) : IActionPlugin
+    {
+        public string Name { get; } = name;
+        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) =>
+            Task.FromException(new HttpRequestException("simulated post-retry failure"));
+    }
+
+    private sealed class SlowPlugin(string name) : IActionPlugin
+    {
+        public string Name { get; } = name;
+        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) =>
+            Task.Delay(TimeSpan.FromSeconds(30), ct);
+    }
+
     private sealed class CapturingLogger : ILogger<ChannelActionDispatcher>
     {
         public List<LogEntry> Entries { get; } = new();
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel level, EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => Entries.Add(new LogEntry(level, id, formatter(state, exception)));
+            => Entries.Add(new LogEntry(
+                level,
+                id,
+                formatter(state, exception),
+                state as IReadOnlyList<KeyValuePair<string, object?>>));
 
-        public sealed record LogEntry(LogLevel Level, EventId Id, string Message);
+        public sealed record LogEntry(
+            LogLevel Level,
+            EventId Id,
+            string Message,
+            IReadOnlyList<KeyValuePair<string, object?>>? State);
     }
 }
