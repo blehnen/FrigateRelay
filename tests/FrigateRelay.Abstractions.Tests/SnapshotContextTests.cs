@@ -76,6 +76,38 @@ public sealed class SnapshotContextTests
         result.Should().BeSameAs(expected);
     }
 
+    [TestMethod]
+    public async Task ResolveAsync_PreResolved_ReturnsCachedWithoutInvokingResolver()
+    {
+        // The dispatcher uses this constructor to share ONE resolved snapshot
+        // across the validator chain and the action plugin (Phase 7 CONTEXT-7 D1
+        // + RESEARCH §5). The cached result is returned regardless of EventContext.
+        var cached = new SnapshotResult { Bytes = [0xFF, 0xD8, 0xFF, 0xE0], ContentType = "image/jpeg", ProviderName = "Frigate" };
+        var ctx = new SnapshotContext(cached);
+        var evt = MakeEvent("evt-cached");
+
+        var first = await ctx.ResolveAsync(evt, CancellationToken.None);
+        var second = await ctx.ResolveAsync(evt, CancellationToken.None);
+
+        first.Should().BeSameAs(cached);
+        second.Should().BeSameAs(cached);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_PreResolvedNull_ReturnsNullWithoutInvokingResolver()
+    {
+        // When upstream resolution returned null (no provider configured / provider returned
+        // nothing), the dispatcher still wraps it via PreResolved so the validator and action
+        // both observe a null snapshot. The PreResolved branch must distinguish "explicitly null"
+        // from default(SnapshotContext) (which has no resolver and no _hasPreResolved flag).
+        var ctx = new SnapshotContext((SnapshotResult?)null);
+        var evt = MakeEvent("evt-null");
+
+        var result = await ctx.ResolveAsync(evt, CancellationToken.None);
+
+        result.Should().BeNull();
+    }
+
     private sealed class StubResolver(SnapshotResult? toReturn) : ISnapshotResolver
     {
         public ValueTask<SnapshotResult?> ResolveAsync(EventContext context, string? perActionProviderName, string? subscriptionDefaultProviderName, CancellationToken cancellationToken) =>
