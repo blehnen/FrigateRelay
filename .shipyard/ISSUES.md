@@ -135,6 +135,23 @@ Phase 4 ships a working MQTT → BlueIris vertical slice but the repo has no `RE
 - Phase 11 (Operations & Docs) begins per ROADMAP — generate the full docs tree.
 - An external user opens an issue asking for setup instructions.
 
+---
+
+### ID-10: `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions` raised to `public` — should be `internal`
+
+**Source:** reviewer (Phase 5 REVIEW-1.2, 2026-04-26)
+**Severity:** Minor
+**Status:** Open
+
+**Description:**
+`ActionEntry` (`src/FrigateRelay.Host/Configuration/ActionEntry.cs:18`), `ActionEntryJsonConverter` (`src/FrigateRelay.Host/Configuration/ActionEntryJsonConverter.cs:15`), and `SnapshotResolverOptions` (`src/FrigateRelay.Host/Snapshots/SnapshotResolverOptions.cs:7`) are declared `public`. Per PLAN-1.2 Task 1 acceptance criteria, these should be `internal`. They were raised to `public` during the build to resolve CS0053 (public `SubscriptionOptions.Actions: IReadOnlyList<ActionEntry>` cannot have an internal element type).
+
+The deliberate trade-off was to raise the new types rather than cascade `SubscriptionOptions`, `HostSubscriptionsOptions`, `DedupeCache`, and `SubscriptionMatcher` to `internal`. This is documented in SUMMARY-1.2 Decisions.
+
+**Fix:** Consolidate into the existing ID-2 sweep. When `IActionDispatcher` and `DispatcherOptions` are internalized (ID-2), also internalize `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions`, `SubscriptionOptions`, and `HostSubscriptionsOptions` in the same pass. All of these are host-internal configuration types with no external consumers.
+
+**Impact:** API surface correctness. No functional impact. No external consumers exist.
+
 ## Closed Issues
 
 (None)
