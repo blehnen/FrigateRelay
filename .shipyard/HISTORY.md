@@ -357,3 +357,50 @@
 - **Cross-cutting**: ID-12 (`IConfiguration.Bind` ≠ `[JsonConverter]`) explicitly out of scope in PLAN-1.2 + PLAN-3.1; D4 asymmetric-retry stance loud-commented in PLAN-2.1 Task 3 registrar code AND noted for CLAUDE.md update in PLAN-3.1 Task 3; Phase 5 review-3.1 dead-code lesson explicit in PLAN-3.1 Task 2 Context block.
 - Checkpoint tag: `post-plan-phase-7`.
 - Next: `/shipyard:build 7`.
+- [2026-04-26T20:56:56Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-26 — Phase 7 built (`/shipyard:build 7`)
+
+- **10 atomic per-task commits** between `pre-build-phase-7` and `acc3de4` + 1 phase-close artifact commit (`5d578da`):
+  - Wave 1 (PLAN-1.1 + PLAN-1.2 in parallel):
+    - `12ee767` — IValidationPlugin gains SnapshotContext param.
+    - `29adaab` — SnapshotContext.PreResolved ctor + 2 tests.
+    - `c4ba938` — dispatcher validator chain + snapshot share + 2 tests.
+    - `b021f3c` — ActionEntry gains optional Validators field.
+    - `f6996d2` — ActionEntryJsonConverter handles Validators + 2 tests.
+  - Wave 2 (PLAN-2.1):
+    - `072961c` — CodeProjectAi plugin project + validator + registrar (tasks 1+3 bundled per orchestrator-finishes pattern).
+    - `be28f4c` — CodeProjectAiValidator 8 unit tests (task 2 TDD).
+  - Wave 3 (PLAN-3.1):
+    - `8f55f8a` — EventPump resolves keyed validators per ActionEntry.
+    - `da120c1` — StartupValidation.ValidateValidators + HostBootstrap wiring + CodeProjectAi registrar.
+    - `acc3de4` — MqttToValidatorTests integration tests (Validator_ShortCircuits_OnlyAttachedAction + Validator_Pass_BothActionsFire).
+- **143/143 tests pass** (Phase 6 baseline 124, +19 new). Build clean (0 warnings). Integration tests pass with Docker-backed Mosquitto.
+- **Both subagent builders failed on Bash permission** (Wave 1 PLAN-1.1 and PLAN-1.2 builders). Orchestrator finished both inline using the same pattern as Phases 1/3/5/6 truncation recovery. PLAN-1.2 builder did manage Read/Edit before failing, leaving 67 LoC of correct edits on disk that the orchestrator validated and committed atomically.
+- **Phase verification**: COMPLETE. All ROADMAP-listed Phase 7 deliverables met or exceeded. All 13 CONTEXT-7 decisions D1-D13 honored. All architecture invariants hold (no Result/Wait, no ServicePointManager, no excluded libs, no hardcoded IPs in src/ or tests/).
+- **Security audit**: PASS / Low risk. 0 critical/high/medium. 3 informational notes (NOTE-1 scoped TLS bypass matching BlueIris/Pushover precedent, NOTE-2 fail-fast config validation, NOTE-3 SSRF surface unchanged from existing plugins). All matching Phase 4-6 patterns; no remediation required.
+- **Simplifier**: 3 Low findings — all deferred:
+  - L1 `CapturingLoggerProvider` in MqttToValidatorTests.cs (Rule of Two — defer until third integration test needs cross-category log capture).
+  - L2 OnError/timeout/unavailable catch-block ordering pattern across BlueIris/Pushover/CodeProjectAi (Rule of Three technically met but bodies differ; document the pattern in CLAUDE.md instead of extracting code).
+  - L3 EventPump validator-resolution `keys.Select(...).ToArray()` allocation per dispatch (defer to Phase 9 perf pass; modern JIT may elide).
+- **Documenter**: 4 actionable CLAUDE.md gaps + 1 Phase 11 plugin-author-guide note — all 5 deferred to Phase 11 OSS-polish docs sprint per the established Phase 5+6 pattern. Captured in DOCUMENTATION-7.md for ship-time pickup:
+  - CLAUDE-1 (HIGH) validator/action retry asymmetry doc.
+  - CLAUDE-2 (HIGH) keyed-validator-instance pattern doc.
+  - CLAUDE-3 (HIGH) `partial class` requirement for `[LoggerMessage]` source-gen.
+  - CLAUDE-4 (MEDIUM) SnapshotContext.PreResolved sharing path invariant.
+  - CLAUDE-5 (LOW) plugin-author-guide IValidationPlugin samples for Phase 11.
+- **Real Phase 7 build issues caught and fixed inline**:
+  - CS1734 on `<paramref name="snapshot"/>` in interface-level XML doc — `paramref` requires parameter scope; fixed with `<c>snapshot</c>` text reference.
+  - CS0260 on `partial class Log` nested in non-partial outer class — added `partial` to outer `CodeProjectAiValidator`.
+  - CA5359 on always-true cert callback — scoped #pragma matching BlueIris precedent.
+  - CA1861 on `new[] { ... }` literal arrays in test methods — hoisted to `static readonly string[]`.
+  - IDE0005 on unused `Microsoft.Extensions.DependencyInjection` usings — removed.
+  - CS8417 on `await using var app` for `IHost` — IHost is IDisposable not IAsyncDisposable; switched to `using var` matching Phase 6 precedent.
+- **Lessons-learned drafts** (for `/shipyard:ship`):
+  - **Subagent Bash-permission denial is the steady-state pattern in this session.** Both Wave 1 builders failed identically. The orchestrator-finishes-inline pattern handles it without quality loss but loses ~30s per failed dispatch. Either elevate subagent permissions OR restructure agents to Read/Edit-only with orchestrator running all bash steps.
+  - **`[LoggerMessage]` source-gen requires `partial` up the nesting chain.** The CS0260 trap will catch any future plugin author who picks the modern attribute style over `LoggerMessage.Define<...>` static fields. Worth a CLAUDE.md `## Conventions` note (Phase 11 docs sprint will add).
+  - **`SnapshotContext` was struct-based without resolver caching.** The new `PreResolved` ctor (10 LoC) is the simplest way to share one fetch across validator + action without restructuring the type to a class.
+  - **Phase 5 review-3.1 dead-code regression mode is real and recurring.** Loud inline comment + explicit `git grep` acceptance criterion at the wire-up site is the lightweight countermeasure that keeps catching it.
+  - **`run-tests.sh` auto-discovery via `find tests -maxdepth 2`** absorbed the new CodeProjectAi test project with zero workflow edits. Phase 3's extraction (initially flagged as Rule-of-Two violation by Phase 2 simplifier) keeps paying off.
+  - **`IHost` is `IDisposable` not `IAsyncDisposable`** — surprising for modern hosting; `using var app` is the correct pattern.
+- Checkpoint tags: `pre-build-phase-7`, `post-build-phase-7`.
