@@ -37,9 +37,10 @@ internal sealed class FrigateSnapshotProvider : ISnapshotProvider
     public async Task<SnapshotResult?> FetchAsync(SnapshotRequest request, CancellationToken ct)
     {
         var eventId = request.Context.EventId;
+        var encodedId = Uri.EscapeDataString(eventId);
         var path = _options.UseThumbnail
-            ? $"/api/events/{eventId}/thumbnail.jpg"
-            : $"/api/events/{eventId}/snapshot.jpg";
+            ? $"/api/events/{encodedId}/thumbnail.jpg"
+            : $"/api/events/{encodedId}/snapshot.jpg";
 
         var url = BuildUrl(path, request);
 
@@ -84,7 +85,7 @@ internal sealed class FrigateSnapshotProvider : ISnapshotProvider
                 {
                     Bytes = bytes,
                     ContentType = contentType,
-                    ProviderName = "Frigate",
+                    ProviderName = Name,
                     ETag = etag,
                 };
             }
@@ -154,7 +155,7 @@ internal sealed class FrigateSnapshotProvider : ISnapshotProvider
         private static readonly Action<ILogger, string, string, Exception?> _snapshotFailedMessage =
             LoggerMessage.Define<string, string>(
                 LogLevel.Warning,
-                new EventId(3, "frigate_snapshot_failed"),
+                new EventId(4, "frigate_snapshot_failed"),
                 "Frigate snapshot fetch failed for event {EventId}: {Reason}");
 
         private static readonly Action<ILogger, string, int, Exception?> _snapshotFailedStatus =

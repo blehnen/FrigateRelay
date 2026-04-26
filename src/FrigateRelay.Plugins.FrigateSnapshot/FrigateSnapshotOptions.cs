@@ -18,6 +18,7 @@ public sealed record FrigateSnapshotOptions
     /// Must be supplied via configuration — no default is provided to avoid committing IP addresses.
     /// </summary>
     [Required]
+    [Url]
     public required string BaseUrl { get; init; }
 
     /// <summary>Gets a value indicating whether to fetch the thumbnail image instead of the full snapshot.</summary>

@@ -1,6 +1,5 @@
 using FrigateRelay.Abstractions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace FrigateRelay.Plugins.BlueIris;
 
@@ -18,12 +17,10 @@ internal sealed class BlueIrisSnapshotProvider : ISnapshotProvider
 
     public BlueIrisSnapshotProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<BlueIrisOptions> options,
         BlueIrisSnapshotUrlTemplate snapshotTemplate,
         ILogger<BlueIrisSnapshotProvider> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _ = options; // bound via DI; kept for potential future use
         _snapshotTemplate = snapshotTemplate;
         _logger = logger;
     }
@@ -79,7 +76,7 @@ internal sealed class BlueIrisSnapshotProvider : ISnapshotProvider
             LoggerMessage.Define<int, string>(
                 LogLevel.Warning,
                 new EventId(1, "blueiris_snapshot_non_success"),
-                "bluiris_snapshot_non_success status={Status} url={Url}");
+                "blueiris_snapshot_non_success status={Status} url={Url}");
 
         private static readonly Action<ILogger, string, Exception?> _networkError =
             LoggerMessage.Define<string>(

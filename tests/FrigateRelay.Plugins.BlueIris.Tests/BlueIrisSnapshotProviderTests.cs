@@ -47,14 +47,9 @@ public sealed class BlueIrisSnapshotProviderTests
         var sp = services.BuildServiceProvider();
         var factory = sp.GetRequiredService<IHttpClientFactory>();
 
-        var options = Options.Create(new BlueIrisOptions
-        {
-            TriggerUrlTemplate = $"{baseUrl}/trigger/{{camera}}",
-        });
-
         var snapshotTemplate = new BlueIrisSnapshotUrlTemplate(BlueIrisUrlTemplate.Parse(fullTemplate));
 
-        var sut = new BlueIrisSnapshotProvider(factory, options, snapshotTemplate, logger);
+        var sut = new BlueIrisSnapshotProvider(factory, snapshotTemplate, logger);
         return (sut, server, logger);
     }
 
@@ -104,9 +99,13 @@ public sealed class BlueIrisSnapshotProviderTests
     [TestMethod]
     public async Task FetchAsync_NetworkError_ReturnsNull_AndLogsWarning()
     {
-        // Use a port with no listener to simulate a connection-refused network error.
-        // Pick a port unlikely to be in use; if this is flaky, WireMock fault injection is the alternative.
-        var unusedPort = 19999;
+        // Use a port that was just freed (bind ephemeral, capture port, release) to simulate a
+        // connection-refused network error. Avoids hard-coded ports that can collide with other
+        // services on CI runners.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var unusedPort = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
         var badTemplate = $"http://127.0.0.1:{unusedPort}/snapshot/{{camera}}";
 
         var logger = new CapturingLogger<BlueIrisSnapshotProvider>();
@@ -121,14 +120,9 @@ public sealed class BlueIrisSnapshotProviderTests
 
         var sp = services.BuildServiceProvider();
         var factory = sp.GetRequiredService<IHttpClientFactory>();
-        var options = Options.Create(new BlueIrisOptions
-        {
-            TriggerUrlTemplate = "http://127.0.0.1:19999/trigger/{camera}",
-            RequestTimeout = TimeSpan.FromSeconds(3),
-        });
 
         var snapshotTemplate = new BlueIrisSnapshotUrlTemplate(BlueIrisUrlTemplate.Parse(badTemplate));
-        var sut = new BlueIrisSnapshotProvider(factory, options, snapshotTemplate, logger);
+        var sut = new BlueIrisSnapshotProvider(factory, snapshotTemplate, logger);
 
         var request = new SnapshotRequest { Context = MakeContext("test_cam") };
         var result = await sut.FetchAsync(request, CancellationToken.None);

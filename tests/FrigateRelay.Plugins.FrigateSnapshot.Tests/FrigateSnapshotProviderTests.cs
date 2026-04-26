@@ -35,59 +35,6 @@ public class FrigateSnapshotProviderTests
         IncludeBoundingBox = includeBbox,
     };
 
-    /// <summary>
-    /// Builds a <see cref="FrigateSnapshotProvider"/> wired to a real <see cref="IHttpClientFactory"/>
-    /// pointed at the given WireMock server URL, using the provided options overrides.
-    /// </summary>
-    private static (FrigateSnapshotProvider Provider, CapturingLogger<FrigateSnapshotProvider> Logger)
-        BuildProvider(string baseUrl, Action<FrigateSnapshotOptions>? configureOptions = null)
-    {
-        var opts = new FrigateSnapshotOptions { BaseUrl = baseUrl };
-        if (configureOptions != null)
-        {
-            // Build a fresh record with the overrides applied via a helper.
-            opts = ApplyOverrides(opts, configureOptions);
-        }
-
-        var logger = new CapturingLogger<FrigateSnapshotProvider>();
-
-        var services = new ServiceCollection();
-        services.AddHttpClient("FrigateSnapshot", client =>
-        {
-            client.BaseAddress = new Uri(opts.BaseUrl);
-            client.Timeout = opts.RequestTimeout;
-        });
-
-        var sp = services.BuildServiceProvider();
-        var factory = sp.GetRequiredService<IHttpClientFactory>();
-        var provider = new FrigateSnapshotProvider(factory, new OptionsWrapper<FrigateSnapshotOptions>(opts), logger);
-        return (provider, logger);
-    }
-
-    // Record mutation helper — creates a new record with specific properties overridden.
-    private static FrigateSnapshotOptions ApplyOverrides(FrigateSnapshotOptions opts, Action<OptionsMutator> configure)
-    {
-        var mutator = new OptionsMutator(opts);
-        configure(mutator);
-        return mutator.Build();
-    }
-
-    private static FrigateSnapshotOptions ApplyOverrides(FrigateSnapshotOptions opts, Action<FrigateSnapshotOptions> _)
-        => opts; // unused overload guard
-
-    // Mutable builder for FrigateSnapshotOptions (records are immutable, so we use with-expressions).
-    private sealed class OptionsMutator(FrigateSnapshotOptions source)
-    {
-        private FrigateSnapshotOptions _opts = source;
-        public void UseThumbnail(bool v) => _opts = _opts with { UseThumbnail = v };
-        public void IncludeBoundingBox(bool v) => _opts = _opts with { IncludeBoundingBox = v };
-        public void Retry404Count(int v) => _opts = _opts with { Retry404Count = v };
-        public void Retry404Delay(TimeSpan v) => _opts = _opts with { Retry404Delay = v };
-        public void ApiToken(string v) => _opts = _opts with { ApiToken = v };
-        public FrigateSnapshotOptions Build() => _opts;
-    }
-
-    // Simplified build helper accepting a pre-built options record directly.
     private static (FrigateSnapshotProvider Provider, CapturingLogger<FrigateSnapshotProvider> Logger)
         BuildProviderWithOptions(FrigateSnapshotOptions opts)
     {
