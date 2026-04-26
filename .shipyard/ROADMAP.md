@@ -156,6 +156,8 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ## Phase 5 — Snapshot Providers
 
+**Status:** complete_with_gaps (2026-04-26) — all 7 ROADMAP deliverables PASS; 100/100 tests across 6 suites (99 unit + 1 integration); 29 new tests vs ≥10 gate (+190%). 1 critical (REVIEW-3.1: `ValidateSnapshotProviders` was dead code) resolved inline before phase closeout. Security audit: PASS (Low) — 0 critical, 0 important, 2 advisory. 5 simplifier findings + 2 auditor advisory deferred (all trivial, recommended as a single chore commit before Phase 6). 3 new ISSUES entries (ID-10 accessibility cascade, ID-11 `CapturingLogger<T>` triplication, ID-12 `IConfiguration.Bind` back-compat regression for legacy `Actions: ["BlueIris"]` shape).
+
 **Goal.** Add the `ISnapshotProvider` shipped implementations (`BlueIrisSnapshot`, `FrigateSnapshot`) and the resolution order (per-action override → per-subscription default → global `DefaultSnapshotProvider`).
 
 **Dependencies.** Phase 4.

@@ -260,3 +260,26 @@
 
 - [2026-04-26T00:10:00Z] Phase 5: Build started (agent mode, sequential Wave 1 then parallel Wave 2 then Wave 3) (building)
 - [2026-04-26T14:10:28Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T14:47:18Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T14:47:55Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T14:48:48Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-26 — Phase 5 built (`/shipyard:build 5`)
+
+- **12 commits** across 3 waves: PLAN-1.1 (3 commits, 7 SnapshotResolver tests), PLAN-1.2 (2 commits, 9 ActionEntry/StartupValidationSnapshot tests + 5 fixture migrations), PLAN-2.1 (3 commits, 4 BlueIrisSnapshotProvider tests), PLAN-2.2 (2 commits, 6 FrigateSnapshotProvider tests + new plugin assembly), PLAN-3.1 (2 commits, 3 SnapshotResolutionEndToEnd tests + HostBootstrap wiring + ProjectReferences). Cleanup commit `26e8fc2` resolves the REVIEW-3.1 Critical.
+- **100/100 tests pass** (99 unit + 1 integration). Build clean, 0 warnings.
+- **Builder truncation pattern continued** — every wave's builder agent truncated at ~30-40 tool uses. Orchestrator finished each plan inline. Per-task atomic commits made resumption cheap. Reviewer agent ALSO doesn't self-persist REVIEW-*.md files (Phase 1 lesson still unresolved); orchestrator transcribed inline reports for REVIEW-1.1/1.2 only — REVIEW-2.1/2.2/3.1 captured in this entry.
+- **Critical fix (inline)**: REVIEW-3.1 found `StartupValidation.ValidateSnapshotProviders` was dead code — defined in PLAN-1.2 but never called from `HostBootstrap.ValidateStartup`. Fixed in commit `26e8fc2`.
+- **Real Phase-4 → Phase-5 regression discovered**: `IConfiguration.Bind` for `IReadOnlyList<ActionEntry>` does NOT fire `[JsonConverter]`. The plan's promise of back-compat for legacy `appsettings.json` `"Actions": ["BlueIris"]` shape was incorrect. Surfaced when integration test failed with "found 0" trigger fires. Fixture migrated to object form. Tracked as **ID-12**. Operator upgrade implication: existing Phase-4 deployments with string-array shape silently lose action firing.
+- **Architectural cascade**: `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions` raised from `internal` to `public` (CS0053 from public `SubscriptionOptions`/`HostSubscriptionsOptions`). Tracked as **ID-10** for the future ID-2 internalization sweep.
+- **Phase verification**: COMPLETE_WITH_GAPS. All 7 ROADMAP deliverables met; D1–D4 honored; CLAUDE.md invariant greps clean.
+- **Security audit**: PASS (Low). 0 critical, 0 important, 2 advisory (`EventId` not URL-encoded in FrigateSnapshot path — benign for UUIDs; `BaseUrl` no URI format validation — fail-fast violation).
+- **Simplifier**: 5 actionable findings, all trivial (4 are reviewer Important items: dead `IOptions<BlueIrisOptions>` injection, hard-coded port 19999, duplicate `EventId(3)`, 62 LoC dead test scaffolding). Recommended as one `chore(phase-5): cleanup` commit before Phase 6.
+- **Documenter**: 5 CLAUDE.md gap edits proposed; deferred to Phase 11 docs sprint per Phase-3 user decision.
+- **Reviewer verdicts**: 1.1 PASS, 1.2 PASS, 2.1 REQUEST_CHANGES (3 important / 0 critical), 2.2 APPROVE (2 important / 0 critical), 3.1 REQUEST_CHANGES → resolved (1 critical fixed inline).
+- **Lessons-learned drafts** (for `/shipyard:ship`):
+  - **`[JsonConverter]` ≠ Configuration binding**: `Microsoft.Extensions.Configuration.Binder` does not call System.Text.Json. Plans promising dual-form binding via `JsonConverter` are wrong. Use `TypeConverter`, `IConfigureOptions`, or a custom binder for scalar-or-object polymorphism in `IConfiguration`.
+  - **Accessibility cascade is a real planning hazard**: CS0053 forces consumers to track outer-type modifiers. Architect should grep `public.*<NewType>` consumers before locking the new type's accessibility.
+  - **Reviewer agent doesn't self-persist** (since Phase 1). Orchestrator must transcribe inline reports — or the REVIEW files just don't land on disk.
+  - **Builder truncation is a steady-state cost** (~30-40 tool uses). Per-task atomic commits + clear failure protocols make every truncation cheap to recover from.
+- Checkpoint tags: `pre-build-phase-5`, `post-build-phase-5`.
