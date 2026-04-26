@@ -38,14 +38,18 @@ internal static class HostBootstrap
             .Bind(builder.Configuration.GetSection("Dispatcher"))
             .Configure(opts =>
             {
+                var merged = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
                 var blueIrisCapacity = builder.Configuration.GetValue<int?>("BlueIris:QueueCapacity");
                 if (blueIrisCapacity is { } c)
-                {
-                    opts.PerPluginQueueCapacity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["BlueIris"] = c,
-                    };
-                }
+                    merged["BlueIris"] = c;
+
+                var pushoverCapacity = builder.Configuration.GetValue<int?>("Pushover:QueueCapacity");
+                if (pushoverCapacity is { } pc)
+                    merged["Pushover"] = pc;
+
+                if (merged.Count > 0)
+                    opts.PerPluginQueueCapacity = merged;
             });
 
         // Snapshot resolver options + resolver singleton.
@@ -63,6 +67,8 @@ internal static class HostBootstrap
             registrars.Add(new FrigateRelay.Plugins.BlueIris.PluginRegistrar());
         if (builder.Configuration.GetSection("FrigateSnapshot").Exists())
             registrars.Add(new FrigateRelay.Plugins.FrigateSnapshot.PluginRegistrar());
+        if (builder.Configuration.GetSection("Pushover").Exists())
+            registrars.Add(new FrigateRelay.Plugins.Pushover.PluginRegistrar());
 
         using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
         var bootstrapLogger = bootstrapLoggerFactory.CreateLogger<IPluginRegistrar>();

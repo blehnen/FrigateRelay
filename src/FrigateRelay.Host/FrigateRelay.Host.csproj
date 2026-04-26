@@ -33,6 +33,7 @@
     <ProjectReference Include="..\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.BlueIris\FrigateRelay.Plugins.BlueIris.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.FrigateSnapshot\FrigateRelay.Plugins.FrigateSnapshot.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
   </ItemGroup>
 
   <ItemGroup>

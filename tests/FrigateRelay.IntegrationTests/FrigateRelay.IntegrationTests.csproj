@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FrigateRelay.Host\FrigateRelay.Host.csproj" />
     <ProjectReference Include="..\..\src\FrigateRelay.Plugins.BlueIris\FrigateRelay.Plugins.BlueIris.csproj" />
+    <ProjectReference Include="..\..\src\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
     <ProjectReference Include="..\..\src\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
   </ItemGroup>
 
