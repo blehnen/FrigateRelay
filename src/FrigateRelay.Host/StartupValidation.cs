@@ -84,4 +84,47 @@ internal static class StartupValidation
             }
         }
     }
+
+    /// <summary>
+    /// Verifies that every named validator instance referenced by any
+    /// <see cref="ActionEntry.Validators"/> resolves to a registered keyed
+    /// <see cref="IValidationPlugin"/>. Throws <see cref="InvalidOperationException"/>
+    /// on the first unresolved key (PROJECT.md V3 + CONTEXT-7 D2).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An <see cref="ActionEntry.Validators"/> key referencing a top-level <c>Validators</c>
+    /// instance with an UNKNOWN <c>Type</c> value is detected here as "not registered" — no
+    /// plugin registrar claimed that <c>Type</c>, so no keyed singleton was added, and
+    /// <see cref="ServiceProviderKeyedServiceExtensions.GetKeyedService{T}"/> returns null. The
+    /// error message points operators to "ensure each instance has a recognized Type" exactly
+    /// because of this chain.
+    /// </para>
+    /// </remarks>
+    public static void ValidateValidators(
+        IEnumerable<SubscriptionOptions> subscriptions,
+        IServiceProvider services)
+    {
+        var subList = subscriptions as IList<SubscriptionOptions> ?? subscriptions.ToList();
+        for (int i = 0; i < subList.Count; i++)
+        {
+            var sub = subList[i];
+            for (int j = 0; j < sub.Actions.Count; j++)
+            {
+                var action = sub.Actions[j];
+                if (action.Validators is null || action.Validators.Count == 0) continue;
+                foreach (var key in action.Validators)
+                {
+                    var plugin = services.GetKeyedService<IValidationPlugin>(key);
+                    if (plugin is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Validator '{key}' is referenced by Subscription[{i}].Actions[{j}].Validators " +
+                            $"but not registered. Check the top-level Validators section and ensure each " +
+                            $"instance has a recognized Type.");
+                    }
+                }
+            }
+        }
+    }
 }

@@ -34,6 +34,7 @@
     <ProjectReference Include="..\FrigateRelay.Plugins.BlueIris\FrigateRelay.Plugins.BlueIris.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.FrigateSnapshot\FrigateRelay.Plugins.FrigateSnapshot.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.CodeProjectAi\FrigateRelay.Plugins.CodeProjectAi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

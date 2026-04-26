@@ -69,6 +69,11 @@ internal static class HostBootstrap
             registrars.Add(new FrigateRelay.Plugins.FrigateSnapshot.PluginRegistrar());
         if (builder.Configuration.GetSection("Pushover").Exists())
             registrars.Add(new FrigateRelay.Plugins.Pushover.PluginRegistrar());
+        // CodeProjectAi: only register when the top-level Validators section is present.
+        // The registrar itself iterates that section and only acts on Type=="CodeProjectAi"
+        // entries, but gating here keeps the registrar list clean for inspection / logging.
+        if (builder.Configuration.GetSection("Validators").Exists())
+            registrars.Add(new FrigateRelay.Plugins.CodeProjectAi.PluginRegistrar());
 
         using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
         var bootstrapLogger = bootstrapLoggerFactory.CreateLogger<IPluginRegistrar>();
@@ -88,5 +93,11 @@ internal static class HostBootstrap
         var snapshotOpts = services.GetRequiredService<IOptions<SnapshotResolverOptions>>().Value;
         var snapshotProviders = services.GetRequiredService<IEnumerable<ISnapshotProvider>>();
         StartupValidation.ValidateSnapshotProviders(subsOpts.Subscriptions, snapshotOpts.DefaultProviderName, snapshotProviders);
+
+        // Phase 7: per-action validator key resolution. Phase 5 review-3.1 lesson —
+        // ValidateSnapshotProviders was once dead code; ValidateValidators MUST be wired
+        // into this exact call chain so an undefined or unknown-Type validator key fails
+        // host startup rather than silently dropping the validator at dispatch time.
+        StartupValidation.ValidateValidators(subsOpts.Subscriptions, services);
     }
 }
