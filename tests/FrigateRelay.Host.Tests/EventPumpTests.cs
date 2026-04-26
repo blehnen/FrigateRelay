@@ -48,7 +48,7 @@ public sealed class EventPumpTests
         };
         var source = new FakeSource("FrigateMqtt", new[] { context });
 
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         // StartAsync invokes ExecuteAsync; awaiting StopAsync then awaits the running task.
@@ -88,7 +88,7 @@ public sealed class EventPumpTests
             SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
         };
         var source = new FakeSource("FrigateMqtt", new[] { Make("e1"), Make("e2") });
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await pump.StartAsync(cts.Token);
@@ -106,6 +106,12 @@ public sealed class EventPumpTests
     {
         public static readonly NoOpDispatcher Instance = new();
         public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct) => ValueTask.CompletedTask;
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+        public object? GetService(Type serviceType) => null;
     }
 
     private sealed class FakeSource : IEventSource

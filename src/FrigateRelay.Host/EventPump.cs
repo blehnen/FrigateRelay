@@ -46,6 +46,7 @@ internal sealed class EventPump : BackgroundService
     private readonly IOptionsMonitor<HostSubscriptionsOptions> _subsMonitor;
     private readonly IActionDispatcher _dispatcher;
     private readonly Dictionary<string, IActionPlugin> _actionsByName;
+    private readonly IServiceProvider _services;
     private readonly ILogger<EventPump> _logger;
 
     public EventPump(
@@ -54,6 +55,7 @@ internal sealed class EventPump : BackgroundService
         IOptionsMonitor<HostSubscriptionsOptions> subsMonitor,
         IActionDispatcher dispatcher,
         IEnumerable<IActionPlugin> actionPlugins,
+        IServiceProvider services,
         ILogger<EventPump> logger)
     {
         _sources = sources.ToList();
@@ -61,6 +63,7 @@ internal sealed class EventPump : BackgroundService
         _subsMonitor = subsMonitor;
         _dispatcher = dispatcher;
         _actionsByName = actionPlugins.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        _services = services;
         _logger = logger;
     }
 
@@ -93,8 +96,17 @@ internal sealed class EventPump : BackgroundService
                         // against registered plugins at startup. An IndexerKeyNotFoundException here
                         // indicates a startup-validation bug — throw rather than silently drop.
                         var plugin = _actionsByName[entry.Plugin];
+
+                        // Resolve per-action validator instances by key (CONTEXT-7 D2 / RESEARCH §2).
+                        // Treat null and empty Validators identically (PLAN-1.2 contract). Resolution is
+                        // safe at this point because StartupValidation.ValidateValidators ran in
+                        // HostBootstrap.ValidateStartup and confirmed every key resolves.
+                        IReadOnlyList<IValidationPlugin> validators = entry.Validators is { Count: > 0 } keys
+                            ? keys.Select(k => _services.GetRequiredKeyedService<IValidationPlugin>(k)).ToArray()
+                            : Array.Empty<IValidationPlugin>();
+
                         await _dispatcher.EnqueueAsync(
-                            context, plugin, Array.Empty<IValidationPlugin>(),
+                            context, plugin, validators,
                             entry.SnapshotProvider, sub.DefaultSnapshotProvider, ct).ConfigureAwait(false);
                         LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
                     }

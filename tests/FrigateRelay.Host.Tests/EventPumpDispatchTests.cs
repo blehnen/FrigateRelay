@@ -143,6 +143,7 @@ public sealed class EventPumpDispatchTests
             monitor,
             dispatcher,
             plugins,
+            Substitute.For<IServiceProvider>(),
             NullLogger<EventPump>.Instance);
         return (pump, cache);
     }
