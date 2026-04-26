@@ -241,3 +241,19 @@
 - [2026-04-25T19:59:45Z] Session ended during build (may need /shipyard:resume)
 - [2026-04-25T20:23:28Z] Session ended during build (may need /shipyard:resume)
 - [2026-04-25T20:38:32Z] Phase ?: Phase 4 build complete. 71/71 tests passing. 8 gaps in ISSUES.md, 1 resolved (ID-5). (complete_with_gaps)
+- [2026-04-25T20:47:30Z] Phase ?: Planning phase 5 (Snapshot Providers): CONTEXT-5 captured, dispatching researcher (planning)
+
+## 2026-04-26 — Phase 5 planned (`/shipyard:plan 5`)
+
+- Resumed mid-planning. STATE.json was stale ("dispatching researcher") but research, 5 plans, and CRITIQUE.md were already written 2026-04-25 — verdict: **CAUTION** (6 items, no critical issues).
+- User chose **targeted revision cycle** over full re-plan or accept-and-build.
+- **Architect revision** (1 cycle, 11 tool uses, surgical edits to 5 plan files):
+  - PLAN-1.1: object-initializer for `SnapshotRequest` (no positional ctor exists); builder note added.
+  - PLAN-1.2: `files_touched` now includes 5 test files that compile-break on `Actions: IReadOnlyList<string> → IReadOnlyList<ActionEntry>` migration; `StartupValidation.ValidateActions` iteration update made explicit (`entry.Plugin`); `dependencies: [1.1]` frontmatter + header note locking Wave 1 sequential execution; folded fixture updates into Task 2 (no 4th task).
+  - PLAN-2.1: committed to wrapper-record DI strategy (`BlueIrisSnapshotUrlTemplate(BlueIrisUrlTemplate Template)`) over keyed services — concrete registrar code snippet provided; constructor injection updated; verification grep updated.
+  - PLAN-2.2: removed `Jenkinsfile` from `files_touched` and Task 3 Step 4 — `run-tests.sh` auto-discovers via `find tests/*.Tests/*.Tests.csproj` glob; `git diff -- Jenkinsfile` empty added as acceptance criterion.
+  - PLAN-3.1: `tests/FrigateRelay.Host.Tests/FrigateRelay.Host.Tests.csproj` added to `files_touched` with exact `<ProjectReference>` entries for BlueIris + FrigateSnapshot plugins; registrar invocation pattern clarified (`registrars.Add` + `PluginRegistrarRunner.RunAll`).
+- **Verifier re-run**: **READY**. All 6 cautions fixed and verified (CRITIQUE.md overwritten). No new issues introduced by the revisions.
+- Final wave/test layout: 3 waves, 5 plans, 29 planned tests (≥10 gate, +190% cushion).
+- Planning interruption observation: STATE.json was stale by 2 ROADMAP-pipeline steps (verifier had run but state-write didn't fire). Worth investigating shipyard hook reliability — but not a Phase 5 concern.
+- Next: `/shipyard:build 5`.
