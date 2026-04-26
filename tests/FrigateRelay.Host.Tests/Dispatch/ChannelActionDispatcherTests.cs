@@ -270,17 +270,119 @@ public sealed class ChannelActionDispatcherTests
     }
 
     // -------------------------------------------------------------------------
+    // Test 7 (Phase 7 PLAN-1.1 Task 3): validator chain short-circuits on first fail
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public async Task EnqueueAsync_WhenValidatorFails_SkipsAction_LogsValidatorRejected()
+    {
+        // CONTEXT-7 D6 + ROADMAP Phase 7: a failing validator short-circuits THIS action only,
+        // logs validator_rejected with action + validator + reason in structured state.
+        var blueIris = new RecordingPlugin("BlueIris");
+        var failing = new StubValidator("strict-person", Verdict.Fail("low_confidence"));
+        var passing = new StubValidator("never-runs", Verdict.Pass());
+        var logger = new CapturingLogger<ChannelActionDispatcher>();
+        using var dispatcher = BuildDispatcher(new IActionPlugin[] { blueIris }, logger: logger);
+
+        await dispatcher.StartAsync(CancellationToken.None);
+        try
+        {
+            using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await dispatcher.EnqueueAsync(
+                MakeContext("e-rejected"),
+                blueIris,
+                new IValidationPlugin[] { failing, passing },
+                ct: writeCts.Token);
+
+            await Task.Delay(200);
+
+            blueIris.Executed.Should().Be(0, "action MUST NOT execute when a validator fails");
+            failing.Calls.Should().Be(1, "first validator runs");
+            passing.Calls.Should().Be(0, "second validator MUST NOT run after first fails (short-circuit)");
+
+            var rejected = logger.Entries
+                .Where(e => e.Level == LogLevel.Warning && e.Id.Name == "ValidatorRejected")
+                .ToList();
+            rejected.Should().HaveCount(1, "exactly one validator_rejected log per failed verdict");
+
+            var entry = rejected[0];
+            entry.Message.Should().Contain("strict-person");
+            entry.Message.Should().Contain("BlueIris");
+            entry.Message.Should().Contain("low_confidence");
+
+            // CONTEXT-7 D7: structured state must carry event_id, camera, label, action,
+            // validator, reason — operators key alerts off these fields, so coverage is mandatory.
+            entry.State.Should().NotBeNull();
+            var keys = entry.State!.Select(kv => kv.Key).ToList();
+            keys.Should().Contain("EventId");
+            keys.Should().Contain("Camera");
+            keys.Should().Contain("Label");
+            keys.Should().Contain("Action");
+            keys.Should().Contain("Validator");
+            keys.Should().Contain("Reason");
+        }
+        finally
+        {
+            await dispatcher.StopAsync(CancellationToken.None);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 8 (Phase 7 PLAN-1.1 Task 3): SnapshotContext is shared between
+    // validator chain and action — provider hit at most once per dispatch.
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public async Task EnqueueAsync_WhenValidatorsPresent_PreResolvesSnapshotOnce_SharesWithAction()
+    {
+        // RESEARCH §5: when validators are present the dispatcher must pre-resolve the
+        // snapshot ONCE and pass the cached SnapshotContext.PreResolved to both the
+        // validator chain and the action. Two ResolveAsync calls (validator + action)
+        // must produce ONE underlying resolver invocation.
+        var resolver = new CountingResolver();
+        var validator = new SnapshotReadingValidator("inspect");
+        var plugin = new SnapshotReadingPlugin("BlueIris");
+        var logger = new CapturingLogger<ChannelActionDispatcher>();
+        using var dispatcher = BuildDispatcher(new IActionPlugin[] { plugin }, logger: logger, resolver: resolver);
+
+        await dispatcher.StartAsync(CancellationToken.None);
+        try
+        {
+            using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await dispatcher.EnqueueAsync(
+                MakeContext("e-share"),
+                plugin,
+                new IValidationPlugin[] { validator },
+                perActionSnapshotProvider: "Frigate",
+                ct: writeCts.Token);
+
+            await Task.Delay(200);
+
+            resolver.Calls.Should().Be(1, "underlying resolver MUST be invoked exactly once when validators are present");
+            validator.ObservedSnapshot.Should().NotBeNull("validator received the resolved snapshot");
+            plugin.ObservedSnapshot.Should().NotBeNull("action received the resolved snapshot");
+            plugin.ObservedSnapshot.Should().BeSameAs(validator.ObservedSnapshot,
+                "both validator and action must observe the SAME SnapshotResult instance (PreResolved sharing)");
+        }
+        finally
+        {
+            await dispatcher.StopAsync(CancellationToken.None);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
     private static ChannelActionDispatcher BuildDispatcher(
         IEnumerable<IActionPlugin> plugins,
         int capacity = 256,
-        CapturingLogger<ChannelActionDispatcher>? logger = null)
+        CapturingLogger<ChannelActionDispatcher>? logger = null,
+        ISnapshotResolver? resolver = null)
     {
         logger ??= new CapturingLogger<ChannelActionDispatcher>();
         var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = capacity });
-        return new ChannelActionDispatcher(plugins, logger, options);
+        return new ChannelActionDispatcher(plugins, logger, options, resolver);
     }
 
     private sealed class ThrowingPlugin(string name) : IActionPlugin
@@ -295,6 +397,72 @@ public sealed class ChannelActionDispatcherTests
         public string Name { get; } = name;
         public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) =>
             Task.Delay(TimeSpan.FromSeconds(30), ct);
+    }
+
+    private sealed class RecordingPlugin(string name) : IActionPlugin
+    {
+        private int _executed;
+        public int Executed => _executed;
+        public string Name { get; } = name;
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
+        {
+            Interlocked.Increment(ref _executed);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubValidator(string name, Verdict verdict) : IValidationPlugin
+    {
+        private int _calls;
+        public int Calls => _calls;
+        public string Name { get; } = name;
+        public Task<Verdict> ValidateAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(verdict);
+        }
+    }
+
+    private sealed class SnapshotReadingValidator(string name) : IValidationPlugin
+    {
+        public string Name { get; } = name;
+        public SnapshotResult? ObservedSnapshot { get; private set; }
+        public async Task<Verdict> ValidateAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
+        {
+            ObservedSnapshot = await snapshot.ResolveAsync(ctx, ct).ConfigureAwait(false);
+            return Verdict.Pass();
+        }
+    }
+
+    private sealed class SnapshotReadingPlugin(string name) : IActionPlugin
+    {
+        public string Name { get; } = name;
+        public SnapshotResult? ObservedSnapshot { get; private set; }
+        public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
+        {
+            ObservedSnapshot = await snapshot.ResolveAsync(ctx, ct).ConfigureAwait(false);
+        }
+    }
+
+    private sealed class CountingResolver : ISnapshotResolver
+    {
+        private int _calls;
+        private readonly SnapshotResult _result = new()
+        {
+            Bytes = [0xFF, 0xD8, 0xFF, 0xE0],
+            ContentType = "image/jpeg",
+            ProviderName = "Frigate",
+        };
+        public int Calls => _calls;
+        public ValueTask<SnapshotResult?> ResolveAsync(
+            EventContext context,
+            string? perActionProviderName,
+            string? subscriptionDefaultProviderName,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return ValueTask.FromResult<SnapshotResult?>(_result);
+        }
     }
 
 }

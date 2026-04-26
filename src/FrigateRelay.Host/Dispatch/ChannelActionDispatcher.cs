@@ -37,6 +37,14 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             new EventId(101, "DispatchRetryExhausted"),
             "Dropped event_id={EventId} action={Action} after retry exhaustion. Downstream may be unhealthy.");
 
+    // CONTEXT-7 D6 + D7: a failing validator short-circuits THIS action only; structured
+    // state must carry event_id, camera, label, action, validator, reason for operator alerting.
+    private static readonly Action<ILogger, string, string, string, string, string, string, Exception?> LogValidatorRejected =
+        LoggerMessage.Define<string, string, string, string, string, string>(
+            LogLevel.Warning,
+            new EventId(20, "ValidatorRejected"),
+            "validator_rejected event_id={EventId} camera={Camera} label={Label} action={Action} validator={Validator} reason={Reason}");
+
     private readonly List<IActionPlugin> _plugins;
     private readonly ILogger<ChannelActionDispatcher> _logger;
     private readonly DispatcherOptions _dispatcherOpts;
@@ -172,12 +180,56 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
 
             try
             {
-                // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
-                // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
-                var snapshotCtx = _snapshotResolver is null
+                // Build the initial resolver-backed SnapshotContext from per-action /
+                // per-subscription tiers carried on the DispatchItem.
+                // NOTE: ChannelActionDispatcher's field is `_snapshotResolver`;
+                // SnapshotContext's own backing field is `_resolver` — different files,
+                // do not confuse the two.
+                var initial = _snapshotResolver is null
                     ? default
                     : new SnapshotContext(_snapshotResolver, item.PerActionSnapshotProvider, item.SubscriptionSnapshotProvider);
-                await plugin.ExecuteAsync(item.Context, snapshotCtx, ct).ConfigureAwait(false);
+
+                // Pre-resolve ONCE when validators are present so the validator chain
+                // and the action observe the SAME SnapshotResult (RESEARCH §5).
+                // No validators → action plugin resolves lazily on its own; no fetch
+                // for BlueIris-only subscriptions that don't read the snapshot at all.
+                SnapshotContext shared;
+                if (item.Validators.Count > 0)
+                {
+                    var preResolved = await initial.ResolveAsync(item.Context, ct).ConfigureAwait(false);
+                    shared = new SnapshotContext(preResolved);
+
+                    // Validator chain — runs ABOVE the action's Polly retry pipeline (CONTEXT-7 D11).
+                    // A failing verdict short-circuits THIS action only; the consumer continues to
+                    // the next DispatchItem. Other actions in the same event proceed independently
+                    // because each is its own DispatchItem (CONTEXT-7 D6 / PROJECT.md V3).
+                    foreach (var validator in item.Validators)
+                    {
+                        var verdict = await validator.ValidateAsync(item.Context, shared, ct).ConfigureAwait(false);
+                        if (!verdict.Passed)
+                        {
+                            LogValidatorRejected(
+                                _logger,
+                                item.Context.EventId,
+                                item.Context.Camera,
+                                item.Context.Label,
+                                plugin.Name,
+                                validator.Name,
+                                verdict.Reason ?? "(no reason)",
+                                null);
+                            dispatchActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
+                            goto NextItem; // skip the rest of this dispatch; do not invoke the action.
+                        }
+                    }
+                }
+                else
+                {
+                    shared = initial;
+                }
+
+                // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
+                // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
+                await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
                 dispatchActivity?.SetStatus(ActivityStatusCode.Ok);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -195,6 +247,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 dispatchActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
                 // Do NOT rethrow — a poison item must not kill the consumer task.
             }
+            NextItem:;
         }
     }
 }
