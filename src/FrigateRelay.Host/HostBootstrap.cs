@@ -14,6 +14,8 @@ namespace FrigateRelay.Host;
 /// </summary>
 internal static class HostBootstrap
 {
+    private static readonly string[] PluginNamesWithQueueCapacity = ["BlueIris", "Pushover"];
+
     /// <summary>
     /// Registers all host-scope and plugin services on <paramref name="builder"/>.
     /// Must be called before <c>builder.Build()</c>.
@@ -40,13 +42,11 @@ internal static class HostBootstrap
             {
                 var merged = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                var blueIrisCapacity = builder.Configuration.GetValue<int?>("BlueIris:QueueCapacity");
-                if (blueIrisCapacity is { } c)
-                    merged["BlueIris"] = c;
-
-                var pushoverCapacity = builder.Configuration.GetValue<int?>("Pushover:QueueCapacity");
-                if (pushoverCapacity is { } pc)
-                    merged["Pushover"] = pc;
+                foreach (var pluginName in PluginNamesWithQueueCapacity)
+                {
+                    if (builder.Configuration.GetValue<int?>($"{pluginName}:QueueCapacity") is { } cap)
+                        merged[pluginName] = cap;
+                }
 
                 if (merged.Count > 0)
                     opts.PerPluginQueueCapacity = merged;

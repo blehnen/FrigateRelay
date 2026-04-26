@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FrigateRelay.Plugins.FrigateSnapshot\FrigateRelay.Plugins.FrigateSnapshot.csproj" />
     <ProjectReference Include="..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <ProjectReference Include="..\FrigateRelay.TestHelpers\FrigateRelay.TestHelpers.csproj" />
   </ItemGroup>
 
 </Project>

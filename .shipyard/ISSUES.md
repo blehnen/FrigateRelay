@@ -152,23 +152,14 @@ The deliberate trade-off was to raise the new types rather than cascade `Subscri
 
 **Impact:** API surface correctness. No functional impact. No external consumers exist.
 
-### ID-11: `CapturingLogger<T>` duplicated across 3 test assemblies — Rule of Three
+### ID-11: `CapturingLogger<T>` duplicated across test assemblies — Rule of Three  *[RESOLVED 2026-04-26]*
 
 **Source:** reviewer (Phase 5 REVIEW-2.2, 2026-04-26)
 **Severity:** Minor
-**Status:** Open
+**Status:** **Resolved** (Phase 6 prep cleanup, commit pending)
 
-**Description:**
-`CapturingLogger<T>` is now duplicated in three test assemblies:
-- `tests/FrigateRelay.Host.Tests/CapturingLogger.cs` (canonical, extracted in commit `c68dfaf`).
-- `tests/FrigateRelay.Plugins.BlueIris.Tests/CapturingLogger.cs` (Phase 4 duplicate).
-- `tests/FrigateRelay.Plugins.FrigateSnapshot.Tests/CapturingLogger.cs` (Phase 5 duplicate).
-
-Three copies of an 11-line helper crosses the Rule-of-Three threshold. A shared `tests/FrigateRelay.TestUtilities/` project would consolidate cleanly.
-
-**Fix:** Create `tests/FrigateRelay.TestUtilities/` with `OutputType=Library`, move the canonical `CapturingLogger.cs` there, and reference it from all three test projects. Delete the duplicates. The `run-tests.sh` glob will continue to ignore it (no `*.Tests.csproj` suffix).
-
-**Impact:** Test-code maintainability. A real bug in the canonical helper today would need 3 sync edits.
+**Resolution:**
+Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`OutputType=Library`, no test runner deps). `CapturingLogger<T>` raised to `public sealed`, namespace `FrigateRelay.TestHelpers`. The 4 duplicate copies (Host.Tests, BlueIris.Tests, FrigateSnapshot.Tests, Pushover.Tests) deleted. Each test csproj gains a `<ProjectReference>` to TestHelpers; type is exposed via `global using FrigateRelay.TestHelpers;` in a `Usings.cs` per test project. `run-tests.sh` glob (`tests/*.Tests/*.Tests.csproj`) does not pick up the helper project (no `.Tests` suffix). 124/124 tests still pass after extraction.
 
 ---
 

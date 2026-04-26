@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
     <ProjectReference Include="..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <ProjectReference Include="..\FrigateRelay.TestHelpers\FrigateRelay.TestHelpers.csproj" />
   </ItemGroup>
 
 </Project>
