@@ -39,6 +39,7 @@ public sealed class PluginRegistrar : IPluginRegistrar
         var httpClientBuilder = context.Services.AddHttpClient("Pushover", (sp, client) =>
         {
             var opts = sp.GetRequiredService<IOptions<PushoverOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseAddress);
             client.Timeout = opts.RequestTimeout;
         });
 
