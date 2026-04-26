@@ -16,4 +16,10 @@ public sealed record BlueIrisOptions
 
     /// <summary>Optional override for the dispatcher channel capacity. When null, dispatcher default (256) is used.</summary>
     public int? QueueCapacity { get; init; }
+
+    /// <summary>
+    /// Optional. When set, FrigateRelay.Plugins.BlueIris registers an ISnapshotProvider named "BlueIris".
+    /// Uses the same 4-token DSL as TriggerUrlTemplate ({camera}, {label}, {event_id}, {zone}).
+    /// </summary>
+    public string? SnapshotUrlTemplate { get; init; }
 }
