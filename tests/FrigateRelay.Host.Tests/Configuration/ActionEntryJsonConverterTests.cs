@@ -64,4 +64,28 @@ public sealed class ActionEntryJsonConverterTests
         Assert.AreEqual(entry.Plugin, result.Plugin);
         Assert.AreEqual(entry.SnapshotProvider, result.SnapshotProvider);
     }
+
+    private static readonly string[] _twoValidators = ["strict-person", "lax-vehicle"];
+
+    [TestMethod]
+    public void Roundtrip_ObjectForm_WithValidators_PreservesAllFields()
+    {
+        var entry = new ActionEntry("Pushover", "Frigate", _twoValidators);
+        var json = JsonSerializer.Serialize(entry, Options);
+        var roundtrip = JsonSerializer.Deserialize<ActionEntry>(json, Options)!;
+        roundtrip.Plugin.Should().Be("Pushover");
+        roundtrip.SnapshotProvider.Should().Be("Frigate");
+        roundtrip.Validators.Should().BeEquivalentTo(_twoValidators);
+    }
+
+    [TestMethod]
+    public void Roundtrip_ObjectForm_WithoutValidators_ProducesNullValidators()
+    {
+        var json = """{"Plugin":"BlueIris"}""";
+        var entry = JsonSerializer.Deserialize<ActionEntry>(json, Options)!;
+        entry.Plugin.Should().Be("BlueIris");
+        entry.Validators.Should().BeNull(); // back-compat — operators without Validators see null, not empty
+        var rewritten = JsonSerializer.Serialize(entry, Options);
+        rewritten.Should().NotContain("Validators"); // omit when null
+    }
 }
