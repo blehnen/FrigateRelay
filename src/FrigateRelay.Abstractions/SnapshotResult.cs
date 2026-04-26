@@ -13,4 +13,10 @@ public sealed record SnapshotResult
 
     /// <summary>Gets the name of the provider that produced this result.</summary>
     public required string ProviderName { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP ETag value returned by the provider, if any.
+    /// Reserved for future conditional-fetch caching; not populated in v1.
+    /// </summary>
+    public string? ETag { get; init; }
 }
