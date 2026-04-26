@@ -109,7 +109,14 @@ public sealed class EventPumpDispatchTests
     };
 
     private static SubscriptionOptions Sub(string name, string[] actions, int cooldownSeconds = 60) =>
-        new() { Name = name, Camera = "front", Label = "person", CooldownSeconds = cooldownSeconds, Actions = actions };
+        new()
+        {
+            Name = name,
+            Camera = "front",
+            Label = "person",
+            CooldownSeconds = cooldownSeconds,
+            Actions = actions.Select(a => new ActionEntry(a)).ToArray(),
+        };
 
     private static (EventPump pump, IDisposable cache) BuildPump(
         EventContext[] events,

@@ -1,3 +1,5 @@
+using FrigateRelay.Host.Snapshots;
+
 namespace FrigateRelay.Host.Configuration;
 
 /// <summary>
@@ -16,4 +18,11 @@ public sealed record HostSubscriptionsOptions
     /// section is absent or contains no entries.
     /// </summary>
     public IReadOnlyList<SubscriptionOptions> Subscriptions { get; init; } = Array.Empty<SubscriptionOptions>();
+
+    /// <summary>
+    /// Gets the snapshot resolution options (global default provider name + cache TTL).
+    /// Bound from the <c>Snapshots</c> config section. Defaults to a zero-configuration
+    /// instance (no global default, 10-second sliding TTL).
+    /// </summary>
+    public SnapshotResolverOptions Snapshots { get; init; } = new();
 }

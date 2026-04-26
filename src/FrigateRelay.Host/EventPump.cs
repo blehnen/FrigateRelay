@@ -87,15 +87,19 @@ internal sealed class EventPump : BackgroundService
                     if (!_dedupe.TryEnter(sub, context)) continue;
                     LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
 
-                    foreach (var actionName in sub.Actions)
+                    foreach (var entry in sub.Actions)
                     {
                         // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
                         // against registered plugins at startup. An IndexerKeyNotFoundException here
                         // indicates a startup-validation bug — throw rather than silently drop.
-                        var plugin = _actionsByName[actionName];
+                        var plugin = _actionsByName[entry.Plugin];
                         await _dispatcher.EnqueueAsync(
                             context, plugin, Array.Empty<IValidationPlugin>(), ct).ConfigureAwait(false);
                         LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
+                        // entry.SnapshotProvider and sub.DefaultSnapshotProvider are stashed here
+                        // for Plan 3.1 to wire into the dispatcher / resolver. No behavioral change in Wave 1.
+                        _ = entry.SnapshotProvider;
+                        _ = sub.DefaultSnapshotProvider;
                     }
                 }
             }

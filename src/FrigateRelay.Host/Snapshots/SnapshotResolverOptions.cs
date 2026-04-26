@@ -4,7 +4,7 @@ namespace FrigateRelay.Host.Snapshots;
 /// Configuration options for the snapshot resolution pipeline.
 /// Bound from the <c>Snapshots</c> config section by <c>HostBootstrap</c>.
 /// </summary>
-internal sealed record SnapshotResolverOptions
+public sealed record SnapshotResolverOptions
 {
     /// <summary>
     /// Gets the name of the globally-configured default snapshot provider.

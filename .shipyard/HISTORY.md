@@ -257,3 +257,6 @@
 - Final wave/test layout: 3 waves, 5 plans, 29 planned tests (≥10 gate, +190% cushion).
 - Planning interruption observation: STATE.json was stale by 2 ROADMAP-pipeline steps (verifier had run but state-write didn't fire). Worth investigating shipyard hook reliability — but not a Phase 5 concern.
 - Next: `/shipyard:build 5`.
+
+- [2026-04-26T00:10:00Z] Phase 5: Build started (agent mode, sequential Wave 1 then parallel Wave 2 then Wave 3) (building)
+- [2026-04-26T14:10:28Z] Session ended during build (may need /shipyard:resume)

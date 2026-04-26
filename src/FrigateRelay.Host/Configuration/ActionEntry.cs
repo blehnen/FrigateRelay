@@ -15,4 +15,4 @@ namespace FrigateRelay.Host.Configuration;
 /// the per-subscription default or global default is used (resolver tiering from Plan 1.1).
 /// </param>
 [JsonConverter(typeof(ActionEntryJsonConverter))]
-internal sealed record ActionEntry(string Plugin, string? SnapshotProvider = null);
+public sealed record ActionEntry(string Plugin, string? SnapshotProvider = null);

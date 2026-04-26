@@ -13,7 +13,7 @@ public sealed class SubscriptionActionWiringTests
     {
         var subs = new[]
         {
-            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = ["DoesNotExist"] },
+            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("DoesNotExist")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
 
@@ -28,7 +28,7 @@ public sealed class SubscriptionActionWiringTests
     {
         var subs = new[]
         {
-            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = ["BlueIris"] },
+            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("BlueIris")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
 
@@ -42,7 +42,7 @@ public sealed class SubscriptionActionWiringTests
     {
         var subs = new[]
         {
-            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = ["blueiris"] },
+            new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("blueiris")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
 

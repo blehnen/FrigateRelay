@@ -12,8 +12,9 @@ namespace FrigateRelay.Host.Configuration;
 /// </list>
 /// This preserves backward compatibility with Phase 4 fixtures and live config files.
 /// </summary>
-internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
+public sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
 {
+    /// <inheritdoc />
     public override ActionEntry Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.String)
@@ -36,6 +37,7 @@ internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
             $"Expected a string or an object with a 'Plugin' field for ActionEntry, but got {reader.TokenType}.");
     }
 
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, ActionEntry value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();

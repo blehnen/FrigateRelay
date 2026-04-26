@@ -40,9 +40,17 @@ public sealed record SubscriptionOptions
     public int CooldownSeconds { get; init; } = 60;
 
     /// <summary>
-    /// Gets the list of action plugin names that fire for this subscription. Empty (default)
+    /// Gets the list of action entries that fire for this subscription. Empty (default)
     /// means no actions fire — fail-safe per CONTEXT-4 D2. Unknown plugin names cause startup
     /// failure (PROJECT.md S2). Plugin name match is case-insensitive ordinal.
+    /// Each entry may carry an optional per-action snapshot provider override.
     /// </summary>
-    public IReadOnlyList<string> Actions { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<ActionEntry> Actions { get; init; } = Array.Empty<ActionEntry>();
+
+    /// <summary>
+    /// Gets the default snapshot provider name for all actions in this subscription.
+    /// When <see langword="null"/>, the global default from <c>Snapshots:DefaultProviderName</c> is used.
+    /// Per-action <see cref="ActionEntry.SnapshotProvider"/> takes precedence over this value.
+    /// </summary>
+    public string? DefaultSnapshotProvider { get; init; }
 }
