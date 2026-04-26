@@ -306,3 +306,25 @@
   - Wave 2: PLAN-2.1 — new `FrigateRelay.Plugins.Pushover` project with multipart POST, snapshot attachment, 10 unit tests.
   - Wave 3: PLAN-3.1 — HostBootstrap conditional registrar + `MqttToBothActionsTests` integration test.
 - Zero revision cycles needed. Checkpoint tag: `post-plan-phase-6`.
+- [2026-04-26T16:14:28Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T16:15:38Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T16:15:41Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-26T16:15:55Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-26 — Phase 6 built (`/shipyard:build 6`)
+
+- **5 commits** across 3 waves: Wave 1 (combined commit `f859251` after 2 builder truncations — `EventTokenTemplate` extraction + `SnapshotContext` struct + `IActionPlugin.ExecuteAsync` signature change + dispatcher plumbing + 13 tests); Wave 2 (`607687b` Pushover scaffold + 4 startup-validation tests, `dff4828` `PushoverActionPlugin` multipart POST + 6 behavioral tests); Wave 3 (`dd160ef` HostBootstrap registrar + QueueCapacity merge, `b2eef39` `MqttToBothActionsTests` integration + Pushover BaseAddress seam).
+- **124/124 tests** (122 unit + 2 integration). Build clean, 0 warnings.
+- **6 builder truncations** at the steady ~30-40 tool-use boundary. Orchestrator finished each plan inline: 6 stub plugin signature updates (CS0535 cascade), DispatchItem/IActionDispatcher/EventPump plumbing, full `PushoverActionPlugin.ExecuteAsync` implementation, multipart-quoting + WireMock-binary fixture fixes, BaseAddress seam wiring.
+- **Critical findings**: 0. Reviewer files weren't written for Wave 2/3 (chronic agent issue from Phase 5).
+- **Phase verification**: COMPLETE. All 7 ROADMAP deliverables met. All 10 CONTEXT decisions + 3 ARCH decisions honored.
+- **Security audit**: PASS (Low). 0 critical/important. 1 advisory: Polly `AddResilienceHandler` doesn't have an explicit `ShouldHandle` 4xx-skip predicate — relies on `Microsoft.Extensions.Http.Resilience` defaults; recommend adding for documentation value.
+- **Simplifier**: 2 High (CapturingLogger<T> 4-copy → shared TestHelpers project; HostBootstrap per-plugin QueueCapacity if-let → loop), 2 Medium (BlueIrisUrlTemplate intentional duplication — needs doc comment; StubResolver Rule of Two), 2 Low (BuildFastRetryProvider dead code; HostBootstrap registrar conditionals approaching Rule of Three at Phase 7).
+- **Documenter**: 2 actionable for CLAUDE.md (IActionPlugin.ExecuteAsync 3-param + accept-and-ignore convention; ID-12 object-form Actions warning); 3 deferred to Phase 11.
+- **Lessons-learned drafts**:
+  - **Interface signature changes cascade through stub/test plugins**. CS0535 errors are mechanical but tool-budget-eating. Future `IActionPlugin` changes should be accompanied by an automated stub-update grep.
+  - **`MultipartFormDataContent.name=` is unquoted in .NET 10 default** (was quoted in older versions). Tests asserting `name="token"` form fail; use `name=token`.
+  - **WireMock returns null `Body` (string) for binary multipart**. Use `BodyAsBytes` + UTF-8 decode.
+  - **Pushover returns HTTP 200 with `{"status":0}` for app-level rejections** (e.g. bad token). Plugin must parse body, not just trust HTTP status.
+  - **`HttpClient.BaseAddress` is required** when plugin uses relative URIs. Both production registrar AND test helpers must set it from options.
+- Checkpoint tags: `pre-build-phase-6`, `post-build-phase-6`.
