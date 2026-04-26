@@ -23,11 +23,21 @@ public interface IActionDispatcher
     /// Phase 4 always passes <c>Array.Empty&lt;IValidationPlugin&gt;()</c>; Phase 7 populates
     /// per-action validators (CONTEXT-4 D4).
     /// </param>
+    /// <param name="perActionSnapshotProvider">
+    /// Per-action snapshot provider override from <c>ActionEntry.SnapshotProvider</c>;
+    /// <see langword="null"/> falls through to per-subscription, then global tiers.
+    /// </param>
+    /// <param name="subscriptionDefaultSnapshotProvider">
+    /// Per-subscription default snapshot provider from <c>SubscriptionOptions.DefaultSnapshotProvider</c>;
+    /// <see langword="null"/> falls through to the global default.
+    /// </param>
     /// <param name="ct">A token that signals the host is shutting down.</param>
     /// <returns>A <see cref="ValueTask"/> that completes when the item has been enqueued.</returns>
     ValueTask EnqueueAsync(
         EventContext ctx,
         IActionPlugin action,
         IReadOnlyList<IValidationPlugin> validators,
-        CancellationToken ct);
+        string? perActionSnapshotProvider,
+        string? subscriptionDefaultSnapshotProvider,
+        CancellationToken ct = default);
 }

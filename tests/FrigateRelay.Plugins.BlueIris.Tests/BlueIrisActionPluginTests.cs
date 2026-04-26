@@ -102,7 +102,7 @@ public class BlueIrisActionPluginTests
         var sp = BuildProviderViaRegistrar(templateUrl);
         var plugin = sp.GetRequiredService<IActionPlugin>();
 
-        await plugin.ExecuteAsync(NewCtx(camera: "front"), CancellationToken.None);
+        await plugin.ExecuteAsync(NewCtx(camera: "front"), default, CancellationToken.None);
 
         server.LogEntries.Should().HaveCount(1);
         var requestMessage = server.LogEntries.Single().RequestMessage!;
@@ -138,7 +138,7 @@ public class BlueIrisActionPluginTests
         var sp = BuildFastRetryProvider(templateUrl);
         var plugin = sp.GetRequiredService<IActionPlugin>();
 
-        await plugin.ExecuteAsync(NewCtx(), CancellationToken.None);
+        await plugin.ExecuteAsync(NewCtx(), default, CancellationToken.None);
 
         server.LogEntries.Should().HaveCount(3);
     }
@@ -155,7 +155,7 @@ public class BlueIrisActionPluginTests
         var sp = BuildFastRetryProvider(templateUrl);
         var plugin = sp.GetRequiredService<IActionPlugin>();
 
-        var act = async () => await plugin.ExecuteAsync(NewCtx(), CancellationToken.None);
+        var act = async () => await plugin.ExecuteAsync(NewCtx(), default, CancellationToken.None);
 
         await act.Should().ThrowAsync<HttpRequestException>();
         server.LogEntries.Should().HaveCount(4); // 1 initial + 3 retries

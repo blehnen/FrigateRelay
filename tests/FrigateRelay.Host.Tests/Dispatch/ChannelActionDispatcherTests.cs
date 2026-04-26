@@ -79,10 +79,10 @@ public sealed class ChannelActionDispatcherTests
             // WriteAsync with a timeout ct so the test doesn't hang if the channel
             // unexpectedly blocks (it shouldn't — capacity=2, first two fit immediately).
             using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await dispatcher.EnqueueAsync(ctx1, blueIris, Array.Empty<IValidationPlugin>(), writeCts.Token);
-            await dispatcher.EnqueueAsync(ctx2, blueIris, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await dispatcher.EnqueueAsync(ctx1, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
+            await dispatcher.EnqueueAsync(ctx2, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
             // This 3rd enqueue should trigger drop-oldest (evicts ctx1) and fire the callback.
-            await dispatcher.EnqueueAsync(ctx3, blueIris, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await dispatcher.EnqueueAsync(ctx3, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
 
             // Give the MeterListener callback a moment to fire (it's synchronous on the
             // itemDropped callback which fires inside WriteAsync on the same thread, but
@@ -120,7 +120,7 @@ public sealed class ChannelActionDispatcherTests
 
         var ctx = MakeContext("e-stop");
         using var enqueueCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await dispatcher.EnqueueAsync(ctx, blueIris, Array.Empty<IValidationPlugin>(), enqueueCts.Token);
+        await dispatcher.EnqueueAsync(ctx, blueIris, Array.Empty<IValidationPlugin>(), ct: enqueueCts.Token);
 
         // Give the consumer a moment to pick up the item.
         await Task.Delay(50);
@@ -148,13 +148,13 @@ public sealed class ChannelActionDispatcherTests
     private sealed class StubPlugin(string name) : IActionPlugin
     {
         public string Name { get; } = name;
-        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) => Task.CompletedTask;
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class BlockingPlugin(string name, Task blockUntil) : IActionPlugin
     {
         public string Name { get; } = name;
-        public async Task ExecuteAsync(EventContext ctx, CancellationToken ct) =>
+        public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) =>
             await blockUntil.WaitAsync(ct).ConfigureAwait(false);
     }
 
@@ -200,9 +200,9 @@ public sealed class ChannelActionDispatcherTests
         try
         {
             using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await dispatcher.EnqueueAsync(MakeContext("e-ex-1"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-1"), throwingPlugin, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
             await Task.Delay(100);
-            await dispatcher.EnqueueAsync(MakeContext("e-ex-2"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-2"), throwingPlugin, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
             await Task.Delay(100);
 
             meterListener.RecordObservableInstruments();
@@ -230,7 +230,7 @@ public sealed class ChannelActionDispatcherTests
             // Consumer must still be alive — enqueue a third item from a no-op plugin that shares
             // the same dispatcher channel, but for simplicity verify the dispatcher can still
             // accept an item (GetQueueDepth == 0 after processing).
-            await dispatcher.EnqueueAsync(MakeContext("e-ex-3"), throwingPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+            await dispatcher.EnqueueAsync(MakeContext("e-ex-3"), throwingPlugin, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
             await Task.Delay(100);
             dispatcher.GetQueueDepth(throwingPlugin).Should().Be(0, "consumer is still running and draining");
         }
@@ -253,7 +253,7 @@ public sealed class ChannelActionDispatcherTests
         await dispatcher.StartAsync(CancellationToken.None);
 
         using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await dispatcher.EnqueueAsync(MakeContext("e-cancel"), slowPlugin, Array.Empty<IValidationPlugin>(), writeCts.Token);
+        await dispatcher.EnqueueAsync(MakeContext("e-cancel"), slowPlugin, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
 
         // Give the consumer time to enter ExecuteAsync (it's now blocked on Task.Delay(30s)).
         await Task.Delay(100);
@@ -286,14 +286,14 @@ public sealed class ChannelActionDispatcherTests
     private sealed class ThrowingPlugin(string name) : IActionPlugin
     {
         public string Name { get; } = name;
-        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) =>
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) =>
             Task.FromException(new HttpRequestException("simulated post-retry failure"));
     }
 
     private sealed class SlowPlugin(string name) : IActionPlugin
     {
         public string Name { get; } = name;
-        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) =>
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) =>
             Task.Delay(TimeSpan.FromSeconds(30), ct);
     }
 

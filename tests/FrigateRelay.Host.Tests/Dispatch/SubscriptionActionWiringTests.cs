@@ -67,6 +67,6 @@ public sealed class SubscriptionActionWiringTests
     private sealed class StubPlugin(string name) : IActionPlugin
     {
         public string Name { get; } = name;
-        public Task ExecuteAsync(EventContext ctx, CancellationToken ct) => Task.CompletedTask;
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) => Task.CompletedTask;
     }
 }

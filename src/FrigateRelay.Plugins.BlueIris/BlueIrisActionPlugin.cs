@@ -33,7 +33,7 @@ internal sealed class BlueIrisActionPlugin : IActionPlugin
 
     public string Name => "BlueIris";
 
-    public async Task ExecuteAsync(EventContext ctx, CancellationToken ct)
+    public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
     {
         var url = _template.Resolve(ctx);
         using var client = _httpFactory.CreateClient("BlueIris");

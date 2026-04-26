@@ -40,6 +40,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     private readonly List<IActionPlugin> _plugins;
     private readonly ILogger<ChannelActionDispatcher> _logger;
     private readonly DispatcherOptions _dispatcherOpts;
+    private readonly ISnapshotResolver? _snapshotResolver;
 
     private Dictionary<IActionPlugin, Channel<DispatchItem>> _channels = new();
     private readonly Dictionary<string, IActionPlugin> _actionsByName =
@@ -56,11 +57,13 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     public ChannelActionDispatcher(
         IEnumerable<IActionPlugin> plugins,
         ILogger<ChannelActionDispatcher> logger,
-        IOptions<DispatcherOptions> options)
+        IOptions<DispatcherOptions> options,
+        ISnapshotResolver? snapshotResolver = null)
     {
         _plugins = plugins.ToList();
         _logger = logger;
         _dispatcherOpts = options.Value;
+        _snapshotResolver = snapshotResolver;
     }
 
     /// <inheritdoc />
@@ -123,7 +126,9 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         EventContext ctx,
         IActionPlugin action,
         IReadOnlyList<IValidationPlugin> validators,
-        CancellationToken ct)
+        string? perActionSnapshotProvider = null,
+        string? subscriptionDefaultSnapshotProvider = null,
+        CancellationToken ct = default)
     {
         if (!_channels.TryGetValue(action, out var channel))
         {
@@ -134,7 +139,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         }
 
         await channel.Writer.WriteAsync(
-            new DispatchItem(ctx, action, validators, Activity.Current),
+            new DispatchItem(ctx, action, validators, Activity.Current,
+                perActionSnapshotProvider, subscriptionDefaultSnapshotProvider),
             ct).ConfigureAwait(false);
     }
 
@@ -168,7 +174,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             {
                 // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
                 // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
-                await plugin.ExecuteAsync(item.Context, ct).ConfigureAwait(false);
+                var snapshotCtx = _snapshotResolver is null
+                    ? default
+                    : new SnapshotContext(_snapshotResolver, item.PerActionSnapshotProvider, item.SubscriptionSnapshotProvider);
+                await plugin.ExecuteAsync(item.Context, snapshotCtx, ct).ConfigureAwait(false);
                 dispatchActivity?.SetStatus(ActivityStatusCode.Ok);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)

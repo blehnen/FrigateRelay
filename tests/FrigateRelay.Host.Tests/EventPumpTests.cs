@@ -105,7 +105,7 @@ public sealed class EventPumpTests
     private sealed class NoOpDispatcher : IActionDispatcher
     {
         public static readonly NoOpDispatcher Instance = new();
-        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct) => ValueTask.CompletedTask;
     }
 
     private sealed class FakeSource : IEventSource
