@@ -78,5 +78,9 @@ internal static class HostBootstrap
         var subsOpts = services.GetRequiredService<IOptions<HostSubscriptionsOptions>>().Value;
         var actionPlugins = services.GetRequiredService<IEnumerable<IActionPlugin>>();
         StartupValidation.ValidateActions(subsOpts.Subscriptions, actionPlugins);
+
+        var snapshotOpts = services.GetRequiredService<IOptions<SnapshotResolverOptions>>().Value;
+        var snapshotProviders = services.GetRequiredService<IEnumerable<ISnapshotProvider>>();
+        StartupValidation.ValidateSnapshotProviders(subsOpts.Subscriptions, snapshotOpts.DefaultProviderName, snapshotProviders);
     }
 }

@@ -152,6 +152,48 @@ The deliberate trade-off was to raise the new types rather than cascade `Subscri
 
 **Impact:** API surface correctness. No functional impact. No external consumers exist.
 
+### ID-11: `CapturingLogger<T>` duplicated across 3 test assemblies — Rule of Three
+
+**Source:** reviewer (Phase 5 REVIEW-2.2, 2026-04-26)
+**Severity:** Minor
+**Status:** Open
+
+**Description:**
+`CapturingLogger<T>` is now duplicated in three test assemblies:
+- `tests/FrigateRelay.Host.Tests/CapturingLogger.cs` (canonical, extracted in commit `c68dfaf`).
+- `tests/FrigateRelay.Plugins.BlueIris.Tests/CapturingLogger.cs` (Phase 4 duplicate).
+- `tests/FrigateRelay.Plugins.FrigateSnapshot.Tests/CapturingLogger.cs` (Phase 5 duplicate).
+
+Three copies of an 11-line helper crosses the Rule-of-Three threshold. A shared `tests/FrigateRelay.TestUtilities/` project would consolidate cleanly.
+
+**Fix:** Create `tests/FrigateRelay.TestUtilities/` with `OutputType=Library`, move the canonical `CapturingLogger.cs` there, and reference it from all three test projects. Delete the duplicates. The `run-tests.sh` glob will continue to ignore it (no `*.Tests.csproj` suffix).
+
+**Impact:** Test-code maintainability. A real bug in the canonical helper today would need 3 sync edits.
+
+---
+
+### ID-12: `Actions: ["BlueIris"]` string-form back-compat broken under `IConfiguration.Bind`
+
+**Source:** Phase 5 build (integration test regression, 2026-04-26)
+**Severity:** Medium
+**Status:** Open
+
+**Description:**
+PLAN-1.2 promised back-compat via `ActionEntryJsonConverter` so existing `appsettings.json` fixtures using `"Actions": ["BlueIris"]` (string-array form) would still bind. The converter works for direct `JsonSerializer.Deserialize` calls (5 unit tests in `ActionEntryJsonConverterTests` confirm this), **but does not fire when `IConfiguration.Bind` reads the configuration tree**.
+
+The Configuration binder builds `IReadOnlyList<ActionEntry>` by iterating `Actions:0`, `Actions:1`, ... and constructing each `ActionEntry` from child paths. When the path resolves to a scalar string (e.g. `Subscriptions:0:Actions:0 = "BlueIris"`), the binder has no `TypeConverter` for `ActionEntry` and silently produces an empty `Actions` list. The `MqttToBlueIris_HappyPath` integration test caught this — it failed with "found 0" trigger fires until the fixture was updated to the object form `Subscriptions:0:Actions:0:Plugin = "BlueIris"`.
+
+This means existing operators with Phase 4 `appsettings.json` files using the string-array shape will silently lose action firing on upgrade to Phase 5.
+
+**Fix options:**
+1. **`TypeConverter` on `ActionEntry`** — implement `ActionEntryTypeConverter` that converts a string to `new ActionEntry(stringValue)`. Register via `[TypeConverter(typeof(...))]` on the record. The Configuration binder uses `TypeConverter` for primitive-like types, so this would handle the scalar case.
+2. **Custom `IConfigureOptions<HostSubscriptionsOptions>`** — post-process the `Actions` list after binding by re-walking `IConfiguration` paths and patching scalar children into the object form.
+3. **Document the breaking change** — accept that the migration requires fixture updates, surface it in the upgrade notes.
+
+Recommended: Option 1. The TypeConverter pattern is small (~15 LOC + 3 unit tests) and idiomatic for `Microsoft.Extensions.Configuration`.
+
+**Impact:** Operator upgrade path. No data loss, but actions silently stop firing if the legacy string-array shape is used. Fail-fast would be preferable but the binder doesn't surface bind failures by default.
+
 ## Closed Issues
 
 (None)

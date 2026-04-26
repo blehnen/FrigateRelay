@@ -47,7 +47,7 @@ public sealed class MqttToBlueIrisSliceTests
             ["Subscriptions:0:Name"] = "FrontCam",
             ["Subscriptions:0:Camera"] = "front",
             ["Subscriptions:0:Label"] = "person",
-            ["Subscriptions:0:Actions:0"] = "BlueIris",
+            ["Subscriptions:0:Actions:0:Plugin"] = "BlueIris",
         });
 
         HostBootstrap.ConfigureServices(builder);
