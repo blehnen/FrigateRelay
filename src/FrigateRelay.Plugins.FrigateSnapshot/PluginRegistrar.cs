@@ -9,7 +9,7 @@ namespace FrigateRelay.Plugins.FrigateSnapshot;
 /// <summary>
 /// Registers FrigateSnapshot plugin services into the host DI container.
 /// </summary>
-internal sealed class PluginRegistrar : IPluginRegistrar
+public sealed class PluginRegistrar : IPluginRegistrar
 {
     /// <inheritdoc />
     public void Register(PluginRegistrationContext context)

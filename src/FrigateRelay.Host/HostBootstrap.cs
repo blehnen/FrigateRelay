@@ -2,6 +2,7 @@ using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Snapshots;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
@@ -47,12 +48,21 @@ internal static class HostBootstrap
                 }
             });
 
+        // Snapshot resolver options + resolver singleton.
+        builder.Services.AddOptions<SnapshotResolverOptions>()
+            .Bind(builder.Configuration.GetSection("Snapshots"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton<ISnapshotResolver, SnapshotResolver>();
+
         // Plugin registrars — each is added only when its config section is present so
         // ValidateOnStart does not reject required fields when the plugin is not in use.
         var registrationContext = new PluginRegistrationContext(builder.Services, builder.Configuration);
         List<IPluginRegistrar> registrars = [new FrigateRelay.Sources.FrigateMqtt.PluginRegistrar()];
         if (builder.Configuration.GetSection("BlueIris").Exists())
             registrars.Add(new FrigateRelay.Plugins.BlueIris.PluginRegistrar());
+        if (builder.Configuration.GetSection("FrigateSnapshot").Exists())
+            registrars.Add(new FrigateRelay.Plugins.FrigateSnapshot.PluginRegistrar());
 
         using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
         var bootstrapLogger = bootstrapLoggerFactory.CreateLogger<IPluginRegistrar>();
