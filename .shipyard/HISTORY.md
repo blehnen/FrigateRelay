@@ -283,3 +283,26 @@
   - **Reviewer agent doesn't self-persist** (since Phase 1). Orchestrator must transcribe inline reports — or the REVIEW files just don't land on disk.
   - **Builder truncation is a steady-state cost** (~30-40 tool uses). Per-task atomic commits + clear failure protocols make every truncation cheap to recover from.
 - Checkpoint tags: `pre-build-phase-5`, `post-build-phase-5`.
+
+## 2026-04-26 — Phase 5 cleanup pass (`chore(phase-5)`)
+
+- Single commit `5f90d2c` applies all 5 simplifier findings + 2 auditor advisory items + the PLAN-2.1 reviewer log typo. Net **-60 LoC** across 5 files (16 insertions / 76 deletions). 100/100 tests still passing.
+- **Source fixes**: dead `IOptions<BlueIrisOptions>` ctor param dropped; `bluiris_->blueiris_` log typo; `EventId` URL-encoded in `FrigateSnapshotProvider` (auditor A1); `ProviderName` literal → `Name` property; distinct `EventId(4)` for `_snapshotFailedMessage`; `[Url]` DataAnnotation on `FrigateSnapshotOptions.BaseUrl` (auditor A2).
+- **Test fixes**: hard-coded port 19999 → `TcpListener` ephemeral port; 62 LoC of dead `BuildProvider`/`OptionsMutator`/`ApplyOverrides` scaffolding deleted from FrigateSnapshotProviderTests.
+- **Deferred** (out of scope): PLAN-2.1 reviewer Important #3 (`PluginRegistrar` raw `IConfiguration` read — track for ID-2 sweep), PLAN-2.2 reviewer Important #2 (`IncludeBoundingBox` OR-merge — needs a dedicated test, not a fix).
+
+## 2026-04-26 — Phase 6 planned (`/shipyard:plan 6`)
+
+- **Discussion capture (CONTEXT-6.md)**: 4 user decisions (D1–D4) + 6 inherited (D5–D10). Configurable `MessageTemplate` with default; text-only when no snapshot; global `Priority` default; new `MqttToBothActionsTests` class.
+- **Researcher** (no truncation, 17 tool uses): produced `RESEARCH.md` (~420 lines) with Pushover API cookbook, `MultipartFormDataContent` recipe, Polly retry semantics for non-idempotent endpoints. Recommended **template extraction** to Abstractions (`EventTokenTemplate`) since Rule of Three is crossed (BlueIris trigger + BlueIris snapshot + Pushover message). Recommended **Option D for snapshot resolver call site**: `SnapshotContext` readonly struct passed via extended `IActionPlugin.ExecuteAsync` signature.
+- **Architect** (clean, 7 tool uses): locked **ARCH-D1 = (b)** `Resolve(EventContext, bool urlEncode = true)` — single method with default. **ARCH-D2 = Option D** confirmed. **ARCH-D3** — `Title` defaults to `null` (Pushover renders user's app name). 4 plans / 3 waves / 24 new tests (8 + 5 + 10 + 1 integration).
+- **Verifier (compliance)**: **READY**. All 7 ROADMAP deliverables owned. All 10 CONTEXT decisions honored. Test count exceeds gate by 200%.
+- **Verifier (critique)**: **READY** with 2 cautions:
+  1. **PLAN-1.2 blast radius audit**: FrigateSnapshot and FrigateMqtt test projects need spot-check for direct `IActionPlugin.ExecuteAsync` call sites (verifier confirmed none exist before truncating; cross-checked clean).
+  2. **PLAN-3.1 secret-scan tripwire**: `tests/` is NOT excluded in `.github/scripts/secret-scan.sh`. Builder must use short fake credentials (<20 chars) to pass the regex.
+  3. **PLAN-2.1/3.1 BaseAddress seam** (architect-flagged): integration test needs `PushoverOptions.BaseAddress` override for WireMock redirect; should land in PLAN-2.1 task 2 if discovered, otherwise PLAN-3.1 inline.
+- **Wave shape**:
+  - Wave 1 (parallel-safe): PLAN-1.1 `EventTokenTemplate` extraction + BlueIris migration; PLAN-1.2 `SnapshotContext` plumbing through `IActionPlugin.ExecuteAsync` + DispatchItem.
+  - Wave 2: PLAN-2.1 — new `FrigateRelay.Plugins.Pushover` project with multipart POST, snapshot attachment, 10 unit tests.
+  - Wave 3: PLAN-3.1 — HostBootstrap conditional registrar + `MqttToBothActionsTests` integration test.
+- Zero revision cycles needed. Checkpoint tag: `post-plan-phase-6`.
