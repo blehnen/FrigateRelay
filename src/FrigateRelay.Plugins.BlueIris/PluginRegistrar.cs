@@ -34,6 +34,17 @@ public sealed class PluginRegistrar : IPluginRegistrar
         context.Services.AddSingleton(sp =>
             BlueIrisUrlTemplate.Parse(sp.GetRequiredService<IOptions<BlueIrisOptions>>().Value.TriggerUrlTemplate));
 
+        // Snapshot provider — opt-in when SnapshotUrlTemplate is configured.
+        // Read directly from IConfiguration (same source as the Options bind above) to avoid
+        // building a second ServiceProvider inside Register().
+        var snapshotUrlTemplate = context.Configuration.GetSection("BlueIris")["SnapshotUrlTemplate"];
+        if (!string.IsNullOrWhiteSpace(snapshotUrlTemplate))
+        {
+            var parsedSnapshot = BlueIrisUrlTemplate.Parse(snapshotUrlTemplate); // fail-fast at startup if invalid
+            context.Services.AddSingleton(new BlueIrisSnapshotUrlTemplate(parsedSnapshot));
+            context.Services.AddSingleton<ISnapshotProvider, BlueIrisSnapshotProvider>();
+        }
+
         var httpClientBuilder = context.Services.AddHttpClient("BlueIris", (sp, client) =>
         {
             var opts = sp.GetRequiredService<IOptions<BlueIrisOptions>>().Value;
