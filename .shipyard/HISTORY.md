@@ -1,5 +1,43 @@
 # Shipyard History
 
+## 2026-04-26 — Phase 8 planned (Profiles in Configuration)
+
+- 4 plans across 3 waves, 11 tasks total. All plans ≤ 3 tasks; all acceptance criteria measurable.
+  - **Wave 1 (parallel-disjoint files, sequential commit order):**
+    - PLAN-1.1 (3 tasks) — Visibility sweep (9 types → `internal`) + `ProfileOptions` + `SubscriptionOptions.Profile` + `HostSubscriptionsOptions.Profiles`. Closes ID-2 + ID-10.
+    - PLAN-1.2 (2 tasks) — `ActionEntryTypeConverter` + tests + `[TypeConverter]` on `ActionEntry` + visibility flip on `ActionEntry`. Closes ID-12. **Commit-order dependency on PLAN-1.1 (CS0053 cascade) — must commit second OR be squashed into a single commit with PLAN-1.1.**
+  - **Wave 2:**
+    - PLAN-2.1 (3 tasks) — `ProfileResolver` + collect-all retrofit of all Phase 4–7 startup validators (D7) + ≥10 `ProfileResolutionTests` covering D1 mutex, undefined refs, and aggregated error reporting.
+  - **Wave 3:**
+    - PLAN-3.1 (3 tasks) — `appsettings.Example.json` (9-subscription user deployment in Profiles shape) + `legacy.conf` user-supplied prompt + `ConfigSizeParityTest` (hard-fails on missing fixture per D9) + CLAUDE.md ID-12-block update + ISSUES.md closure for ID-2/ID-10/ID-12.
+- Coverage verifier: **PASS** — 5/5 ROADMAP deliverables, 9/9 D-decisions, 3/3 issue closures, 14 new tests vs ≥14 gate.
+- Plan critique verifier: **READY** — all file paths exist or are properly scheduled, all API surfaces match real codebase shape, all verification commands runnable.
+- One critique note (mitigated inline): PLAN-1.2 frontmatter and Dependencies section now explicitly document the commit-order constraint on PLAN-1.1. Builder must land PLAN-1.1 first OR squash both Wave 1 plans into one commit.
+- Architect deviations from strict CONTEXT-8 reading (verifier judged all 4 as **strengthens**):
+  - `ActionEntry` visibility flip moved into PLAN-1.2 (with TypeConverter) for cleaner file ownership.
+  - `ProfileResolver` returns a new resolved list rather than mutating in place.
+  - `ConfigSizeParityTest` adds an optional bind-and-validate sub-assertion.
+  - `appsettings.Example.json` linked into test csproj via `<None Include=... Link=...>` to dodge relative-path issues.
+- Planning artifacts:
+  - `.shipyard/phases/8/CONTEXT-8.md` — 9 binding decisions D1–D9.
+  - `.shipyard/phases/8/RESEARCH.md` — researcher's investigation.
+  - `.shipyard/phases/8/plans/PLAN-{1.1,1.2,2.1,3.1}.md`.
+  - `.shipyard/phases/8/SANITIZATION-CHECKLIST.md` — user redaction checklist for `legacy.conf`.
+  - `.shipyard/phases/8/VERIFICATION.md` — coverage verdict.
+  - `.shipyard/phases/8/CRITIQUE.md` — feasibility verdict.
+
+## 2026-04-26 — Phase 8 planning kicked off (Profiles in Configuration)
+
+- Discussion capture (CONTEXT-8.md) complete. 6 decisions locked:
+  - **D1** Profile + inline = mutually exclusive (fail-fast if both, fail-fast if neither).
+  - **D2** ID-12 (legacy `Actions: ["BlueIris"]` string-form silently dropped) fixed in Phase 8 via `ActionEntryTypeConverter`.
+  - **D3** `ConfigSizeParityTest` measures the real (sanitized) production INI, not a synthetic.
+  - **D4** Snapshot precedence unchanged — 3-tier (per-action → per-subscription → global). Profiles do NOT introduce a 4th tier.
+  - **D5** Profiles are flat dictionary; no `BasedOn` / nested composition.
+  - **D6** Sanitized INI fixture is user-provided with auditable `SANITIZATION-CHECKLIST.md`; build pauses if missing — no auto-sanitization regex pass.
+- Cross-cutting note for architect: consider folding ID-2/ID-10 (visibility sweep on `ActionEntry`, `SubscriptionOptions`, `IActionDispatcher`, etc.) into Phase 8 since the same files are being modified — flag if scope feels stretched.
+- Native task scaffolding: 6 tasks created (#1 Discussion, #2 Researcher, #3 Architect, #4 Verifier-coverage, #5 Verifier-critique, #6 Commit+checkpoint). #1 complete.
+
 ## 2026-04-24 — Project initialized
 
 - Phase: 1
