@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace FrigateRelay.Host.Configuration;
@@ -24,8 +25,9 @@ namespace FrigateRelay.Host.Configuration;
 /// Consumers MUST treat <see langword="null"/> and empty-list identically:
 /// <c>(action.Validators?.Count ?? 0) == 0</c>.
 /// </param>
+[TypeConverter(typeof(ActionEntryTypeConverter))]
 [JsonConverter(typeof(ActionEntryJsonConverter))]
-public sealed record ActionEntry(
+internal sealed record ActionEntry(
     string Plugin,
     string? SnapshotProvider = null,
     IReadOnlyList<string>? Validators = null);
