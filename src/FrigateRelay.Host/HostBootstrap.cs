@@ -5,6 +5,9 @@ using FrigateRelay.Host.Matching;
 using FrigateRelay.Host.Snapshots;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 
 namespace FrigateRelay.Host;
@@ -46,6 +49,28 @@ internal static class HostBootstrap
             if (!string.IsNullOrWhiteSpace(seqUrl))
                 lc.WriteTo.Seq(seqUrl, formatProvider: null);
         });
+
+        // OpenTelemetry registration (D2 — ActivitySource + Meter always registered;
+        // OTLP exporter only when Otel:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT is set).
+        // IConfiguration key takes precedence; env var is the fallback for container deployments.
+        var otlpEndpoint = builder.Configuration["Otel:OtlpEndpoint"]
+            ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(r => r.AddService(serviceName: "FrigateRelay"))
+            .WithTracing(b =>
+            {
+                b.AddSource("FrigateRelay");
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                    b.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            })
+            .WithMetrics(b =>
+            {
+                b.AddMeter("FrigateRelay");
+                b.AddRuntimeInstrumentation();
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                    b.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            });
 
         // Host-scope services.
         builder.Services.AddOptions<HostSubscriptionsOptions>()
