@@ -134,6 +134,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         EventContext ctx,
         IActionPlugin action,
         IReadOnlyList<IValidationPlugin> validators,
+        string subscription = "",
         string? perActionSnapshotProvider = null,
         string? subscriptionDefaultSnapshotProvider = null,
         CancellationToken ct = default)
@@ -146,9 +147,13 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 "Ensure startup validation prevents unknown plugin names from reaching EnqueueAsync.");
         }
 
+        DispatcherDiagnostics.ActionsDispatched.Add(
+            1,
+            new TagList { { "subscription", subscription }, { "action", action.Name } });
+
         await channel.Writer.WriteAsync(
             new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
-                perActionSnapshotProvider, subscriptionDefaultSnapshotProvider),
+                subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider),
             ct).ConfigureAwait(false);
     }
 
@@ -169,14 +174,19 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     {
         await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
         {
-            // Restore the producer-side Activity so OTel sees the channel hop as one logical trace.
-            using var dispatchActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
-                "ActionDispatch",
+            // action.<name>.execute span — consumer-side, parented to the producer's ActivityContext
+            // captured across the Channel<T> boundary (PLAN-2.1 Task 2 / CONTEXT-9 D1).
+            var spanName = $"action.{plugin.Name.ToLowerInvariant()}.execute";
+            using var actionActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                spanName,
                 ActivityKind.Consumer,
                 parentContext: item.ParentContext);
 
-            dispatchActivity?.SetTag("action", plugin.Name);
-            dispatchActivity?.SetTag("event_id", item.Context.EventId);
+            actionActivity?.SetTag("event.id", item.Context.EventId);
+            actionActivity?.SetTag("action", plugin.Name);
+            actionActivity?.SetTag("subscription", item.Subscription);
+
+            var actionTags = new TagList { { "subscription", item.Subscription }, { "action", plugin.Name } };
 
             try
             {
@@ -205,9 +215,34 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                     // because each is its own DispatchItem (CONTEXT-7 D6 / PROJECT.md V3).
                     foreach (var validator in item.Validators)
                     {
+                        // validator.<name>.check span — one per validator per action invocation (PLAN-2.1 Task 2).
+                        var validatorSpanName = $"validator.{validator.Name.ToLowerInvariant()}.check";
+                        using var vActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                            validatorSpanName, ActivityKind.Internal);
+                        vActivity?.SetTag("event.id", item.Context.EventId);
+                        vActivity?.SetTag("validator", validator.Name);
+                        vActivity?.SetTag("action", plugin.Name);
+                        vActivity?.SetTag("subscription", item.Subscription);
+
                         var verdict = await validator.ValidateAsync(item.Context, shared, ct).ConfigureAwait(false);
+                        vActivity?.SetTag("verdict", verdict.Passed ? "pass" : "fail");
                         if (!verdict.Passed)
+                            vActivity?.SetTag("reason", verdict.Reason);
+
+                        var validatorTags = new TagList
                         {
+                            { "subscription", item.Subscription },
+                            { "action", plugin.Name },
+                            { "validator", validator.Name }
+                        };
+
+                        if (verdict.Passed)
+                        {
+                            DispatcherDiagnostics.ValidatorsPassed.Add(1, validatorTags);
+                        }
+                        else
+                        {
+                            DispatcherDiagnostics.ValidatorsRejected.Add(1, validatorTags);
                             LogValidatorRejected(
                                 _logger,
                                 item.Context.EventId,
@@ -217,8 +252,9 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                                 validator.Name,
                                 verdict.Reason ?? "(no reason)",
                                 null);
-                            dispatchActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
-                            goto NextItem; // skip the rest of this dispatch; do not invoke the action.
+                            actionActivity?.SetTag("outcome", "validator_rejected");
+                            actionActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
+                            goto NextItem; // short-circuits THIS action only (PROJECT.md V3).
                         }
                     }
                 }
@@ -230,21 +266,26 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
                 // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
                 await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
-                dispatchActivity?.SetStatus(ActivityStatusCode.Ok);
+                actionActivity?.SetTag("outcome", "success");
+                actionActivity?.SetStatus(ActivityStatusCode.Ok);
+                DispatcherDiagnostics.ActionsSucceeded.Add(1, actionTags);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Graceful shutdown — do not log, do not increment counter.
-                dispatchActivity?.SetStatus(ActivityStatusCode.Error, "Cancelled");
+                // Graceful shutdown — not an error (CONTEXT-9 D4 / ID-6 fix).
+                // Do NOT log, do NOT increment a failure counter.
+                actionActivity?.SetStatus(ActivityStatusCode.Unset);
                 return;
             }
             catch (Exception ex)
             {
                 DispatcherDiagnostics.Exhausted.Add(1,
                     new KeyValuePair<string, object?>("action", plugin.Name));
+                DispatcherDiagnostics.ActionsFailed.Add(1, actionTags);
 
                 LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
-                dispatchActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
+                actionActivity?.SetTag("outcome", "failure");
+                actionActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
                 // Do NOT rethrow — a poison item must not kill the consumer task.
             }
             NextItem:;

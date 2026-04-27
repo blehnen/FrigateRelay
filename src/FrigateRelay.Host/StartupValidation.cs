@@ -30,6 +30,10 @@ internal static class StartupValidation
     {
         var errors = new List<string>();
 
+        // Pass 0 — observability endpoint URI validation (D2 fail-fast on malformed endpoint).
+        var configuration = services.GetRequiredService<IConfiguration>();
+        ValidateObservability(configuration, errors);
+
         // Pass 1 — profile resolution (D1 mutex + undefined-profile guard).
         var resolved = ProfileResolver.Resolve(options, errors);
 
@@ -50,6 +54,23 @@ internal static class StartupValidation
             throw new InvalidOperationException(
                 "Startup configuration invalid:\n  - " + string.Join("\n  - ", errors));
         }
+    }
+
+    /// <summary>
+    /// Validates observability endpoint URIs. A non-empty <c>Otel:OtlpEndpoint</c> or
+    /// <c>Serilog:Seq:ServerUrl</c> that is not a valid absolute URI is an operator error
+    /// that would cause silent export failures at runtime. Accumulates into
+    /// <paramref name="errors"/> (D7 collect-all).
+    /// </summary>
+    internal static void ValidateObservability(IConfiguration config, ICollection<string> errors)
+    {
+        var endpoint = config["Otel:OtlpEndpoint"];
+        if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
+            errors.Add($"Otel:OtlpEndpoint '{endpoint}' is not a valid absolute URI.");
+
+        var seq = config["Serilog:Seq:ServerUrl"];
+        if (!string.IsNullOrWhiteSpace(seq) && !Uri.TryCreate(seq, UriKind.Absolute, out _))
+            errors.Add($"Serilog:Seq:ServerUrl '{seq}' is not a valid absolute URI.");
     }
 
     /// <summary>

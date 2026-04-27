@@ -36,6 +36,7 @@ public sealed class EventPumpDispatchTests
             Arg.Is<EventContext>(c => c.EventId == "ev-1"),
             Arg.Is<IActionPlugin>(p => p.Name == "BlueIris"),
             Arg.Is<IReadOnlyList<IValidationPlugin>>(v => v.Count == 0),
+            Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
@@ -63,6 +64,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<EventContext>(),
             Arg.Any<IActionPlugin>(),
             Arg.Any<IReadOnlyList<IValidationPlugin>>(),
+            Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
@@ -90,6 +92,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<EventContext>(),
             Arg.Is<IActionPlugin>(p => p.Name == "BlueIris"),
             Arg.Any<IReadOnlyList<IValidationPlugin>>(),
+            Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
@@ -98,6 +101,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<EventContext>(),
             Arg.Is<IActionPlugin>(p => p.Name == "Pushover"),
             Arg.Any<IReadOnlyList<IValidationPlugin>>(),
+            Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());

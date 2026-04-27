@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
@@ -83,32 +84,68 @@ internal sealed class EventPump : BackgroundService
         {
             await foreach (var context in source.ReadEventsAsync(ct).WithCancellation(ct).ConfigureAwait(false))
             {
+                // mqtt.receive span — wraps the entire per-event processing body (PLAN-2.1 Task 1).
+                using var receiveActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                    "mqtt.receive", ActivityKind.Server);
+                receiveActivity?.SetTag("event.id", context.EventId);
+                receiveActivity?.SetTag("event.source", source.Name);
+
+                DispatcherDiagnostics.EventsReceived.Add(
+                    1,
+                    new TagList { { "camera", context.Camera }, { "label", context.Label } });
+
                 var subs = _subsMonitor.CurrentValue.Subscriptions;
-                var matches = SubscriptionMatcher.Match(context, subs);
+
+                // event.match span — wraps subscription matching and dedupe (PLAN-2.1 Task 1).
+                IReadOnlyList<SubscriptionOptions> matches;
+                using (var matchActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                    "event.match", ActivityKind.Internal))
+                {
+                    matchActivity?.SetTag("event.id", context.EventId);
+                    matchActivity?.SetTag("camera", context.Camera);
+                    matchActivity?.SetTag("label", context.Label);
+
+                    matches = SubscriptionMatcher.Match(context, subs);
+                    matchActivity?.SetTag("subscription_count_matched", matches.Count);
+                }
+
                 foreach (var sub in matches)
                 {
                     if (!_dedupe.TryEnter(sub, context)) continue;
                     LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
 
-                    foreach (var entry in sub.Actions)
+                    DispatcherDiagnostics.EventsMatched.Add(
+                        1,
+                        new TagList { { "camera", context.Camera }, { "label", context.Label }, { "subscription", sub.Name } });
+
+                    // dispatch.enqueue span — wraps per-subscription action enqueue loop (PLAN-2.1 Task 1).
+                    using (var enqueueActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+                        "dispatch.enqueue", ActivityKind.Producer))
                     {
-                        // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
-                        // against registered plugins at startup. An IndexerKeyNotFoundException here
-                        // indicates a startup-validation bug — throw rather than silently drop.
-                        var plugin = _actionsByName[entry.Plugin];
+                        enqueueActivity?.SetTag("event.id", context.EventId);
+                        enqueueActivity?.SetTag("subscription", sub.Name);
+                        enqueueActivity?.SetTag("action_count", sub.Actions.Count);
 
-                        // Resolve per-action validator instances by key (CONTEXT-7 D2 / RESEARCH §2).
-                        // Treat null and empty Validators identically (PLAN-1.2 contract). Resolution is
-                        // safe at this point because StartupValidation.ValidateValidators ran in
-                        // HostBootstrap.ValidateStartup and confirmed every key resolves.
-                        IReadOnlyList<IValidationPlugin> validators = entry.Validators is { Count: > 0 } keys
-                            ? keys.Select(k => _services.GetRequiredKeyedService<IValidationPlugin>(k)).ToArray()
-                            : Array.Empty<IValidationPlugin>();
+                        foreach (var entry in sub.Actions)
+                        {
+                            // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
+                            // against registered plugins at startup. An IndexerKeyNotFoundException here
+                            // indicates a startup-validation bug — throw rather than silently drop.
+                            var plugin = _actionsByName[entry.Plugin];
 
-                        await _dispatcher.EnqueueAsync(
-                            context, plugin, validators,
-                            entry.SnapshotProvider, sub.DefaultSnapshotProvider, ct).ConfigureAwait(false);
-                        LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
+                            // Resolve per-action validator instances by key (CONTEXT-7 D2 / RESEARCH §2).
+                            // Treat null and empty Validators identically (PLAN-1.2 contract). Resolution is
+                            // safe at this point because StartupValidation.ValidateValidators ran in
+                            // HostBootstrap.ValidateStartup and confirmed every key resolves.
+                            IReadOnlyList<IValidationPlugin> validators = entry.Validators is { Count: > 0 } keys
+                                ? keys.Select(k => _services.GetRequiredKeyedService<IValidationPlugin>(k)).ToArray()
+                                : Array.Empty<IValidationPlugin>();
+
+                            await _dispatcher.EnqueueAsync(
+                                context, plugin, validators,
+                                sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider, ct).ConfigureAwait(false);
+                            LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
+                        }
                     }
                 }
             }
@@ -119,6 +156,7 @@ internal sealed class EventPump : BackgroundService
         }
         catch (Exception ex)
         {
+            DispatcherDiagnostics.ErrorsUnhandled.Add(1);
             LogPumpFaulted(_logger, source.Name, ex, null);
         }
         finally

@@ -23,6 +23,10 @@ internal interface IActionDispatcher
     /// Phase 4 always passes <c>Array.Empty&lt;IValidationPlugin&gt;()</c>; Phase 7 populates
     /// per-action validators (CONTEXT-4 D4).
     /// </param>
+    /// <param name="subscription">
+    /// The subscription name that produced this dispatch item.
+    /// Carried for telemetry tagging per CONTEXT-9 D3.
+    /// </param>
     /// <param name="perActionSnapshotProvider">
     /// Per-action snapshot provider override from <c>ActionEntry.SnapshotProvider</c>;
     /// <see langword="null"/> falls through to per-subscription, then global tiers.
@@ -37,7 +41,8 @@ internal interface IActionDispatcher
         EventContext ctx,
         IActionPlugin action,
         IReadOnlyList<IValidationPlugin> validators,
-        string? perActionSnapshotProvider,
-        string? subscriptionDefaultSnapshotProvider,
+        string subscription = "",
+        string? perActionSnapshotProvider = null,
+        string? subscriptionDefaultSnapshotProvider = null,
         CancellationToken ct = default);
 }
