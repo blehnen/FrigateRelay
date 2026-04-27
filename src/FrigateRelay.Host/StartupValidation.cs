@@ -31,8 +31,11 @@ internal static class StartupValidation
         var errors = new List<string>();
 
         // Pass 0 — observability endpoint URI validation (D2 fail-fast on malformed endpoint).
-        var configuration = services.GetRequiredService<IConfiguration>();
-        ValidateObservability(configuration, errors);
+        // GetService (not GetRequired) so unit tests that build a minimal ServiceCollection
+        // without IConfiguration still exercise passes 1-4 without failure.
+        var configuration = services.GetService<IConfiguration>();
+        if (configuration is not null)
+            ValidateObservability(configuration, errors);
 
         // Pass 1 — profile resolution (D1 mutex + undefined-profile guard).
         var resolved = ProfileResolver.Resolve(options, errors);
