@@ -176,16 +176,17 @@ Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`
 
 **Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
 **Severity:** Minor
-**Status:** Open — folded into PLAN-3.1 scope (Wave 3 TDD)
+**Status:** **Closed** (commit `9dfdb83`, Phase 9 PLAN-3.1 Task 1)
 
 **Description:**
-`StartupValidation.ValidateObservability` was added in PLAN-2.2 commit `c7ee4d1` but has no direct tests. The existing `ValidateAll` test suite supplies a minimal `ServiceCollection` without `IConfiguration`, so the `if (configuration is not null)` guard skips Pass 0 entirely — no test exercises `ValidateObservability`. A future refactor that removes the guard would silently regress fail-fast behavior.
+`StartupValidation.ValidateObservability` was added in PLAN-2.2 commit `c7ee4d1` but had no direct tests. The existing `ValidateAll` test suite supplies a minimal `ServiceCollection` without `IConfiguration`, so the `if (configuration is not null)` guard skips Pass 0 entirely — no test exercises `ValidateObservability`. A future refactor that removes the guard would silently regress fail-fast behavior.
 
-**Fix (PLAN-3.1 scope):** Add 3 tests in `tests/FrigateRelay.Host.Tests/Observability/` calling `StartupValidation.ValidateObservability` directly via `InternalsVisibleTo`:
+**Resolution:**
+Added `tests/FrigateRelay.Host.Tests/Observability/ValidateObservabilityTests.cs` (3 tests):
 1. malformed `Otel:OtlpEndpoint` (e.g. `"not-a-uri"`) produces one error containing `"Otel:OtlpEndpoint"`.
 2. malformed `Serilog:Seq:ServerUrl` produces one error containing `"Serilog:Seq:ServerUrl"`.
 3. valid absolute URIs for both keys produce zero errors.
-Use `new ConfigurationBuilder().AddInMemoryCollection(...).Build()` as the config source.
+Uses `new ConfigurationBuilder().AddInMemoryCollection(...).Build()` as the config source.
 
 ---
 
@@ -222,25 +223,13 @@ Use `new ConfigurationBuilder().AddInMemoryCollection(...).Build()` as the confi
 
 ---
 
-### ID-16: `ValidateObservability` has no unit tests
+### ID-16: `ValidateObservability` has no unit tests  *[CLOSED 2026-04-27]*
 
 **Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
 **Severity:** Important
-**Status:** Open
+**Status:** **Closed** (commit `9dfdb83`, Phase 9 PLAN-3.1 Task 1)
 
-**Description:**
-`src/FrigateRelay.Host/StartupValidation.cs` lines 68–77 implement `ValidateObservability`. The existing `ValidateAll` test suite builds a minimal `ServiceCollection` without `IConfiguration`, causing Pass 0 to be skipped entirely via the `if (configuration is not null)` null-guard (line 37). No test exercises the method directly. A malformed `Otel:OtlpEndpoint` or `Serilog:Seq:ServerUrl` that should fail startup could be silently accepted if a future refactor removes or bypasses the guard.
-
-**Fix:** Add three tests to `tests/FrigateRelay.Host.Tests` targeting `StartupValidation.ValidateObservability` directly (the method is `internal static`, accessible via `InternalsVisibleTo`):
-1. Malformed `Otel:OtlpEndpoint` (e.g. `"not-a-uri"`) produces exactly one error containing `"Otel:OtlpEndpoint"`.
-2. Malformed `Serilog:Seq:ServerUrl` produces exactly one error containing `"Serilog:Seq:ServerUrl"`.
-3. Valid absolute URIs for both keys produce zero errors.
-
-Use `new ConfigurationBuilder().AddInMemoryCollection(...)` to supply the config without spinning up the full host.
-
-**Reactivation triggers:**
-- Next builder pass touching `StartupValidation.cs`.
-- Phase 9 Wave 3 test-count gate review.
+**Resolution:** Duplicate entry — see first ID-16 entry above. Closed by the same commit.
 
 ---
 
