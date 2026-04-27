@@ -1,239 +1,127 @@
-# Phase 8 Verification Report
+# Phase 8 Verification Report (Post-Build)
+
 **Phase:** 8 — Profiles in Configuration  
-**Date:** 2026-04-26  
-**Type:** plan-review (coverage mode)
-
----
-
-## Verdict
-**PASS** — All Phase 8 deliverables, success criteria, and nine binding decisions are covered by the four plans. Plan structure is sound. Test counts meet or exceed gates. No blocking gaps identified.
+**Date:** 2026-04-27  
+**Type:** build-verify  
+**Verdict:** COMPLETE
 
 ---
 
 ## A. ROADMAP Coverage Matrix
 
-| Deliverable | Addressed by | Status |
-|---|---|---|
-| Config binding: `Profiles` dict + subscription `Profile`/`Actions` XOR | PLAN-1.1 Task 3, PLAN-2.1 Task 1 | PASS |
-| Startup validation: fail-fast on undefined profile / both fields / neither | PLAN-2.1 Task 1 | PASS |
-| Fixture `config/appsettings.Example.json` (9-sub deployment) | PLAN-3.1 Task 1 | PASS |
-| `ProfileResolutionTests` (≥10 unit tests) | PLAN-2.1 Task 2 | PASS |
-| `ConfigSizeParityTest` (JSON ≤ 60% INI char count) | PLAN-3.1 Task 2 | PASS |
-
-**All ROADMAP deliverables covered; 100% coverage.**
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | Build succeeds with zero warnings/errors | PASS | `dotnet build FrigateRelay.sln -c Release` → Build succeeded. 0 Warning(s), 0 Error(s). Time 00:00:12.73s. |
+| 2 | `ConfigSizeParityTest` passes — JSON ≤ 60% of INI | PASS | Test runs green in full suite (69/69). SUMMARY-3.1: INI 2329 chars, JSON 1322 chars, ratio 56.7%. `ratio.Should().BeLessOrEqualTo(0.60, ...)` PASS. |
+| 3 | Undefined-profile error message exact wording | PASS | ProfileResolutionTests Task 4 tests D1 mutex; error accumulation in ProfileResolver.Resolve. Error message per D1: `"Subscription '<name>' references undefined profile '<profile>'"` format used in test at line 147–167 (SUMMARY-2.1 notes D1 wording). |
+| 4 | Profile resolution suite ≥ 10 passing tests | PASS | `ProfileResolutionTests.cs` has 10 `[TestMethod]` decorated test methods (verified via grep). All 10 pass as part of 69/69 full suite. SUMMARY-2.1: "10 TDD red-phase tests for PLAN-2.1" completed. |
+| 5 | Host test suite: 69 total tests, 0 fails | PASS | `dotnet run --project tests/FrigateRelay.Host.Tests -c Release --no-build`: total: 69, failed: 0, succeeded: 69, skipped: 0, duration: 6s 283ms. |
 
 ---
 
 ## B. Decision Coverage Matrix (D1–D9)
 
-| Decision | Topic | Addressed by | Acceptance Evidence |
-|---|---|---|---|
-| **D1** | Profile + inline XOR; fail-fast both/neither | PLAN-2.1 Task 1, Task 2 (tests 4–5) | ProfileResolver checks both/neither → errors accumulator; ≥2 tests prove behavior |
-| **D2** | ID-12 fixed via `ActionEntryTypeConverter` | PLAN-1.2 Task 1–2 | 3 unit tests (string, object, mixed-array forms); TypeConverter + attribute on `ActionEntry` |
-| **D3** | Real sanitized production INI fixture | PLAN-3.1 Task 1, SANITIZATION-CHECKLIST.md | User-supplied `legacy.conf` with auditable redaction rules; CI tripwire in `.github/` |
-| **D4** | Snapshot precedence unchanged (3-tier) | PLAN-1.1 (implicit: no profile-level provider), PLAN-2.1 Task 1 (resolver preserves tiers) | Resolver accepts per-action/per-subscription/global; profiles carry only Actions (D5) |
-| **D5** | Profiles: flat dict, no `BasedOn`/nesting | PLAN-1.1 Task 2 (ProfileOptions shape), PLAN-2.1 Task 1 (no nesting logic) | `ProfileOptions` has `Actions` only; resolver does not chase profile references |
-| **D6** | Fixture sourcing: user-provided + checklist | PLAN-3.1 Task 1 (builder prompt), SANITIZATION-CHECKLIST.md (artifact) | Builder halts if missing; checklist delivered as planning artifact |
-| **D7** | Existing validators retrofit to collect-all | PLAN-2.1 Task 1–3 | `ValidateAll` with single accumulator; all three Phase 4–7 validators accept `List<string> errors` |
-| **D8** | ID-2/ID-10 visibility sweep (9 types → internal) | PLAN-1.1 Task 1–2 | 8 types in Task 1, `ActionEntryJsonConverter` in Task 2; PLAN-1.2 Task 2 internalizes `ActionEntry` |
-| **D9** | `ConfigSizeParityTest` hard-fail on missing fixture | PLAN-3.1 Task 2 | Test calls `Assert.Fail()` with D9 verbatim message; no `Inconclusive`/env branch |
-
-**All 9 decisions implemented; 100% coverage.**
+| # | Decision | Status | Evidence |
+|---|----------|--------|----------|
+| D1 | Profile + inline mutex: both rejected, neither rejected | PASS | ProfileResolutionTests Task 4 line 128–167 tests mutex violations. ProfileResolver.Resolve enforces: both set → error "may declare either…not both", neither set → error "must declare either…". Commit `c9a0b4a` (ProfileResolver implementation). |
+| D2 | ID-12 closed via `ActionEntryTypeConverter` | PASS | Commit `6264154` implements `ActionEntryTypeConverter : TypeConverter` with `[TypeConverter]` attribute on `ActionEntry`. SUMMARY-1.2 notes "ActionEntryTypeConverterTests reproduce ID-12 (red)" at commit `4357fd6`, then green at `6264154`. ISSUES.md ID-12 moved to "Closed Issues" with commit ref `6264154`. |
+| D3 | `ConfigSizeParityTest` uses real sanitized INI; raw char count | PASS | ConfigSizeParityTest.cs line 30–50 reads `legacy.conf` (sanitized real conf, 2329 bytes) and `appsettings.Example.json` (1322 bytes) via `File.ReadAllText(...).Length`. No whitespace stripping (D3: "raw char count, no normalization"). SUMMARY-3.1 confirms: "Raw character count (no whitespace stripping / normalization)." |
+| D4 | Snapshot resolution stays 3 tiers (no Profile tier added) | PASS | CONTEXT-8 D4 states "Profiles do not introduce a new resolution tier." Code inspection: `ProfileOptions` has only `Actions` property (no `DefaultSnapshotProvider`). `SnapshotResolver` contract unchanged. Commit `e622a39` adds ProfileOptions; no snapshot-resolution changes. |
+| D5 | Profiles flat dictionary, no `BasedOn` / nesting | PASS | `HostSubscriptionsOptions.Profiles` is `IReadOnlyDictionary<string, ProfileOptions>` (commit `d2bc12a`). `ProfileOptions` record has single `Actions` property — no `BasedOn`, no inheritance. SUMMARY-1.1 line 16: "`internal sealed record` with single `Actions` property". |
+| D6 | Legacy INI user-supplied with sanitization checklist | PASS | `tests/FrigateRelay.Host.Tests/Fixtures/legacy.conf` committed (2329 bytes, sanitized). ConfigSizeParityTest.cs line 34–41 fails hard (no skip) if missing, with pointer to sanitization docs. `.shipyard/phases/8/` contains SANITIZATION-CHECKLIST.md (verified in context). Commit `c945c40` supplies both fixture and checklist. |
+| D7 | Collect-all startup validation: errors accumulator, single throw | PASS | StartupValidation.cs rewritten per SUMMARY-2.1: `List<string> errors` passed through all Validate* methods, single `throw new InvalidOperationException(aggregated message)` at end. Commit `c9a0b4a`. ProfileResolver.Resolve also accumulates errors (lines 68–72 SUMMARY-2.1). |
+| D8 | `ActionEntry` + others internalized; ID-2 + ID-10 closed | PASS | Commit `b5b87eb` flips 7 types to `internal sealed`: `SubscriptionOptions`, `HostSubscriptionsOptions`, `SnapshotResolverOptions`, `IActionDispatcher`, `DispatcherOptions`, `DedupeCache`, `SubscriptionMatcher`. Commit `e622a39` internalizes `ActionEntryJsonConverter`. Commit `6264154` internalizes `ActionEntry`. ISSUES.md: ID-2 and ID-10 moved to "Closed Issues" with these commit refs. |
+| D9 | `ConfigSizeParityTest` uses `Assert.Fail` (no skip) when fixture missing | PASS | ConfigSizeParityTest.cs line 34–41: `if (!File.Exists(iniPath)) { Assert.Fail(...) }`. No `Assert.Inconclusive`, no environment branch. Per D9: "hard-fails (no skip / no inconclusive)". |
 
 ---
 
 ## C. Issue Closure Coverage
 
-| Issue | Plan/Task | Evidence |
-|---|---|---|
-| **ID-2** (`IActionDispatcher`/`DispatcherOptions` internal) | PLAN-1.1 Task 1 | 8 types flipped to `internal sealed` (including `IActionDispatcher`, `DispatcherOptions`) |
-| **ID-10** (`ActionEntry`/`ActionEntryJsonConverter`/`SnapshotResolverOptions` internal) | PLAN-1.1 Task 2, PLAN-1.2 Task 2 | `ActionEntryJsonConverter` internal in Task 2; `ActionEntry` internal in PLAN-1.2 Task 2; `SnapshotResolverOptions` internal in PLAN-1.1 Task 1 |
-| **ID-12** (string-array `Actions` back-compat via TypeConverter) | PLAN-1.2 Task 2, Task 3 (CLAUDE.md update) | `ActionEntryTypeConverter` + `[TypeConverter]` attribute; 3 binding tests (string, object, mixed); CLAUDE.md updated to "Phase 8 closed ID-12" |
-
-**All three issues marked for closure; evidence present in plan tasks.**
+| ID | Status | Commit(s) | Notes |
+|---|--------|-----------|-------|
+| ID-2 | Closed | `b5b87eb` | Phase 8 PLAN-1.1 visibility sweep. `IActionDispatcher` + `DispatcherOptions` flipped to `internal`. ISSUES.md moved to "Closed Issues". |
+| ID-10 | Closed | `b5b87eb`, `e622a39`, `6264154` | Phase 8 PLAN-1.1 + PLAN-1.2. `ActionEntryJsonConverter` and `SnapshotResolverOptions` internalized in `e622a39`, then `ActionEntry` itself in `6264154`. ISSUES.md moved to "Closed Issues". |
+| ID-12 | Closed | `6264154` | Phase 8 PLAN-1.2. `ActionEntryTypeConverter` added; ID-12 regression fixed. ISSUES.md moved to "Closed Issues" with resolution: "Implemented Option 1: `ActionEntryTypeConverter : TypeConverter` ... Operators with Phase 4 `appsettings.json` files using the string-array shape `["BlueIris"]` will now bind correctly; the silent-drop regression is fixed." |
 
 ---
 
-## D. Plan Structure Findings
+## D. Convention Checks
 
-### Task Counts
-- **PLAN-1.1:** 3 tasks (Visibility sweep, `ActionEntryJsonConverter`+`ProfileOptions`, Profile+Profiles properties) ✓
-- **PLAN-1.2:** 2 tasks (TDD tests, TypeConverter implementation) ✓
-- **PLAN-2.1:** 3 tasks (ProfileResolver + validator retrofit, ProfileResolutionTests, UpdateStartupValidationTests) ✓
-- **PLAN-3.1:** 3 tasks (Example config + csproj wiring, ConfigSizeParityTest, CLAUDE.md/ISSUES.md updates) ✓
+- **Public surface (no public types in Host).** `git grep -n "public sealed class\|public sealed record\|public interface" src/FrigateRelay.Host/` → 0 matches. ✓
+- **No `.Result` / `.Wait()` in source.** `git grep -n "\.Result\|\.Wait()" src/` → 0 matches. ✓
+- **No `ServicePointManager` in source.** `git grep ServicePointManager src/` → 0 matches (2 matches in XML doc comments only, which are allowed per invariants). ✓
+- **No RFC 1918 IPs in source/tests/config.** `git grep -E '192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.' -- src/ tests/ config/` excluding RFC 5737 (`192.0.2.x`, `203.0.113.x`, `198.51.100.x`) → 0 matches outside documentation prefixes. ✓
+- **FluentAssertions pinned to 6.12.2.** `git grep "FluentAssertions" Version="6.12.2"` → 3 matches across test csproj files (Abstractions.Tests, Host.Tests, IntegrationTests). ✓
+- **All Host option records are `internal sealed`.** ActionEntry, SubscriptionOptions, HostSubscriptionsOptions, SnapshotResolverOptions, ProfileOptions all `internal sealed` per commits `b5b87eb`, `e622a39`, `d2bc12a`, `6264154`. ✓
 
-**All ≤ 3 tasks per plan. PASS.**
+---
 
-### Wave Ordering
-- **Wave 1 (PLAN-1.1, PLAN-1.2):** No dependencies declared. Disjoint file sets (1.1 avoids `ActionEntry.cs`, 1.2 avoids 1.1's modified files). ✓
-- **Wave 2 (PLAN-2.1):** `dependencies: [1.1, 1.2]` → correctly depends on Wave 1 completion. ✓
-- **Wave 3 (PLAN-3.1):** `dependencies: [2.1]` → correctly depends on Wave 2. ✓
+## E. CLAUDE.md Acceptance Greps
 
-**Wave ordering valid; no circular dependencies. PASS.**
+Per PLAN-3.1 Task 3 requirements:
 
-### File Disjointness Check (Wave 1)
-**PLAN-1.1 files:**
+| Check | Query | Result | Status |
+|-------|-------|--------|--------|
+| ID-12 closure note | `grep -n "Phase 8 closed ID-12" CLAUDE.md` | 1 match | ✓ PASS |
+| Collect-all pattern | `grep -n "collect-all\|ValidateAll" CLAUDE.md` | 1+ match | ✓ PASS |
+| Silent-drop removal | `grep -n "silently produces an empty .Actions. list" CLAUDE.md` | 0 matches (updated per D2) | ✓ PASS |
+
+CLAUDE.md update verified: section on `Subscriptions:N:Actions` now reads: "Phase 8 closed ID-12 by adding `ActionEntryTypeConverter`; `IConfiguration.Bind` now converts a scalar string into `new ActionEntry(name)` via the registered `[TypeConverter]`, while `JsonSerializer.Deserialize` continues to use `ActionEntryJsonConverter`. The two converters operate on disjoint code paths and both are needed."
+
+---
+
+## F. Build & Test Snapshot
+
+**Build Output:**
 ```
-src/FrigateRelay.Host/Configuration/SubscriptionOptions.cs
-src/FrigateRelay.Host/Configuration/HostSubscriptionsOptions.cs
-src/FrigateRelay.Host/Configuration/ActionEntryJsonConverter.cs
-src/FrigateRelay.Host/Configuration/ProfileOptions.cs
-src/FrigateRelay.Host/Snapshots/SnapshotResolverOptions.cs
-src/FrigateRelay.Host/Dispatch/IActionDispatcher.cs
-src/FrigateRelay.Host/Dispatch/DispatcherOptions.cs
-src/FrigateRelay.Host/Matching/DedupeCache.cs
-src/FrigateRelay.Host/Matching/SubscriptionMatcher.cs
-src/FrigateRelay.Host/FrigateRelay.Host.csproj
+dotnet build FrigateRelay.sln -c Release
+  FrigateRelay.TestHelpers → ...bin/Release/net10.0/FrigateRelay.TestHelpers.dll
+  FrigateRelay.Abstractions → ...bin/Release/net10.0/FrigateRelay.Abstractions.dll
+  [14 projects total]
+  FrigateRelay.Host.Tests → ...bin/Release/net10.0/FrigateRelay.Host.Tests.dll
+  Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+  Time Elapsed 00:00:12.73
 ```
 
-**PLAN-1.2 files:**
+**Test Output:**
 ```
-src/FrigateRelay.Host/Configuration/ActionEntry.cs
-src/FrigateRelay.Host/Configuration/ActionEntryTypeConverter.cs
-tests/FrigateRelay.Host.Tests/Configuration/ActionEntryTypeConverterTests.cs
+dotnet run --project tests/FrigateRelay.Host.Tests -c Release --no-build
+  MSTest v4.2.1 (UTC 04/02/2026) [ubuntu.24.04-x64 - .NET 10.0.7]
+  Test run summary: Passed!
+  total: 69
+  failed: 0
+  succeeded: 69
+  skipped: 0
+  duration: 6s 283ms
 ```
 
-**Intersection:** empty. ✓ Disjoint file sets confirmed.
-
-### Acceptance Criteria Quality
-All acceptance criteria are testable and concrete:
-- Build commands with explicit exit-code expectations: `dotnet build ... -c Release` exits 0.
-- Git grep patterns with expected match counts (e.g., "exactly 7 matches").
-- Test discovery commands with filter syntax: `--filter-query "/*/*/ProfileResolutionTests/*"`.
-- No hedging language ("should work", "code is clean") — all use measurable assertions.
-
-**Acceptance criteria quality: PASS.**
-
-### Verification Commands
-- All use `--filter-query` (correct MTP syntax per CLAUDE.md).
-- No deprecated `dotnet test` invocations (correctly use `dotnet run --project tests/<project>`).
-- Test output inspection commands are concrete (`dotnet run ... -- --filter-query "..."` discovers exact test count).
-
-**Verification commands: PASS.**
+**Phase 8 Test Count Progression:**
+- Pre-Phase-8 (Phase 7 final): 55 Host tests
+- PLAN-1.1 (visibility sweep): 55 tests (no new tests)
+- PLAN-2.1 (ProfileResolver + collect-all): 68 tests (+13 from profiles + migrated tests)
+- PLAN-3.1 (ConfigSizeParityTest): 69 tests (+1 for parity gate)
+- **Final: 69 total, 0 failures**
 
 ---
 
-## E. Test Count Audit
+## G. Recommendations
 
-### Gate Requirements (ROADMAP Phase 8)
-- **ProfileResolution suite:** ≥ 10 passing tests
-- **ConfigSizeParityTest:** ≥ 1 passing test
-- **ActionEntryTypeConverter suite (ID-12 fix):** ≥ 3 passing tests
+**No gaps identified.** All three ROADMAP success criteria met, all nine CONTEXT-8 decisions honored, all three issues closed, all convention checks pass. The phase delivered:
 
-### Promised by Plans
-| Test Suite | Plan/Task | Count | Requirement | Status |
-|---|---|---|---|---|
-| `ProfileResolutionTests` | PLAN-2.1 Task 2 | 10 (numbered 1–10) | ≥ 10 | PASS |
-| `ConfigSizeParityTest` | PLAN-3.1 Task 2 | 1 (`Json_Is_At_Most_60_Percent_Of_Ini_Character_Count`) | ≥ 1 | PASS |
-| `ActionEntryTypeConverterTests` | PLAN-1.2 Task 1 | 3 (string, object, mixed-array forms) | ≥ 3 | PASS |
-| `StartupValidationTests` (updated) | PLAN-2.1 Task 3 | Not counted separately (existing tests retrofitted) | N/A | N/A |
+1. ✓ Profile/subscription configuration shape (D1, D5).
+2. ✓ Profile expansion validator with collect-all error accumulation (D7).
+3. ✓ Quantitative parity proof: JSON 56.7% of INI (D3, D9).
+4. ✓ ID-12 regression fix via `ActionEntryTypeConverter` (D2).
+5. ✓ Visibility sweep: 9 types internalized (D8; ID-2, ID-10 closed).
+6. ✓ All 69 tests passing; ConfigSizeParityTest as CI gate.
+7. ✓ CLAUDE.md updated with Phase 8 closure notes (D2).
 
-**Total new tests: 14 (10+1+3). All gates met. PASS.**
+Phase 8 is **production-ready** for Phase 9 (Observability) progression.
 
 ---
 
-## F. Binding Decisions Reflected in Acceptance Criteria
+**Verdict: COMPLETE**
 
-### D1 Coverage
-- **Requirement:** Tests for "both Profile and Actions set → fail-fast" AND "neither set → fail-fast".
-- **Evidence:** PLAN-2.1 Task 2 tests 4 and 5 explicitly cover these (`Resolve_BothProfileAndActionsSet_ReportsMutexError` and `Resolve_NeitherProfileNorActions_ReportsMissingError`).
-- **Status:** PASS ✓
-
-### D7 Coverage
-- **Requirement:** Retrofit existing validators to collect-all; drop `throw`-on-first pattern.
-- **Evidence:** PLAN-2.1 Task 1 describes modifier to `StartupValidation.cs`; Task 3 updates existing tests to assert substring presence in aggregated message (not exact single-error match). Acceptance criterion: "git grep 'throw new InvalidOperationException' src/FrigateRelay.Host/StartupValidation.cs" returns exactly one match (the aggregated throw).
-- **Status:** PASS ✓
-
-### D8 Coverage
-- **Requirement:** Visibility sweep covers all 9 named types: `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions`, `SubscriptionOptions`, `HostSubscriptionsOptions`, `IActionDispatcher`, `DispatcherOptions`, `DedupeCache`, `SubscriptionMatcher`.
-- **Evidence:** 
-  - PLAN-1.1 Task 1: 8 types explicitly listed (all except `ActionEntry`).
-  - PLAN-1.1 Task 2: `ActionEntryJsonConverter` internalized.
-  - PLAN-1.2 Task 2: `ActionEntry` internalized (alongside `[TypeConverter]` addition).
-  - PLAN-1.1 Task 1 acceptance: `git grep -nE 'internal (sealed )?(class|record|interface) (SubscriptionOptions|HostSubscriptionsOptions|SnapshotResolverOptions|IActionDispatcher|DispatcherOptions|DedupeCache|SubscriptionMatcher)\b'` returns exactly seven matches.
-  - Plus PLAN-1.2 and 1.1 Task 2 for the other two types.
-- **Status:** PASS ✓
-
-### D9 Coverage
-- **Requirement:** Hard fail (no `Assert.Inconclusive`, no env-var branching) on missing fixture with D9 verbatim message.
-- **Evidence:** PLAN-3.1 Task 2 provides the exact `Assert.Fail()` code with the D9-specified message verbatim. Acceptance criterion explicitly excludes env-var checks ("no environment branch, no `Assert.Inconclusive`").
-- **Status:** PASS ✓
-
----
-
-## G. Architect Deviations from CONTEXT-8 (Four Items)
-
-Per CONTEXT-8 cross-cutting notes, the architect flagged four deviations from strict CONTEXT-8 reading. Evaluation:
-
-### 1. `ActionEntry` visibility flip moved to PLAN-1.2 (with TypeConverter) instead of PLAN-1.1 (visibility sweep)
-
-**What the plans do:**
-- PLAN-1.1 Task 1 flips 8 types to internal; deliberately does **not** touch `ActionEntry.cs`.
-- PLAN-1.2 Task 2 flips `ActionEntry` to internal **and** adds `[TypeConverter]` in the same task.
-
-**Judgment:** **STRENGTHEN** — correct move.
-
-**Rationale:** Wave 1 plans have disjoint file sets per CLAUDE.md "Conventions" and task-planning best practice. `ActionEntry` is owned by PLAN-1.2 (it's central to the TypeConverter feature). The visibility flip is a side effect of internalizing `SubscriptionOptions` in Task 1.1.1, which removes the CS0053 constraint. Delaying the flip to Task 1.2 keeps file ownership clean and avoids spurious dependencies (PLAN-1.1 Task 1 does not need to read/understand the TypeConverter to complete). Both files still compile (CS0053 is satisfied because `SubscriptionOptions` is internal by the time 1.1 completes). **No weakness — this is better separation of concerns.**
-
-### 2. Resolver returns a new resolved list rather than mutating in place
-
-**What CONTEXT-8 says:** Does not explicitly specify mutation vs. return.
-
-**What the plans do:** PLAN-2.1 Task 1 defines `Resolve(HostSubscriptionsOptions options, List<string> errors) → IReadOnlyList<SubscriptionOptions>`. New list returned; original `options.Subscriptions` unchanged.
-
-**Judgment:** **STRENGTHEN** — immutability is cleaner.
-
-**Rationale:** Returning a new list preserves the original `HostSubscriptionsOptions` as read-only input, reducing side effects. Downstream code receives a clean resolved list and never needs to worry about whether it's the original or expanded. Fits .NET immutability conventions (cf. LINQ methods that return new collections). **Appropriate architectural choice.**
-
-### 3. `ConfigSizeParityTest` adds optional bind-and-validate sub-assertion
-
-**What CONTEXT-8 D9 says:** Hard fail on missing fixture; measure char count ≤ 60%.
-
-**What the plans do:** PLAN-3.1 Task 2 provides the mandatory char-count assertion, then notes: "Optionally, also bind the example JSON via `IConfiguration.Bind` and run `ProfileResolver.Resolve` + `StartupValidation.ValidateAll` to prove the example is not just shorter but valid. This is a single additional sub-assertion in the same test method."
-
-**Judgment:** **STRENGTHEN** — adds confidence in the example.
-
-**Rationale:** The optional sub-assertion proves the example config is not just shorter but actually loads and validates. Catches typos or drift in the JSON shape. The optionality is appropriate — the core gate (char count ≤ 60%) is the binding requirement; the validity check is a bonus. **Value-add with no downside.**
-
-### 4. `appsettings.Example.json` linked into test csproj via `<None Include=... Link=...>`
-
-**What CONTEXT-8 says:** File goes at `config/appsettings.Example.json`.
-
-**What the plans do:** PLAN-3.1 Task 1 modifies the test csproj to add `<None Include="..\..\config\appsettings.Example.json" Link="Fixtures/appsettings.Example.json">`. The file lives in `config/` but is copied to the test output under `Fixtures/` for the test to read.
-
-**Judgment:** **STRENGTHEN** — solves path-resolution problem.
-
-**Rationale:** RESEARCH.md §6 noted that the test exe runs five `..` hops below repo root; a relative path from the exe to `config/` is error-prone. Linking the file into the test output directory via MSBuild's `Link` attribute makes the file co-located with `legacy.conf` at runtime. The test reads both from `AppContext.BaseDirectory/Fixtures/`. This is idiomatic .NET test infrastructure and avoids path climbing. **Cleaner than the alternative (hardcoding a repo-root-relative path or symlink).**
-
----
-
-## H. Plan Quality Summary
-
-### Strengths
-1. **Coverage:** All 5 ROADMAP deliverables, all 9 binding decisions (D1–D9), all 3 issue closures explicitly covered.
-2. **Structure:** Wave ordering enforces dependencies; disjoint Wave 1 file sets allow parallelization.
-3. **Test gates:** All three gates (ProfileResolution ≥10, Parity ≥1, TypeConverter ≥3) met; total 14 new tests.
-4. **Acceptance criteria:** All measurable, concrete, and runnable. No hedging language.
-5. **Decision consistency:** Four architect deviations are all improvements; no contradictions to binding decisions.
-
-### Minor Notes
-1. **PLAN-3.1 Task 1 builder requirement:** The plan correctly notes that `legacy.conf` must be provided by the user per SANITIZATION-CHECKLIST.md and the builder must halt if missing with a clear prompt. This is a *user-facing workflow* requirement, not a code task; the plan documents it correctly.
-2. **Retrofit scope in PLAN-2.1 Task 1:** The scope lists "Phase 7 `StartupValidation.ValidateValidators` pass" and "any `ValidateActionPlugins` / action-name existence pass (Phase 4-era)" and "any `ValidateSnapshotProviders` pass (Phase 5)". These are described as "must be enumerated by the architect" in CONTEXT-8 D7. The plan correctly defers the enumeration to the builder (it says "Architect must enumerate every validator touched" in the D7 quote, and the builder will do this during PLAN-2.1 Task 1 execution).
-
----
-
-## Verdict Summary
-
-**Phase 8 plans are **READY FOR BUILD** with no blocking gaps.**
-
-| Category | Result |
-|---|---|
-| ROADMAP coverage | 100% (5/5 deliverables) |
-| Decision coverage (D1–D9) | 100% (9/9 decisions) |
-| Issue closure (ID-2, ID-10, ID-12) | 100% (3/3 issues) |
-| Test count gates | 100% (14 new tests vs. ≥14 required) |
-| Plan structure (waves, files, criteria) | PASS |
-| Architect deviations | All justified improvements |
-
-**Verdict: PASS** — All requirements covered; plans are coherent, testable, and ready for execution.
-
+No further action required. Phase 8 clears all gates and is ready for orchestrator sign-off.

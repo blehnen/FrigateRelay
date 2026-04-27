@@ -135,6 +135,55 @@ Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`
 
 ---
 
+### ID-13: Newline sanitization missing on operator-controlled values in startup-validation exception messages
+
+**Source:** auditor (Phase 8 AUDIT-8, 2026-04-27)
+**Severity:** Low (advisory, CWE-117 log-spoofing only)
+**Status:** Open — deferred to a future hardening pass
+
+**Description:**
+`StartupValidation.cs` interpolates subscription names, profile names, plugin names, and validator keys (all operator-controlled via `appsettings.json`) directly into `InvalidOperationException` messages. The aggregated form uses `string.Join("\n  - ", errors)`, so a name containing `\n  - ` would produce a multi-line message that resembles additional validation failures in structured log output. Exploitability is negligible — the attacker already controls the config file — but the log forensics value of clean error messages is real.
+
+**Fix:** Sanitize embedded values: `name.Replace("\n", "\\n").Replace("\r", "\\r")`. Better yet, switch to structured logging where the errors list is a structured parameter rather than embedded in the message string.
+
+**Reactivation triggers:**
+- Operators report confusing log output during startup failures.
+- A general structured-logging pass is undertaken (Phase 9 observability or later).
+
+---
+
+### ID-14: `ActionEntryTypeConverter` accepts empty/whitespace plugin names
+
+**Source:** auditor (Phase 8 AUDIT-8, 2026-04-27)
+**Severity:** Low (advisory)
+**Status:** Open — deferred
+
+**Description:**
+`ActionEntryTypeConverter.ConvertFrom(string s)` returns `new ActionEntry(s)` for any input — including `""` and `"   "`. The value flows into a case-insensitive DI name lookup in `StartupValidation.ValidateActions`, which catches it as "unknown action plugin" — but the resulting message `"references unknown action plugin '   '"` is confusing.
+
+**Fix:** Add a guard in `ActionEntryTypeConverter.ConvertFrom`: `if (string.IsNullOrWhiteSpace(s)) throw new InvalidOperationException("Action plugin name cannot be empty or whitespace.");`. Trivial; deferred only because no operator has hit it.
+
+---
+
+### ID-15: Secret-scan does not cover RFC 1918 class A (`10.x.x.x`) or class B (`172.16-31.x.x`)
+
+**Source:** auditor (Phase 8 AUDIT-8, 2026-04-27)
+**Severity:** Low (CI hardening)
+**Status:** Open — deferred
+
+**Description:**
+`.github/scripts/secret-scan.sh` PATTERNS array covers `192\.168\.` (RFC 1918 class C) only. A developer accidentally committing `10.0.0.5` or `172.16.0.1` would not be caught. No such IPs exist in the committed tree today, but the tripwire's coverage is asymmetric.
+
+**Fix:** Add two patterns to PATTERNS, two LABELS entries, and two matching fixture lines in `.github/secret-scan-fixture.txt` (the tripwire self-test fails if any pattern lacks a fixture line). Patterns:
+- `10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}`
+- `172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}`
+
+**Reactivation triggers:**
+- Phase 11 (Operations & Docs) hardening pass.
+- A dependabot or contributor PR introduces an unscoped IP literal.
+
+---
+
 ## Closed Issues
 
 ### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*

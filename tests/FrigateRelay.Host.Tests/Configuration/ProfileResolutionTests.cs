@@ -41,13 +41,6 @@ public sealed class ProfileResolutionTests
         return p;
     }
 
-    private static IValidationPlugin ValidationPlugin(string key)
-    {
-        var p = Substitute.For<IValidationPlugin>();
-        p.Name.Returns(key);
-        return p;
-    }
-
     // ─── Task 2 tests ──────────────────────────────────────────────────────────
 
     /// <summary>Test 1 — profile-only subscription uses the profile's actions.</summary>

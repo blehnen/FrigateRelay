@@ -442,3 +442,31 @@
   - **`run-tests.sh` auto-discovery via `find tests -maxdepth 2`** absorbed the new CodeProjectAi test project with zero workflow edits. Phase 3's extraction (initially flagged as Rule-of-Two violation by Phase 2 simplifier) keeps paying off.
   - **`IHost` is `IDisposable` not `IAsyncDisposable`** — surprising for modern hosting; `using var app` is the correct pattern.
 - Checkpoint tags: `pre-build-phase-7`, `post-build-phase-7`.
+- [2026-04-27T13:38:18Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T13:52:29Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T16:17:35Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T16:20:53Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T16:21:51Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-27 — Phase 8 built (`/shipyard:build 8`)
+
+- **8 commits** across 3 waves + 3 orchestrator-driven cleanup commits:
+  - Wave 1 (sequential, CS0053-safe order): `b5b87eb` (flip 7 host types internal + DynamicProxyGenAssembly2 IVT), `e622a39` (internalize ActionEntryJsonConverter + ProfileOptions), `d2bc12a` (Profile/Profiles properties), `a880bac` (ProfileOptions XML docs + SUMMARY-1.1), `4357fd6` (ID-12 red TDD), `6264154` (ActionEntryTypeConverter green, internalize ActionEntry), `544516e` (close ID-2/10/12 in ISSUES + REVIEW-1.2 + SUMMARY-1.2).
+  - Wave 2: `4e1c683` / `c9a0b4a` / `200182c` (ProfileResolver + ValidateAll collect-all retrofit + 10 ProfileResolutionTests), `e340770` (orchestrator fix — restore IOptions<SnapshotResolverOptions> threading flagged by REVIEW-2.1).
+  - Wave 3: `c945c40` (appsettings.Example.json + ConfigSizeParityTest + sanitized legacy.conf + csproj wiring), `85dac72` (CLAUDE.md updates per PLAN-3.1 Task 3 + REVIEW-3.1 — Task 3 originally omitted, fixed inline by orchestrator).
+- **69/69 tests** (was 55 pre-Phase-8). Build clean, 0 warnings.
+- **2 builder truncations** at the steady ~30-40 tool-use boundary; both required `SendMessage` resumption to write SUMMARY files. PLAN-1.1 builder also hit a `.shipyard/` write-block — orchestrator wrote SUMMARY-1.1 from dumped content. Pattern: builders work the code cleanly but stall before the final artifact write.
+- **Critical findings (per phase reviewer):** 1. REVIEW-3.1 caught PLAN-3.1 Task 3 (CLAUDE.md updates) entirely omitted by builder; orchestrator applied the 3 required edits inline (replace stale ID-12 paragraph, add D7 collect-all bullet, add NSubstitute DynamicProxyGenAssembly2 bullet) and committed `85dac72`.
+- **Phase verification:** COMPLETE. All 3 ROADMAP success criteria pass (ConfigSizeParityTest 56.7%, 10 ProfileResolutionTests, undefined-profile fail-fast wording matches). All 9 CONTEXT-8 decisions D1–D9 honored. All 3 issues closed correctly (ID-2 b5b87eb, ID-10 b5b87eb+e622a39+6264154, ID-12 6264154).
+- **Security audit:** PASS (Low). 0 critical / 0 important / 3 advisory: N1 newline-sanitization in error messages (CWE-117 log spoofing, attacker already owns config — negligible), N2 empty/whitespace plugin name accepted by ActionEntryTypeConverter (clean fail-fast in ValidateActions), N3 secret-scan.sh covers RFC 1918 class C only. All 3 deferred and tracked as ID-13/14/15.
+- **Simplifier:** 2 High (dead `ValidationPlugin` helper in ProfileResolutionTests; orphaned `HostSubscriptionsOptions.Snapshots` property — bound but never read), 2 Medium (3x ISnapshotProvider stub factory triplication; `ValidateValidators` unnecessary materialization guard), 3 Low. **Both High fixed inline** in commit (next): drop dead helper + delete orphaned property. Medium and Low deferred to Phase 9 prep.
+- **Documenter:** ACCEPTABLE — no public-API leakage (visibility sweep makes the entire host config / dispatch / matching surface internal). All 3 new internal types carry XML docs. CLAUDE.md gained 2 conventions bullets (collect-all + DynamicProxyGenAssembly2). ID-9 partial-activation recommended (operator `_comment` keys in appsettings.Example.json) but **deferred to Phase 11/12** docs pass per user direction.
+- **Convention drift noted:** PLAN-2.1 builder used `feat(host):`/`test(host):` commit prefixes instead of `shipyard(phase-8):`. Flagged in REVIEW-2.1 + SIMPLIFICATION-8 Low; left as-is in history.
+- **Lessons-learned drafts:**
+  - **Builders stall before final SUMMARY writes.** PLAN-1.1 + 2.1 + 3.1 all reached green-state code but stopped before writing `.shipyard/phases/N/results/SUMMARY-W.P.md`. Pattern is a tool-budget cap right at the deliverable. Mitigation: have orchestrator write SUMMARY from agent's dumped content, or pre-write a stub the builder updates.
+  - **`.shipyard/` writes are sometimes blocked for subagents.** Permission scope is unclear — SendMessage resumption fixed it for some files (REVIEW-2.1) but not others (SUMMARY-1.1). Reliable path: builders dump content; orchestrator writes the file.
+  - **`HostSubscriptionsOptions.Snapshots` was a phantom property.** Both the `Snapshots` config section AND `IOptions<SnapshotResolverOptions>` got bound into the host; no production code read the `HostSubscriptionsOptions.Snapshots` member, only the DI-registered `IOptions<>`. Removing the property eliminated the latent ambiguity. Audit checklist for future option records: every `init` property must have at least one reader.
+  - **Visibility sweep is best done all-at-once.** Phase 5 introduced ID-2 + ID-10 because internalizing `IActionDispatcher` alone caused CS0053 cascade through `SubscriptionOptions.Actions`, forcing the cascade types to be raised back to public. Phase 8 PLAN-1.1 sweeping seven types in one atomic pass made the change feasible, and PLAN-1.2 internalized `ActionEntry` afterwards as a clean follow-up.
+  - **`DynamicProxyGenAssembly2` is required for NSubstitute on internalized types.** Adding only the test-assembly `[InternalsVisibleTo]` is insufficient — Castle DynamicProxy itself needs internals access. NS2003 build errors on internalized types are the symptom. Documented in CLAUDE.md.
+  - **MSTest v4.2.1 uses `--filter`, not `--filter-query`.** Confirms ID-4 staleness; CLAUDE.md flag references should be updated when ID-4 is closed.
+

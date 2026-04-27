@@ -229,7 +229,7 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 8 — Profiles in Configuration
+## Phase 8 — Profiles in Configuration — **COMPLETE (2026-04-27)**
 
 **Goal.** Named action profiles that subscriptions reference, eliminating 9× repetition. Prove Success Criterion #2 quantitatively.
 
