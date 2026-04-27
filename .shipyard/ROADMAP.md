@@ -253,7 +253,7 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 9 — Observability
+## Phase 9 — Observability — **COMPLETE (2026-04-27)**
 
 **Goal.** Full structured logging, OpenTelemetry traces and metrics that span the full pipeline. No App.Metrics, no OpenTracing.
 

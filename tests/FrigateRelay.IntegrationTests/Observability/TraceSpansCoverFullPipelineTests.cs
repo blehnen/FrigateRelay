@@ -119,6 +119,16 @@ public sealed class TraceSpansCoverFullPipelineTests
             a.Kind.Should().Be(ActivityKind.Consumer,
                 $"action span '{a.DisplayName}' must be Consumer kind"));
 
+        // 5b. validator.<name>.check span is parented to its action span (REVIEW-3.1 Important #2).
+        var validatorSpan = allSpans.FirstOrDefault(a => a.DisplayName == "validator.codeprojectai.check");
+        validatorSpan.Should().NotBeNull("validator span must be emitted under its action span");
+        var pushoverSpan = actionSpans.FirstOrDefault(a => a.DisplayName == "action.pushover.execute");
+        if (pushoverSpan is not null && validatorSpan is not null)
+        {
+            validatorSpan.ParentSpanId.Should().Be(pushoverSpan.SpanId,
+                "validator span must be parented to its action span (D8 hierarchy)");
+        }
+
         // 6. Every FrigateRelay span carries the event.id attribute (D8 join-by-correlation).
         allSpans.Should().AllSatisfy(a =>
             GetTag(a, "event.id").Should().NotBeNullOrEmpty(

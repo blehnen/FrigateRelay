@@ -60,6 +60,12 @@ internal sealed class DedupeCache
     /// <param name="ctx">The event context providing <c>Camera</c> and <c>Label</c> for the key.</param>
     public bool TryEnter(SubscriptionOptions sub, EventContext ctx)
     {
+        // CooldownSeconds <= 0 means "no dedupe": every event passes through.
+        // Avoids ArgumentOutOfRangeException from MemoryCache's TimeSpan.Zero rejection
+        // (Phase 9 simplifier finding — was a sharp edge in test fixtures).
+        if (sub.CooldownSeconds <= 0)
+            return true;
+
         var key = $"{sub.Name}|{ctx.Camera}|{ctx.Label}".ToLowerInvariant();
 
         lock (_writeLock)

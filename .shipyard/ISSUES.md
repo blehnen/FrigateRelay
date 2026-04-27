@@ -204,6 +204,81 @@ Uses `new ConfigurationBuilder().AddInMemoryCollection(...).Build()` as the conf
 
 ---
 
+### ID-22: Test fixture `Task.Delay` magic delays (Phase 9 observability tests)
+
+**Source:** simplifier (Phase 9 SIMPLIFICATION-9, 2026-04-27); reviewer (REVIEW-3.1 Suggestion #1/#2)
+**Severity:** Low (test fragility under CI load)
+**Status:** Open — deferred (orchestrator initial-fix attempt deferred due to API mismatch on `CapturingLogger<T>` polling property)
+
+**Description:**
+Three sites in `tests/FrigateRelay.Host.Tests/Observability/` use fixed `Task.Delay` to wait for pipeline state to settle:
+- `EventPumpSpanTests.cs:285` — `Task.Delay(400)` between pump start and stop.
+- `CounterIncrementTests.cs:356` — `Task.Delay(400)` between pump start and stop.
+- `CounterIncrementTests.cs:390` — `Task.Delay(300)` between fault-source start and stop.
+- `CounterIncrementTests.cs:420–422` — `Task.Delay(shouldThrow ? 200 : 100)` between dispatcher enqueue and stop.
+
+Under load these sleeps may be insufficient (causing flake); on fast machines they're unnecessary tax.
+
+**Mitigation (deferred):** Replace with polling on a deterministic signal. Initial inline attempt used `logger.Records.Any()` but `CapturingLogger<T>` does not expose `Records`. Correct property name needs verification (likely `LogEntries`, `Captured`, or similar). Alternatively, expose the in-memory exporter's `activities` collection or the `MeterListener` measurement count to the helper for polling.
+
+---
+
+### ID-18: Counter cardinality DOS via attacker-influenceable MQTT camera/label tags
+
+**Source:** auditor (Phase 9 AUDIT-9, 2026-04-27)
+**Severity:** Low (advisory; CWE-400)
+**Status:** Open — deferred to Phase 11 hardening pass
+
+**Description:**
+`frigaterelay.events.received` and `frigaterelay.events.matched` carry `camera` and `label` tags drawn from MQTT event payloads. An attacker (or misconfigured Frigate instance) with MQTT publish access can emit events with arbitrary `camera`/`label` values, exploding cardinality in the OTel collector. Most hosted backends bill or hard-cap by series count.
+
+**Mitigation:** Normalize tag values against a known-camera allowlist (`var cameraTag = _knownCameras.Contains(context.Camera) ? context.Camera : "other"`), or document that operators must restrict MQTT publish ACLs. Mirrors Phase 8 ID-13 at the metrics layer.
+
+---
+
+### ID-19: OTel/log span tag injection from operator-controlled string values
+
+**Source:** auditor (Phase 9 AUDIT-9, 2026-04-27)
+**Severity:** Low (advisory; CWE-117)
+**Status:** Open — deferred
+
+**Description:**
+Subscription, plugin, and validator names from `appsettings.json` are written verbatim as OTel span tags AND interpolated into span names (`$"action.{plugin.Name.ToLowerInvariant()}.execute"`). Values containing CRLF, null bytes, or excessively long strings could confuse OTLP receivers. Self-inflicted misconfiguration risk.
+
+**Mitigation:** Add a startup-validation pass enforcing `[A-Za-z0-9_-]+` for subscription/plugin/validator names. Bundle with ID-13/14 in the structured-logging hardening pass.
+
+---
+
+### ID-20: OTLP endpoint URI scheme not restricted to http/https
+
+**Source:** auditor (Phase 9 AUDIT-9, 2026-04-27)
+**Severity:** Low (advisory; CWE-183)
+**Status:** Open — deferred
+
+**Description:**
+`ValidateObservability` accepts any absolute URI for `Otel:OtlpEndpoint`. `file:///etc/passwd` or `ftp://...` passes validation; the OpenTelemetry SDK rejects non-HTTP at runtime with `ArgumentException` (no file reads), but the operator gets a crash instead of a structured diagnostic.
+
+**Mitigation:** Add scheme check after `Uri.TryCreate`:
+```csharp
+if (uri.Scheme is not ("http" or "https" or "grpc"))
+    errors.Add($"Otel:OtlpEndpoint scheme '{uri.Scheme}' is not permitted. Use http/https.");
+```
+
+---
+
+### ID-21: Serilog file sink path is operator-controlled without validation
+
+**Source:** auditor (Phase 9 AUDIT-9, 2026-04-27)
+**Severity:** Low (advisory; CWE-22, future-tense)
+**Status:** Open — deferred to Phase 10 Docker work
+
+**Description:**
+The file sink path is hard-coded `"logs/frigaterelay-.log"` (relative, safe) currently. But `Serilog:File:Path` is honored by `ReadFrom.Configuration` if set in env vars or `appsettings.Local.json`. On a container running as root (Phase 10 concern), this could redirect log output to arbitrary paths and overwrite system files.
+
+**Mitigation:** Phase 10 Dockerfile MUST run as non-root user (already in CLAUDE.md). Optionally validate `Serilog:File:Path` for `..` segments at startup.
+
+---
+
 ### ID-15: Secret-scan does not cover RFC 1918 class A (`10.x.x.x`) or class B (`172.16-31.x.x`)
 
 **Source:** auditor (Phase 8 AUDIT-8, 2026-04-27)

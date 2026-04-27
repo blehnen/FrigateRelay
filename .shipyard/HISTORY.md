@@ -498,3 +498,39 @@
   - **Plan-quality verifier wrote to a separate file** (`VERIFICATION_PLAN_QUALITY.md`) instead of appending to the architect's VERIFICATION.md. Either approach is fine; clearer file split is arguably better.
 - Checkpoint tag: `post-plan-phase-9`.
 
+- [2026-04-27T18:40:43Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T18:44:45Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T18:46:31Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T18:53:44Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T18:57:16Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T18:58:46Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:14:59Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:24:26Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:30:46Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:43:30Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:46:51Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:47:39Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:48:36Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-27T19:49:09Z] Session ended during build (may need /shipyard:resume)
+
+## 2026-04-27 — Phase 9 built (`/shipyard:build 9`)
+
+- **Wave 1 (foundation, sequential):** PLAN-1.1 across 3 commits (`32704a6` packages, `277ef64` counter surface, `26f6c2a` DispatchItem ActivityContext flip). 8 OTel + 5 Serilog packages added. DispatcherDiagnostics now has 10 counters. Build green, 69/69 tests preserved.
+- **Wave 2 (parallel, disjoint files):** PLAN-2.1 (`06ff862` instrumentation, `e0ec830` ID-6 ISSUES close) and PLAN-2.2 (`c82dd83` config, `d6da64d` Serilog, `9fe5274` OTel, `c7ee4d1` ValidateObservability). Both reviewers APPROVE. **Parallel-build conflict twice during the wave**: PLAN-2.1's first build attempt failed with PLAN-2.2's in-progress CA1305/IDE0005 errors; PLAN-2.2's `ValidateAll` `GetRequiredService<IConfiguration>` regression broke 5 of PLAN-2.1's tests until orchestrator switched to `GetService<>?.Value` (commit `e340770`). Lesson: warnings-as-errors makes parallel-wave builds brittle even with disjoint files; the build is shared workspace.
+- **Wave 3 (TDD tests):** PLAN-3.1 across 4 commits. 4 unit test files (DispatcherDiagnostics 3, EventPumpSpan 4, ValidateObservability 3 + ID-16 closure, CounterIncrement 9) + 1 integration test file (TraceSpansCoverFullPipeline 2). Host.Tests 69 → 88 (+19; target ≥84 exceeded by 4). 2 new integration tests pass. **Wave 2 regression surfaced**: `MqttToValidatorTests.Validator_ShortCircuits_OnlyAttachedAction` failed because PLAN-2.2's `AddSerilog` clears `builder.Logging` providers, dropping the test's `CapturingLoggerProvider`. Orchestrator inline fix moved capture-provider registration to `builder.Services.AddSingleton<ILoggerProvider>` AFTER `ConfigureServices` (commit `794a893`).
+- **Builder stalls:** Phase 9 builders hit tool-budget caps mid-task more often than Phase 8 — PLAN-1.1, PLAN-2.1, PLAN-2.2, PLAN-3.1 all required SendMessage resumption at least once. PLAN-3.1 builder needed three resumptions. Pattern: cumulative complexity of OTel/Serilog API surface plus concurrent test-file generation taxed the budget. Mitigation that worked: dump SUMMARY content in agent's final result; orchestrator writes the file.
+- **Issues closed this phase:** ID-6 (OperationCanceledException → ActivityStatusCode.Error during shutdown — fixed in PLAN-2.1 commit `06ff862`); ID-16 (`ValidateObservability` had no unit tests — closed in PLAN-3.1 commit `9dfdb83`); ID-17 (env-var fallback validation — orchestrator inline fix `a661d03`).
+- **Issues opened this phase:** ID-18 (cardinality DOS), ID-19 (span tag injection), ID-20 (URI scheme), ID-21 (file-sink path) from auditor advisories; ID-22 (test polling improvement) from simplifier — all Low/deferred.
+- **Phase verification:** COMPLETE. All 3 ROADMAP success criteria met. All 9 D-decisions honored (D1 ActivityContext, D2 OTel-without-exporter, D3 counter tags, D4 ID-6, D5 test split, D6 hand-rolled delegates, D7 Seq conditional, D8 span attributes, D9 errors.unhandled untagged).
+- **Security audit:** PASS_WITH_NOTES (Low). 0 critical/important; 4 advisory (A1–A4 = ID-18–21) all deferred per user direction.
+- **Simplifier:** 2 High applied (CooldownSeconds=0 dedupe guard inline; Task.Delay polling deferred as ID-22 after API-mismatch on `CapturingLogger<T>.Records` property). Validator-span parentage assertion added to `TraceSpansCoverFullPipelineTests` per Med #2.
+- **Documenter:** ACCEPTABLE — no public API leakage; recommends architecture/CLAUDE.md additions for span tree + counter table (deferred to Phase 11/12 docs pass per ID-9).
+- **Lessons-learned drafts:**
+  - **Parallel-wave build hazard under warnings-as-errors.** Even with disjoint file sets, both builders share the workspace; one builder's incomplete code can fail the other's `dotnet build`. Mitigation: the second-to-commit builder must `dotnet build` clean before proceeding, ideally on the merged tree state.
+  - **`AddSerilog` clobbers `builder.Logging.AddProvider` registrations.** Worker SDK Serilog wiring replaces the logging-provider pipeline. Test fixtures that need a `CapturingLoggerProvider` must register via `builder.Services.AddSingleton<ILoggerProvider>` AFTER `ConfigureServices` runs.
+  - **`MemoryCache.AbsoluteExpirationRelativeToNow` rejects `TimeSpan.Zero`.** `DedupeCache.TryEnter` was vulnerable when callers passed `CooldownSeconds = 0`. Phase 9 added a guard treating `<= 0` as "no dedupe". Test fixtures previously had to use `cooldownSeconds = 1` minimum as a workaround.
+  - **`ActivityContext` struct field on channel items is the right pattern.** Lightweight 16-byte struct (TraceId/SpanId/Flags/State); `default` value yields a root span on the consumer side. Avoids GC pressure and `Activity` lifetime coupling.
+  - **`HostApplicationBuilder.Host` doesn't exist in .NET 10 Worker SDK.** Use `builder.Services.AddSerilog((services, lc) => ...)` from `Serilog.Extensions.Hosting`, NOT `builder.Host.UseSerilog`.
+  - **OpenTelemetry InMemoryExporter v1.11.2 vs v1.15.3 API divergence.** v1.11.2's `AddInMemoryExporter(ICollection<Activity>)` lacks the options overload; use `new InMemoryExporter<Activity>(list)` + `AddProcessor(new SimpleActivityExportProcessor(exporter))` instead.
+- Checkpoint tags: `pre-build-phase-9`, `post-build-phase-9`.
+
