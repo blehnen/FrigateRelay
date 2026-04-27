@@ -25,7 +25,7 @@ namespace FrigateRelay.Host.Configuration;
 /// string-array form <c>["BlueIris"]</c> remains silently broken via <c>IConfiguration.Bind</c>.
 /// </para>
 /// </summary>
-public sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
+internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
 {
     /// <inheritdoc />
     public override ActionEntry Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
