@@ -282,7 +282,7 @@ public sealed class EventPumpSpanTests
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
-            await Task.Delay(400); // give pump time to process the single event
+            await Task.Delay(400); // give pump time to process the single event (ID-22: polling improvement deferred)
             await cts.CancelAsync();
             await pump.StopAsync(CancellationToken.None);
         }

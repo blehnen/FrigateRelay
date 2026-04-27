@@ -353,7 +353,7 @@ public sealed class CounterIncrementTests
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
-            await Task.Delay(400);
+            await Task.Delay(400); // ID-22 polling improvement deferred
             await cts.CancelAsync();
             await pump.StopAsync(CancellationToken.None);
         }
@@ -387,7 +387,7 @@ public sealed class CounterIncrementTests
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await pump.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await Task.Delay(300); // ID-22 polling improvement deferred
         await cts.CancelAsync();
         await pump.StopAsync(CancellationToken.None);
     }
@@ -418,7 +418,7 @@ public sealed class CounterIncrementTests
                 ct: cts.Token);
 
             // Give consumer time to process: ThrowingPlugin fails immediately,
-            // StubPlugin succeeds immediately.
+            // StubPlugin succeeds immediately. (ID-22 polling improvement deferred.)
             await Task.Delay(shouldThrow ? 200 : 100);
         }
         finally
