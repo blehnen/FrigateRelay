@@ -26,7 +26,7 @@ namespace FrigateRelay.Host.Matching;
 /// key-space collisions across plugins.
 /// </para>
 /// </remarks>
-public sealed class DedupeCache
+internal sealed class DedupeCache
 {
     private readonly IMemoryCache _cache;
     private readonly object _writeLock = new();

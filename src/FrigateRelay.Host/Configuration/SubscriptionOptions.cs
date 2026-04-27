@@ -15,7 +15,7 @@ namespace FrigateRelay.Host.Configuration;
 /// The D5 stationary/false_positive guard is applied by the source (e.g. the FrigateMqtt plugin's projector)
 /// <em>before</em> events reach the matcher — this record has no knowledge of those flags.
 /// </remarks>
-public sealed record SubscriptionOptions
+internal sealed record SubscriptionOptions
 {
     /// <summary>Gets the unique name of this subscription, used as the dedupe-cache bucket key.</summary>
     public required string Name { get; init; }

@@ -40,6 +40,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="FrigateRelay.Host.Tests" />
     <InternalsVisibleTo Include="FrigateRelay.IntegrationTests" />
+    <!-- Required by NSubstitute to create proxy substitutes for internal interfaces/classes. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
 </Project>

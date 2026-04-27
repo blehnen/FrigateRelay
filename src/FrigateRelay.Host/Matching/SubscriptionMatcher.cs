@@ -20,7 +20,7 @@ namespace FrigateRelay.Host.Matching;
 /// inspect those flags.
 /// </para>
 /// </remarks>
-public static class SubscriptionMatcher
+internal static class SubscriptionMatcher
 {
     /// <summary>
     /// Returns all subscriptions from <paramref name="subs"/> that match <paramref name="context"/>.

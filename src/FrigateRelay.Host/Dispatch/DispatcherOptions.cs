@@ -4,7 +4,7 @@ namespace FrigateRelay.Host.Dispatch;
 /// Configuration options for <see cref="ChannelActionDispatcher"/>.
 /// Bind from the <c>"Dispatcher"</c> configuration section to override defaults.
 /// </summary>
-public sealed record DispatcherOptions
+internal sealed record DispatcherOptions
 {
     /// <summary>
     /// Maximum number of pending <see cref="DispatchItem"/> entries per plugin channel.

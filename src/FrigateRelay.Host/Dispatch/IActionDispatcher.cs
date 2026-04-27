@@ -11,7 +11,7 @@ namespace FrigateRelay.Host.Dispatch;
 /// because it is an internal host seam consumed only by <c>EventPump</c>.
 /// Plugins never depend on this interface; they are resolved via <see cref="IActionPlugin"/>.
 /// </remarks>
-public interface IActionDispatcher
+internal interface IActionDispatcher
 {
     /// <summary>
     /// Enqueues an event for asynchronous execution by the specified action plugin.

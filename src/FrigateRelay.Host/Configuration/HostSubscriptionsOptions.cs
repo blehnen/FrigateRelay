@@ -11,7 +11,7 @@ namespace FrigateRelay.Host.Configuration;
 /// <code>services.Configure&lt;HostSubscriptionsOptions&gt;(builder.Configuration);</code>
 /// A missing or empty <c>Subscriptions</c> section yields an empty list — never <see langword="null"/>.
 /// </remarks>
-public sealed record HostSubscriptionsOptions
+internal sealed record HostSubscriptionsOptions
 {
     /// <summary>
     /// Gets the list of subscription rules. Defaults to an empty array when the configuration
