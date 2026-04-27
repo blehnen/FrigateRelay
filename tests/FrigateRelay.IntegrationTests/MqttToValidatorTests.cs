@@ -227,11 +227,16 @@ public sealed class MqttToValidatorTests
             ["Subscriptions:0:Actions:1:Validators:0"] = "strict-person",
         });
 
-        builder.Logging.ClearProviders();
-        builder.Logging.AddProvider(capture);
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
         HostBootstrap.ConfigureServices(builder);
+
+        // Register the capture provider AFTER ConfigureServices so it survives
+        // AddSerilog's logging-provider replacement. Service-collection registration
+        // bypasses ILoggingBuilder's pipeline, which AddSerilog clears.
+        // (REVIEW-3.1 Important #3 / Wave 2 regression remediation.)
+        builder.Services.AddSingleton<ILoggerProvider>(capture);
+
         var app = builder.Build();
         HostBootstrap.ValidateStartup(app.Services);
         await app.StartAsync().ConfigureAwait(false);
