@@ -65,14 +65,21 @@ Extracted to `tests/FrigateRelay.Host.Tests/CapturingLogger.cs` as `internal sea
 
 ---
 
-### ID-6: `OperationCanceledException` sets `ActivityStatusCode.Error` in dispatcher consumer
+### ID-6: `OperationCanceledException` sets `ActivityStatusCode.Error` in dispatcher consumer  *[CLOSED 2026-04-27]*
 
 **Source:** verifier (Phase 4 post-build review, REVIEW-2.1)
 **Severity:** Minor
-**Status:** Open
+**Status:** **Closed** (commit `06ff862`, Phase 9 PLAN-2.1 Task 2)
 
 **Description:**
 In `ChannelActionDispatcher`'s consumer loop, an `OperationCanceledException` (which occurs during graceful shutdown) sets the OTel `Activity` status to `ActivityStatusCode.Error`. This is semantically incorrect — graceful cancellation is not an error. The status should be `Unset` or `Ok` when cancelled via the shutdown token.
+
+**Resolution:**
+`catch (OperationCanceledException) when (ct.IsCancellationRequested)` block in
+`src/FrigateRelay.Host/Dispatch/ChannelActionDispatcher.cs` now calls
+`actionActivity?.SetStatus(ActivityStatusCode.Unset)` instead of
+`dispatchActivity?.SetStatus(ActivityStatusCode.Error, "Cancelled")`.
+Graceful shutdown no longer produces Error-status spans in OTel traces.
 
 **Impact:** Misleading OTel traces during normal host shutdown. Low-risk one-line fix.
 
