@@ -14,6 +14,14 @@ namespace FrigateRelay.Host.Configuration;
 internal sealed record HostSubscriptionsOptions
 {
     /// <summary>
+    /// Gets the named profiles dictionary. Bound from the top-level <c>Profiles</c> config key.
+    /// Profiles are a flat dictionary of action-list shapes (D5): no BasedOn, no nesting.
+    /// Subscriptions reference a profile by name via <see cref="SubscriptionOptions.Profile"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, ProfileOptions> Profiles { get; init; } =
+        new Dictionary<string, ProfileOptions>();
+
+    /// <summary>
     /// Gets the list of subscription rules. Defaults to an empty array when the configuration
     /// section is absent or contains no entries.
     /// </summary>

@@ -40,6 +40,15 @@ internal sealed record SubscriptionOptions
     public int CooldownSeconds { get; init; } = 60;
 
     /// <summary>
+    /// Gets the name of the profile to use for this subscription's action list.
+    /// Mutually exclusive with <see cref="Actions"/> (D1): setting both is a startup
+    /// configuration error; setting neither is also a startup configuration error.
+    /// When set, the effective action list is resolved from <c>Profiles[Profile]</c>
+    /// by the profile resolution validator before the dispatcher sees the subscription.
+    /// </summary>
+    public string? Profile { get; init; }
+
+    /// <summary>
     /// Gets the list of action entries that fire for this subscription. Empty (default)
     /// means no actions fire — fail-safe per CONTEXT-4 D2. Unknown plugin names cause startup
     /// failure (PROJECT.md S2). Plugin name match is case-insensitive ordinal.
