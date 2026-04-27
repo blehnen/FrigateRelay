@@ -16,11 +16,12 @@ public sealed class SubscriptionActionWiringTests
             new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("DoesNotExist")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateActions(subs, plugins);
+        StartupValidation.ValidateActions(subs, plugins, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*FrontDoor*DoesNotExist*BlueIris*");
+        errors.Should().ContainSingle()
+            .Which.Should().Match("*FrontDoor*DoesNotExist*BlueIris*");
     }
 
     [TestMethod]
@@ -31,10 +32,11 @@ public sealed class SubscriptionActionWiringTests
             new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("BlueIris")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateActions(subs, plugins);
+        StartupValidation.ValidateActions(subs, plugins, errors);
 
-        act.Should().NotThrow();
+        errors.Should().BeEmpty();
     }
 
     [TestMethod]
@@ -45,10 +47,11 @@ public sealed class SubscriptionActionWiringTests
             new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person", Actions = [new ActionEntry("blueiris")] },
         };
         var plugins = new IActionPlugin[] { new StubPlugin("BlueIris") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateActions(subs, plugins);
+        StartupValidation.ValidateActions(subs, plugins, errors);
 
-        act.Should().NotThrow();
+        errors.Should().BeEmpty();
     }
 
     [TestMethod]
@@ -58,10 +61,11 @@ public sealed class SubscriptionActionWiringTests
         {
             new SubscriptionOptions { Name = "FrontDoor", Camera = "front", Label = "person" },
         };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateActions(subs, Array.Empty<IActionPlugin>());
+        StartupValidation.ValidateActions(subs, Array.Empty<IActionPlugin>(), errors);
 
-        act.Should().NotThrow();
+        errors.Should().BeEmpty();
     }
 
     private sealed class StubPlugin(string name) : IActionPlugin

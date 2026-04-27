@@ -20,11 +20,12 @@ public sealed class StartupValidationSnapshotTests
     {
         var subs = Array.Empty<SubscriptionOptions>();
         var providers = new[] { Provider("BlueIris") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateSnapshotProviders(subs, "Frigate", providers);
+        StartupValidation.ValidateSnapshotProviders(subs, "Frigate", providers, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Global Snapshots:DefaultProviderName*Frigate*BlueIris*");
+        errors.Should().ContainSingle()
+            .Which.Should().Match("*Global Snapshots:DefaultProviderName*Frigate*BlueIris*");
     }
 
     [TestMethod]
@@ -41,11 +42,12 @@ public sealed class StartupValidationSnapshotTests
             },
         };
         var providers = new[] { Provider("BlueIris") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: null, providers);
+        StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: null, providers, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*FrontDoor*DoesNotExist*BlueIris*");
+        errors.Should().ContainSingle()
+            .Which.Should().Match("*FrontDoor*DoesNotExist*BlueIris*");
     }
 
     [TestMethod]
@@ -62,11 +64,12 @@ public sealed class StartupValidationSnapshotTests
             },
         };
         var providers = new[] { Provider("BlueIris"), Provider("Frigate") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: null, providers);
+        StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: null, providers, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*FrontDoor*BlueIris*Mystery*Frigate*");
+        errors.Should().ContainSingle()
+            .Which.Should().Match("*FrontDoor*BlueIris*Mystery*Frigate*");
     }
 
     [TestMethod]
@@ -84,9 +87,10 @@ public sealed class StartupValidationSnapshotTests
             },
         };
         var providers = new[] { Provider("BlueIris"), Provider("Frigate") };
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: "BlueIris", providers);
+        StartupValidation.ValidateSnapshotProviders(subs, globalDefaultProviderName: "BlueIris", providers, errors);
 
-        act.Should().NotThrow();
+        errors.Should().BeEmpty();
     }
 }

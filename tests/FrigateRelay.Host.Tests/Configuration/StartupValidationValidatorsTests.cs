@@ -28,11 +28,12 @@ public sealed class StartupValidationValidatorsTests
         };
 
         var services = new ServiceCollection().BuildServiceProvider();
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateValidators(subs, services);
+        StartupValidation.ValidateValidators(subs, services, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*'nonexistent'*Subscription[0].Actions[0]*");
+        errors.Should().ContainSingle()
+            .Which.Should().Contain("'nonexistent'").And.Contain("Subscription[0].Actions[0]");
     }
 
     [TestMethod]
@@ -57,11 +58,12 @@ public sealed class StartupValidationValidatorsTests
         };
 
         var services = new ServiceCollection().BuildServiceProvider();
+        var errors = new List<string>();
 
-        var act = () => StartupValidation.ValidateValidators(subs, services);
+        StartupValidation.ValidateValidators(subs, services, errors);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*'weird'*recognized Type*");
+        errors.Should().ContainSingle()
+            .Which.Should().Contain("'weird'").And.Contain("recognized Type");
     }
 
     [TestMethod]
@@ -88,8 +90,9 @@ public sealed class StartupValidationValidatorsTests
             },
         };
 
-        var act = () => StartupValidation.ValidateValidators(subs, services);
+        var errors = new List<string>();
+        StartupValidation.ValidateValidators(subs, services, errors);
 
-        act.Should().NotThrow();
+        errors.Should().BeEmpty();
     }
 }
