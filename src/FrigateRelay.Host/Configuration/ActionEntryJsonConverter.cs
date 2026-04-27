@@ -18,11 +18,10 @@ namespace FrigateRelay.Host.Configuration;
 /// <c>(action.Validators?.Count ?? 0) == 0</c>.
 /// </para>
 /// <para>
-/// <strong>ID-12 (open):</strong> This converter only fires on <c>JsonSerializer.Deserialize</c>
-/// paths. <c>IConfiguration.Bind</c> bypasses <c>[JsonConverter]</c> and reads
-/// <see cref="ActionEntry"/> via primary-constructor reflection instead. Operators must use
-/// the object form <c>{"Plugin":"…","Validators":["…"]}</c> in appsettings — the legacy
-/// string-array form <c>["BlueIris"]</c> remains silently broken via <c>IConfiguration.Bind</c>.
+/// <c>IConfiguration.Bind</c> takes a separate path: it bypasses <c>[JsonConverter]</c>
+/// and converts scalar strings via <see cref="ActionEntryTypeConverter"/> instead
+/// (ID-12 closed in Phase 8). The two converters operate on disjoint code paths and
+/// both are needed — neither subsumes the other.
 /// </para>
 /// </summary>
 internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>

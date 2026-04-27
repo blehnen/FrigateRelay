@@ -25,19 +25,6 @@ Replace the above with the one-liner above, or similar.
 
 ---
 
-### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal`
-
-**Source:** verifier (Phase 4 post-build review, REVIEW-1.1)
-**Severity:** Minor
-**Status:** Open
-
-**Description:**
-`IActionDispatcher` and `DispatcherOptions` in `src/FrigateRelay.Host/Dispatch/` are declared `public`. These are host-internal types with no external consumers. They should be `internal` to correctly express the boundary.
-
-**Impact:** API surface correctness. No functional impact. No downstream consumers exist yet — cleanest to fix before Phase 5 adds more host-internal types.
-
----
-
 ### ID-3: `TargetFramework` missing from BlueIris csproj(s)
 
 **Source:** verifier (Phase 4 post-build review, REVIEW-1.2)
@@ -137,21 +124,6 @@ Phase 4 ships a working MQTT → BlueIris vertical slice but the repo has no `RE
 
 ---
 
-### ID-10: `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions` raised to `public` — should be `internal`
-
-**Source:** reviewer (Phase 5 REVIEW-1.2, 2026-04-26)
-**Severity:** Minor
-**Status:** Open
-
-**Description:**
-`ActionEntry` (`src/FrigateRelay.Host/Configuration/ActionEntry.cs:18`), `ActionEntryJsonConverter` (`src/FrigateRelay.Host/Configuration/ActionEntryJsonConverter.cs:15`), and `SnapshotResolverOptions` (`src/FrigateRelay.Host/Snapshots/SnapshotResolverOptions.cs:7`) are declared `public`. Per PLAN-1.2 Task 1 acceptance criteria, these should be `internal`. They were raised to `public` during the build to resolve CS0053 (public `SubscriptionOptions.Actions: IReadOnlyList<ActionEntry>` cannot have an internal element type).
-
-The deliberate trade-off was to raise the new types rather than cascade `SubscriptionOptions`, `HostSubscriptionsOptions`, `DedupeCache`, and `SubscriptionMatcher` to `internal`. This is documented in SUMMARY-1.2 Decisions.
-
-**Fix:** Consolidate into the existing ID-2 sweep. When `IActionDispatcher` and `DispatcherOptions` are internalized (ID-2), also internalize `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions`, `SubscriptionOptions`, and `HostSubscriptionsOptions` in the same pass. All of these are host-internal configuration types with no external consumers.
-
-**Impact:** API surface correctness. No functional impact. No external consumers exist.
-
 ### ID-11: `CapturingLogger<T>` duplicated across test assemblies — Rule of Three  *[RESOLVED 2026-04-26]*
 
 **Source:** reviewer (Phase 5 REVIEW-2.2, 2026-04-26)
@@ -163,28 +135,33 @@ Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`
 
 ---
 
-### ID-12: `Actions: ["BlueIris"]` string-form back-compat broken under `IConfiguration.Bind`
+## Closed Issues
+
+### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*
+
+**Source:** verifier (Phase 4 post-build review, REVIEW-1.1)
+**Status:** **Closed** (commit `b5b87eb`, Phase 8 PLAN-1.1)
+
+**Resolution:**
+Phase 8 PLAN-1.1 visibility sweep flipped `IActionDispatcher` and `DispatcherOptions` to `internal`, alongside `SubscriptionOptions`, `HostSubscriptionsOptions`, `SnapshotResolverOptions`, `DedupeCache`, and `SubscriptionMatcher`. `<InternalsVisibleTo Include="DynamicProxyGenAssembly2" />` added in MSBuild item form to permit NSubstitute proxying of `IActionDispatcher`. Build green; 55 Host tests pass.
+
+---
+
+### ID-10: `ActionEntry`, `ActionEntryJsonConverter`, `SnapshotResolverOptions` raised to `public` — should be `internal` *[CLOSED 2026-04-27]*
+
+**Source:** reviewer (Phase 5 REVIEW-1.2, 2026-04-26)
+**Status:** **Closed** (commits `b5b87eb`, `e622a39`, `6264154`, Phase 8 PLAN-1.1 + PLAN-1.2)
+
+**Resolution:**
+Phase 8 PLAN-1.1 internalized `ActionEntryJsonConverter` and `SnapshotResolverOptions` (commit `e622a39`). Phase 8 PLAN-1.2 internalized `ActionEntry` itself (commit `6264154`) — feasible because the visibility sweep also internalized the surrounding `SubscriptionOptions` / `HostSubscriptionsOptions` carriers, eliminating the CS0053 cascade that originally forced the types public. All host-internal configuration types now correctly express the boundary.
+
+---
+
+### ID-12: `Actions: ["BlueIris"]` string-form back-compat broken under `IConfiguration.Bind` *[CLOSED 2026-04-27]*
 
 **Source:** Phase 5 build (integration test regression, 2026-04-26)
 **Severity:** Medium
-**Status:** Open
+**Status:** **Closed** (commit `6264154`, Phase 8 PLAN-1.2)
 
-**Description:**
-PLAN-1.2 promised back-compat via `ActionEntryJsonConverter` so existing `appsettings.json` fixtures using `"Actions": ["BlueIris"]` (string-array form) would still bind. The converter works for direct `JsonSerializer.Deserialize` calls (5 unit tests in `ActionEntryJsonConverterTests` confirm this), **but does not fire when `IConfiguration.Bind` reads the configuration tree**.
-
-The Configuration binder builds `IReadOnlyList<ActionEntry>` by iterating `Actions:0`, `Actions:1`, ... and constructing each `ActionEntry` from child paths. When the path resolves to a scalar string (e.g. `Subscriptions:0:Actions:0 = "BlueIris"`), the binder has no `TypeConverter` for `ActionEntry` and silently produces an empty `Actions` list. The `MqttToBlueIris_HappyPath` integration test caught this — it failed with "found 0" trigger fires until the fixture was updated to the object form `Subscriptions:0:Actions:0:Plugin = "BlueIris"`.
-
-This means existing operators with Phase 4 `appsettings.json` files using the string-array shape will silently lose action firing on upgrade to Phase 5.
-
-**Fix options:**
-1. **`TypeConverter` on `ActionEntry`** — implement `ActionEntryTypeConverter` that converts a string to `new ActionEntry(stringValue)`. Register via `[TypeConverter(typeof(...))]` on the record. The Configuration binder uses `TypeConverter` for primitive-like types, so this would handle the scalar case.
-2. **Custom `IConfigureOptions<HostSubscriptionsOptions>`** — post-process the `Actions` list after binding by re-walking `IConfiguration` paths and patching scalar children into the object form.
-3. **Document the breaking change** — accept that the migration requires fixture updates, surface it in the upgrade notes.
-
-Recommended: Option 1. The TypeConverter pattern is small (~15 LOC + 3 unit tests) and idiomatic for `Microsoft.Extensions.Configuration`.
-
-**Impact:** Operator upgrade path. No data loss, but actions silently stop firing if the legacy string-array shape is used. Fail-fast would be preferable but the binder doesn't surface bind failures by default.
-
-## Closed Issues
-
-(None)
+**Resolution:**
+Implemented Option 1: `ActionEntryTypeConverter : TypeConverter` decorating `ActionEntry` via `[TypeConverter(typeof(ActionEntryTypeConverter))]`. `CanConvertFrom(string) => true`, `ConvertFrom(string s) => new ActionEntry(s)`. Coexists with the existing `[JsonConverter]` on disjoint code paths (binder uses TypeConverter; `JsonSerializer.Deserialize` uses JsonConverter). 3 TDD tests in `ActionEntryTypeConverterTests` exercise string-only / object-only / mixed array binding via `IConfiguration.Bind` — all green. Operators with Phase 4 `appsettings.json` files using the string-array shape `["BlueIris"]` will now bind correctly; the silent-drop regression is fixed.
