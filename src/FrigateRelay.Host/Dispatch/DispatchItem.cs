@@ -11,7 +11,7 @@ namespace FrigateRelay.Host.Dispatch;
 /// <param name="Context">The source-agnostic event that triggered this dispatch.</param>
 /// <param name="Plugin">The action plugin to invoke.</param>
 /// <param name="Validators">Validators to run before the action executes.</param>
-/// <param name="Activity">The ambient <see cref="System.Diagnostics.Activity"/> for distributed tracing.</param>
+/// <param name="ParentContext">The captured trace context of the producing Activity (per CONTEXT-9 D1). Default = no parent (root span on consumer).</param>
 /// <param name="PerActionSnapshotProvider">
 /// The per-action snapshot provider name from <c>ActionEntry.SnapshotProvider</c>.
 /// <see langword="null"/> means fall through to the per-subscription or global tier.
@@ -26,6 +26,6 @@ internal readonly record struct DispatchItem(
     EventContext Context,
     IActionPlugin Plugin,
     IReadOnlyList<IValidationPlugin> Validators,
-    Activity? Activity,
+    ActivityContext ParentContext,
     string? PerActionSnapshotProvider = null,
     string? SubscriptionSnapshotProvider = null);

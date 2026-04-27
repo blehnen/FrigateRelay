@@ -147,7 +147,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         }
 
         await channel.Writer.WriteAsync(
-            new DispatchItem(ctx, action, validators, Activity.Current,
+            new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
                 perActionSnapshotProvider, subscriptionDefaultSnapshotProvider),
             ct).ConfigureAwait(false);
     }
@@ -172,8 +172,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             // Restore the producer-side Activity so OTel sees the channel hop as one logical trace.
             using var dispatchActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
                 "ActionDispatch",
-                ActivityKind.Internal,
-                parentContext: item.Activity?.Context ?? default);
+                ActivityKind.Consumer,
+                parentContext: item.ParentContext);
 
             dispatchActivity?.SetTag("action", plugin.Name);
             dispatchActivity?.SetTag("event_id", item.Context.EventId);
