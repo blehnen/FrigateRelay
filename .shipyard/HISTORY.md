@@ -470,3 +470,31 @@
   - **`DynamicProxyGenAssembly2` is required for NSubstitute on internalized types.** Adding only the test-assembly `[InternalsVisibleTo]` is insufficient — Castle DynamicProxy itself needs internals access. NS2003 build errors on internalized types are the symptom. Documented in CLAUDE.md.
   - **MSTest v4.2.1 uses `--filter`, not `--filter-query`.** Confirms ID-4 staleness; CLAUDE.md flag references should be updated when ID-4 is closed.
 
+
+## 2026-04-27 — Phase 9 planned (`/shipyard:plan 9`)
+
+- **Discussion capture (CONTEXT-9.md):** 9 user-locked decisions:
+  - **D1** ActivityContext struct (not Activity?) on DispatchItem for cross-channel propagation.
+  - **D2** OTel registers but no exporter when OTEL_EXPORTER_OTLP_ENDPOINT is unset (silent no-op; tests use in-memory exporter).
+  - **D3** counter tags: subscription/action/validator/camera/label per counter; errors.unhandled untagged.
+  - **D4** ID-6 (OperationCanceledException → ActivityStatusCode.Error during shutdown) bundled into Phase 9 dispatcher instrumentation.
+  - **D5** test split: unit in Host.Tests/Observability/, integration TraceSpans_CoverFullPipeline in IntegrationTests/Observability/ (Mosquitto + WireMock + in-memory exporter).
+  - **D6** keep hand-rolled Action<ILogger,...> delegates; do NOT migrate to [LoggerMessage].
+  - **D7** Serilog Seq sink: included now, conditionally registered when Serilog:Seq:ServerUrl is set.
+  - **D8** span attribute table seeded; architect finalized in PLAN-2.1.
+  - **D9** errors.unhandled increment site is single top-level catch in EventPump + ChannelActionDispatcher; per-plugin failures already counted by actions.failed.
+- **Researcher** (sonnet, 25 tool uses then resumed) wrote 717-line RESEARCH.md covering existing instrumentation surface, pipeline shape, OTel + Serilog package landscape (versions confirmed 2026-04-27), counter cardinality, MeterListener test pattern, in-memory exporter wiring. Note: researcher claimed `DispatcherDiagnostics.cs` was missing — verified FALSE; file exists. Architect noted the discrepancy and trusted only the API-shape findings.
+- **Architect** (opus, 12 tool uses, no truncation) wrote 4 plans + pre-build VERIFICATION.md:
+  - **Wave 1 (foundation):** PLAN-1.1 — csproj package refs (8 OTel + 5 Serilog), DispatcherDiagnostics counter surface extension (8 D3 counters with tag dimensions), DispatchItem.Activity? → ActivityContext flip per D1. 3 tasks, low risk, no TDD.
+  - **Wave 2 (parallel-safe instrumentation + wiring):** PLAN-2.1 — 5 spans with D8 attribute table, counter increments with TagList, ID-6 fix at ChannelActionDispatcher.cs:~238 (D4), errors.unhandled untagged single site (D9). PLAN-2.2 — UseSerilog Worker SDK, conditional Seq (D7), AddOpenTelemetry with conditional OTLP (D2), appsettings.json Serilog/Otel sections, StartupValidation.ValidateObservability fail-fast on bad URI. Disjoint file sets.
+  - **Wave 3 (TDD):** PLAN-3.1 — unit span/counter tests in Host.Tests/Observability/ + integration TraceSpans_CoverFullPipeline + counter-set integration in IntegrationTests/Observability/. Target 69→≥84 Host.Tests, +2 integration.
+- **Architect did NOT rename** DispatcherDiagnostics → FrigateRelayDiagnostics (RESEARCH.md §7 suggested) — rejected as churn-only since the existing class name is wired throughout the dispatcher.
+- **Verifier (Step 6, plan quality):** PASS. All 5 ROADMAP deliverables, all 9 D-decisions, all 4 plans (≤3 tasks each, valid frontmatter, disjoint Wave 2 files, runnable acceptance commands). Verifier wrote `.shipyard/phases/9/VERIFICATION_PLAN_QUALITY.md` (separate file — append-target was the architect's VERIFICATION.md).
+- **Critique (Step 6a, feasibility stress test):** READY. File-existence claims spot-checked: `DispatcherDiagnostics.cs` exists (PLAN-1.1 correct, RESEARCH.md was wrong), `DispatchItem.Activity?` confirmed at line 29, ID-6 line range plausible, all NEW test directories correctly marked. 2 low-risk pre-build flags: confirm DispatchItem carries Subscription field, confirm ValidateAll exists in StartupValidation.cs. Both will surface immediately at build time.
+- **Test count baseline:** 69 (post-Phase-8). Phase 9 net new: ≥17 (6 span shape + 9 counter MeterListener + 2 integration).
+- **Lessons-learned drafts:**
+  - **Researcher hit tool budget mid-work without writing.** First attempt stopped at "Let me search for files by listing the directory structure properly." Pattern: 25 tool uses on doc + code lookup, but no synthesis budget left for the deliverable. Future researchers should write incrementally; orchestrator can resume but the second pass loses some accumulated context.
+  - **RESEARCH.md inaccuracy: claimed DispatcherDiagnostics.cs was missing.** Wasn't, build was green. Architect verified before relying on the claim. Pattern: if a researcher claim contradicts your green-build observation, verify the claim, not the build.
+  - **Plan-quality verifier wrote to a separate file** (`VERIFICATION_PLAN_QUALITY.md`) instead of appending to the architect's VERIFICATION.md. Either approach is fine; clearer file split is arguably better.
+- Checkpoint tag: `post-plan-phase-9`.
+
