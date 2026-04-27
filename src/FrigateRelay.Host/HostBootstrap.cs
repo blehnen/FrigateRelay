@@ -5,6 +5,7 @@ using FrigateRelay.Host.Matching;
 using FrigateRelay.Host.Snapshots;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace FrigateRelay.Host;
 
@@ -22,6 +23,30 @@ internal static class HostBootstrap
     /// </summary>
     public static void ConfigureServices(HostApplicationBuilder builder)
     {
+        // Serilog wiring (Worker SDK pattern — Serilog.Extensions.Hosting, NOT Serilog.AspNetCore).
+        // AddSerilog on IServiceCollection is the correct API for HostApplicationBuilder in .NET 10.
+        // ReadFrom.Configuration picks up Serilog:MinimumLevel overrides from appsettings.json.
+        // Console + File sinks are always active; Seq is conditional on Serilog:Seq:ServerUrl (D7).
+        // AddSerilog handles provider replacement — do NOT call builder.Logging.ClearProviders().
+        builder.Services.AddSerilog((services, lc) =>
+        {
+            lc.ReadFrom.Configuration(builder.Configuration)
+              .ReadFrom.Services(services)
+              .Enrich.FromLogContext()
+              .WriteTo.Console(
+                  outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}",
+                  formatProvider: null)
+              .WriteTo.File(
+                  path: "logs/frigaterelay-.log",
+                  rollingInterval: RollingInterval.Day,
+                  retainedFileCountLimit: 7,
+                  formatProvider: null);
+
+            var seqUrl = builder.Configuration["Serilog:Seq:ServerUrl"];
+            if (!string.IsNullOrWhiteSpace(seqUrl))
+                lc.WriteTo.Seq(seqUrl, formatProvider: null);
+        });
+
         // Host-scope services.
         builder.Services.AddOptions<HostSubscriptionsOptions>()
             .Bind(builder.Configuration);
