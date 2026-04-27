@@ -20,6 +20,18 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.7" />
     <!-- IMemoryCache / MemoryCache used by DedupeCache; keyed singleton wired by PLAN-3.1. -->
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
+
+    <!-- OpenTelemetry (D2 — registration always; export conditional on Otel:OtlpEndpoint / OTEL_EXPORTER_OTLP_ENDPOINT) -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+
+    <!-- Serilog Worker SDK host wiring (D7 — Seq is conditional on Serilog:Seq:ServerUrl) -->
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
