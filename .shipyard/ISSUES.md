@@ -172,6 +172,37 @@ Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`
 
 ---
 
+### ID-16: `ValidateObservability` has no unit tests
+
+**Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
+**Severity:** Minor
+**Status:** Open — folded into PLAN-3.1 scope (Wave 3 TDD)
+
+**Description:**
+`StartupValidation.ValidateObservability` was added in PLAN-2.2 commit `c7ee4d1` but has no direct tests. The existing `ValidateAll` test suite supplies a minimal `ServiceCollection` without `IConfiguration`, so the `if (configuration is not null)` guard skips Pass 0 entirely — no test exercises `ValidateObservability`. A future refactor that removes the guard would silently regress fail-fast behavior.
+
+**Fix (PLAN-3.1 scope):** Add 3 tests in `tests/FrigateRelay.Host.Tests/Observability/` calling `StartupValidation.ValidateObservability` directly via `InternalsVisibleTo`:
+1. malformed `Otel:OtlpEndpoint` (e.g. `"not-a-uri"`) produces one error containing `"Otel:OtlpEndpoint"`.
+2. malformed `Serilog:Seq:ServerUrl` produces one error containing `"Serilog:Seq:ServerUrl"`.
+3. valid absolute URIs for both keys produce zero errors.
+Use `new ConfigurationBuilder().AddInMemoryCollection(...).Build()` as the config source.
+
+---
+
+### ID-17: `ValidateObservability` did not check `OTEL_EXPORTER_OTLP_ENDPOINT` env-var fallback *[CLOSED 2026-04-27]*
+
+**Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
+**Severity:** Minor
+**Status:** **Closed** (orchestrator inline fix, Phase 9 between Wave 2 and Wave 3)
+
+**Description:**
+`HostBootstrap.cs` resolves `otlpEndpoint` as `config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")`, but the original `ValidateObservability` checked only the config key. If the env var was set to a malformed value while the config key was empty, validation passed and `new Uri(otlpEndpoint)` threw `UriFormatException` with a raw stack trace instead of the structured diagnostic.
+
+**Resolution:**
+`ValidateObservability` now applies the same precedence: `config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")`. Whichever value HostBootstrap consumes is the value validated.
+
+---
+
 ### ID-15: Secret-scan does not cover RFC 1918 class A (`10.x.x.x`) or class B (`172.16-31.x.x`)
 
 **Source:** auditor (Phase 8 AUDIT-8, 2026-04-27)

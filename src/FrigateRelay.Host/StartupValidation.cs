@@ -67,7 +67,9 @@ internal static class StartupValidation
     /// </summary>
     internal static void ValidateObservability(IConfiguration config, ICollection<string> errors)
     {
-        var endpoint = config["Otel:OtlpEndpoint"];
+        // ID-17: validate whichever value HostBootstrap will actually use — config key first,
+        // OTEL_EXPORTER_OTLP_ENDPOINT env var as fallback. If neither is set, no validation needed.
+        var endpoint = config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
         if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
             errors.Add($"Otel:OtlpEndpoint '{endpoint}' is not a valid absolute URI.");
 
