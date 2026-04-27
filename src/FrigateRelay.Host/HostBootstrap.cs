@@ -81,23 +81,15 @@ internal static class HostBootstrap
     }
 
     /// <summary>
-    /// Post-build validation: fails fast when a subscription references an unknown action plugin.
+    /// Post-build validation: runs the full collect-all startup validation pipeline
+    /// (profile resolution → action plugins → snapshot providers → validators).
+    /// A single aggregated <see cref="InvalidOperationException"/> is thrown if any
+    /// errors are found, so operators see all misconfigurations at once (D7).
     /// Call after <c>builder.Build()</c>, before <c>app.RunAsync()</c>.
     /// </summary>
     public static void ValidateStartup(IServiceProvider services)
     {
         var subsOpts = services.GetRequiredService<IOptions<HostSubscriptionsOptions>>().Value;
-        var actionPlugins = services.GetRequiredService<IEnumerable<IActionPlugin>>();
-        StartupValidation.ValidateActions(subsOpts.Subscriptions, actionPlugins);
-
-        var snapshotOpts = services.GetRequiredService<IOptions<SnapshotResolverOptions>>().Value;
-        var snapshotProviders = services.GetRequiredService<IEnumerable<ISnapshotProvider>>();
-        StartupValidation.ValidateSnapshotProviders(subsOpts.Subscriptions, snapshotOpts.DefaultProviderName, snapshotProviders);
-
-        // Phase 7: per-action validator key resolution. Phase 5 review-3.1 lesson —
-        // ValidateSnapshotProviders was once dead code; ValidateValidators MUST be wired
-        // into this exact call chain so an undefined or unknown-Type validator key fails
-        // host startup rather than silently dropping the validator at dispatch time.
-        StartupValidation.ValidateValidators(subsOpts.Subscriptions, services);
+        StartupValidation.ValidateAll(services, subsOpts);
     }
 }
