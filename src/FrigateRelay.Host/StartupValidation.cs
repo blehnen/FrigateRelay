@@ -1,5 +1,7 @@
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
+using FrigateRelay.Host.Snapshots;
+using Microsoft.Extensions.Options;
 
 namespace FrigateRelay.Host;
 
@@ -37,7 +39,8 @@ internal static class StartupValidation
 
         // Pass 3 — snapshot-provider existence (global default + per-sub + per-action).
         var snapshotProviders = services.GetRequiredService<IEnumerable<ISnapshotProvider>>();
-        ValidateSnapshotProviders(resolved, globalDefaultProviderName: null, snapshotProviders, errors);
+        var snapshotOpts = services.GetService<IOptions<SnapshotResolverOptions>>()?.Value;
+        ValidateSnapshotProviders(resolved, snapshotOpts?.DefaultProviderName, snapshotProviders, errors);
 
         // Pass 4 — per-action validator key resolution.
         ValidateValidators(resolved, services, errors);
