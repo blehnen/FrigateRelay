@@ -191,6 +191,52 @@ Extracted to `tests/FrigateRelay.TestHelpers/FrigateRelay.TestHelpers.csproj` (`
 
 ---
 
+### ID-16: `ValidateObservability` has no unit tests
+
+**Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
+**Severity:** Important
+**Status:** Open
+
+**Description:**
+`src/FrigateRelay.Host/StartupValidation.cs` lines 68–77 implement `ValidateObservability`. The existing `ValidateAll` test suite builds a minimal `ServiceCollection` without `IConfiguration`, causing Pass 0 to be skipped entirely via the `if (configuration is not null)` null-guard (line 37). No test exercises the method directly. A malformed `Otel:OtlpEndpoint` or `Serilog:Seq:ServerUrl` that should fail startup could be silently accepted if a future refactor removes or bypasses the guard.
+
+**Fix:** Add three tests to `tests/FrigateRelay.Host.Tests` targeting `StartupValidation.ValidateObservability` directly (the method is `internal static`, accessible via `InternalsVisibleTo`):
+1. Malformed `Otel:OtlpEndpoint` (e.g. `"not-a-uri"`) produces exactly one error containing `"Otel:OtlpEndpoint"`.
+2. Malformed `Serilog:Seq:ServerUrl` produces exactly one error containing `"Serilog:Seq:ServerUrl"`.
+3. Valid absolute URIs for both keys produce zero errors.
+
+Use `new ConfigurationBuilder().AddInMemoryCollection(...)` to supply the config without spinning up the full host.
+
+**Reactivation triggers:**
+- Next builder pass touching `StartupValidation.cs`.
+- Phase 9 Wave 3 test-count gate review.
+
+---
+
+### ID-17: `ValidateObservability` does not validate the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var fallback
+
+**Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
+**Severity:** Important
+**Status:** Open
+
+**Description:**
+`HostBootstrap.cs` lines 56–57 resolve `otlpEndpoint` from `builder.Configuration["Otel:OtlpEndpoint"]` first, then falls back to `Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")`. If the env var is set to a malformed value (e.g. `"not-a-uri"`) while the config key is empty, `ValidateObservability` (which only checks `config["Otel:OtlpEndpoint"]`) reports no error. The OTLP exporter registration at line 65 then calls `new Uri(otlpEndpoint)`, which throws `UriFormatException` at startup — bypassing the fail-fast validation path entirely and producing a less actionable stack trace rather than the structured error message.
+
+**Fix:** In `ValidateObservability`, apply the same env-var fallback logic used in `HostBootstrap`:
+```csharp
+var endpoint = config["Otel:OtlpEndpoint"]
+    ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
+    errors.Add($"Otel:OtlpEndpoint '{endpoint}' is not a valid absolute URI.");
+```
+Alternatively, resolve the merged endpoint value once in `ValidateAll` and pass it to both the validation and wiring sites to keep them in sync.
+
+**Reactivation triggers:**
+- Next builder pass touching `StartupValidation.cs` or `HostBootstrap.cs`.
+- Any operator report of a cryptic `UriFormatException` at startup.
+
+---
+
 ## Closed Issues
 
 ### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*
