@@ -39,12 +39,21 @@ internal static class HostBootstrap
               .Enrich.FromLogContext()
               .WriteTo.Console(
                   outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}",
-                  formatProvider: null)
-              .WriteTo.File(
-                  path: "logs/frigaterelay-.log",
-                  rollingInterval: RollingInterval.Day,
-                  retainedFileCountLimit: 7,
                   formatProvider: null);
+
+            // File sink is suppressed in container deployments (ASPNETCORE_ENVIRONMENT=Docker).
+            // Containers should rely on `docker logs` (stdout capture) — writing to the writable
+            // container layer defeats log capture and fills the layer. Console sink is always active.
+            // Closes ID-23 (PLAN-2.1). Non-Docker deploys (Production, Development) retain the file sink.
+            if (!string.Equals(builder.Environment.EnvironmentName, "Docker",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                lc.WriteTo.File(
+                    path: "logs/frigaterelay-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 7,
+                    formatProvider: null);
+            }
 
             var seqUrl = builder.Configuration["Serilog:Seq:ServerUrl"];
             if (!string.IsNullOrWhiteSpace(seqUrl))

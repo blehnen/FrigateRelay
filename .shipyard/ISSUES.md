@@ -345,6 +345,42 @@ Alternatively, resolve the merged endpoint value once in `ValidateAll` and pass 
 
 ---
 
+### ID-23: File sink active in container — B4 deviation (HostBootstrap programmatic wiring)  *[CLOSED 2026-04-27]*
+
+**Source:** reviewer (Phase 10 REVIEW-1.3, 2026-04-27)
+**Severity:** Important
+**Status:** **Closed** (Phase 10 PLAN-2.1 Task 1)
+
+**Description:**
+`HostBootstrap.ConfigureServices` wires `.WriteTo.File("logs/frigaterelay-.log", ...)` programmatically
+and unconditionally (`src/FrigateRelay.Host/HostBootstrap.cs` lines 43–47). `appsettings.Docker.json`'s
+Console-only `WriteTo` override has no effect on programmatically-added sinks — `ReadFrom.Configuration`
+adds configuration-driven sinks but does not remove sinks already registered in code. In a container
+deployment (`ASPNETCORE_ENVIRONMENT=Docker`), the file sink writes to `/app/logs/` inside the writable
+container layer, defeating full log capture via `docker logs` and partially violating CONTEXT-10 B4
+("rolling file sink off by default in container"). The deviation is acknowledged in PLAN-1.3 and
+`appsettings.Docker.json`'s `_comment`; not hidden, but also not fixed.
+
+**Resolution:**
+`HostBootstrap.ConfigureServices` in `src/FrigateRelay.Host/HostBootstrap.cs` now wraps the
+`.WriteTo.File(...)` call in an environment guard (PLAN-2.1 Task 1, same commit as `docker/Dockerfile`):
+```csharp
+if (!string.Equals(builder.Environment.EnvironmentName, "Docker",
+        StringComparison.OrdinalIgnoreCase))
+{
+    lc.WriteTo.File(path: "logs/frigaterelay-.log", rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7, formatProvider: null);
+}
+```
+The guard activates when `ASPNETCORE_ENVIRONMENT=Docker` (set in `docker/Dockerfile` and
+`docker/docker-compose.example.yml`). The Console sink is unconditional — `docker logs` captures all
+output. Non-Docker deploys (Production, Development) continue to receive the rolling file sink.
+Bundled with the Dockerfile because the env-var convention is established there; the two changes form
+a single cohesive unit. `<InvariantGlobalization>false</InvariantGlobalization>` (redundant .NET 10
+default) also removed from `Host.csproj` in the same commit.
+
+---
+
 ## Closed Issues
 
 ### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*

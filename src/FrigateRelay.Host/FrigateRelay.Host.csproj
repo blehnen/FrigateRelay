@@ -55,7 +55,7 @@
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishAot>false</PublishAot>
-    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- InvariantGlobalization omitted: false is the .NET 10 default for non-AOT builds (PLAN-2.1 noise cleanup). -->
   </PropertyGroup>
 
   <ItemGroup>
