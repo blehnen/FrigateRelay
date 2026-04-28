@@ -8,7 +8,7 @@ namespace FrigateRelay.Plugins.Example;
 /// Sample action plugin scaffolded by the FrigateRelay plugin template.
 /// Replace the body of <see cref="ExecuteAsync"/> with your plugin's behavior.
 /// </summary>
-public sealed class ExampleActionPlugin : IActionPlugin
+public sealed partial class ExampleActionPlugin : IActionPlugin
 {
     private readonly ILogger<ExampleActionPlugin> _logger;
     private readonly ExampleOptions _options;
@@ -23,7 +23,10 @@ public sealed class ExampleActionPlugin : IActionPlugin
 
     public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
     {
-        _logger.LogInformation("Example plugin received event {EventId} for camera {Camera}", ctx.EventId, ctx.Camera);
+        LogEventReceived(_logger, ctx.EventId, ctx.Camera);
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Example plugin received event {EventId} for camera {Camera}")]
+    private static partial void LogEventReceived(ILogger logger, string eventId, string camera);
 }
