@@ -84,6 +84,23 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 - **SnapshotProvider override** — `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
 - **Validators** — attach to specific action entries to gate that action independently.
 
+## Migrating from FrigateMQTTProcessingService
+
+If you are migrating from the author's earlier `FrigateMQTTProcessingService`
+(.NET Framework 4.8 / Topshelf / SharpConfig INI) to FrigateRelay v1.0.0, the
+project ships a one-shot conversion tool plus a field-by-field mapping doc:
+
+- **Tool:** [`tools/FrigateRelay.MigrateConf/`](tools/FrigateRelay.MigrateConf/) — a .NET 10 console app that reads the legacy `.conf` and writes a FrigateRelay-shaped `appsettings.Local.json`.
+  ```bash
+  dotnet run --project tools/FrigateRelay.MigrateConf -c Release -- \
+    --input /path/to/FrigateMQTTProcessingService.conf \
+    --output appsettings.Local.json
+  ```
+- **Field-by-field mapping:** [`docs/migration-from-frigatemqttprocessing.md`](docs/migration-from-frigatemqttprocessing.md) — covers `[ServerSettings]`, `[PushoverSettings]`, `[SubscriptionSettings]` blocks; documents the secrets you must supply via env vars (`Pushover__AppToken`, `Pushover__UserKey`); explains the deliberately-dropped per-subscription `Camera` URL field.
+- **Side-by-side parity window (recommended):** [`docs/parity-window-checklist.md`](docs/parity-window-checklist.md) — the 48-hour run book for verifying behavioral parity in DryRun mode before flipping to production.
+- **Parity report:** [`docs/parity-report.md`](docs/parity-report.md) — the reconciliation output the operator reviews before declaring cutover.
+- **Release procedure:** [`RELEASING.md`](RELEASING.md) — the manual `git tag v1.0.0` run book, including the pre-flight checklist and what `release.yml` does automatically after the tag push.
+
 ## Adding a new action plugin
 
 Install the plugin scaffold template and generate a new project:
