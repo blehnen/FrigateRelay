@@ -3,6 +3,28 @@ phase: 12-parity-cutover
 plan: 3.1
 wave: 3
 dependencies: [1.3, 1.5, 2.1]
+
+# WAVE-1 REVIEWER HEADS-UP (REVIEW-1.5 finding F-1, medium severity, 2026-04-28):
+# This plan's reconciler spec uses `@i` as a discriminator expecting values
+# like "BlueIrisDryRun" / "PushoverDryRun". That assumption is WRONG.
+# Serilog's CompactJsonFormatter emits `@i` as a hex Murmur3 hash of the
+# message template — NEVER an action-name string. The synthetic example
+# fixtures embedded in this plan (lines 264-265, 107) showing
+# `"@i":"BlueIrisDryRun"` will never appear in real output.
+#
+# CORRECT field for action-name discrimination: read the structured property
+# emitted by `LoggerMessage.Define`'s named EventId. PLAN-1.1 emits
+# `EventId.Name = "BlueIrisDryRun"` (top-level "EventId" property in the
+# CompactJson output is an object containing `{ "Id": 203, "Name": "BlueIrisDryRun" }`
+# OR the renderer may flatten this — Wave-3 builder MUST verify against an
+# actual NDJSON sample emitted by the host running with `Logging:File:CompactJson=true`.
+#
+# Builder action: replace all references to `@i` (frontmatter, examples, code spec)
+# with reads from the actual top-level "EventId" property's "Name" sub-property,
+# OR a different structured property the LoggerMessage.Define emission produces.
+# Generate a real NDJSON sample first; let the format dictate the parser.
+
+
 must_haves:
   - tools/FrigateRelay.MigrateConf reconcile subcommand reads NDJSON + legacy CSV, writes parity-report.md
   - Reconciler pairs (camera, label, timestamp-bucket) tuples and lists missed/spurious actions

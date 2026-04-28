@@ -44,7 +44,7 @@ public sealed class MigrateConfRoundTripTests
     }
 
     [TestMethod]
-    public void RunMigrate_LegacyConf_OutputSizeRatioBelowSixty()
+    public void RunMigrate_LegacyConf_OutputSizeRatioBelowSeventy()
     {
         var output = Path.Combine(Path.GetTempPath(), $"frigaterelay-migrate-{Guid.NewGuid():N}.json");
         try
