@@ -35,9 +35,34 @@ internal static class Program
         return 0;
     }
 
-    // Wave 1 stub. PLAN-3.1 replaces with real reconcile logic.
     internal static int RunReconcile(string[] args)
-        => Fail("reconcile verb is not yet implemented (Phase 12 Wave 3 PLAN-3.1).");
+    {
+        if (!TryGetArg(args, "--frigaterelay", out var ndjson) ||
+            !TryGetArg(args, "--legacy", out var csv) ||
+            !TryGetArg(args, "--output", out var output))
+        {
+            return Fail("Usage: migrate-conf reconcile --frigaterelay <ndjson-path> --legacy <csv-path> --output <md-path> [--bucket-seconds 60]");
+        }
+
+        var bucketSeconds = TryGetArg(args, "--bucket-seconds", out var bs) && int.TryParse(bs, out var b) ? b : 60;
+        var bucket = TimeSpan.FromSeconds(bucketSeconds);
+
+        var report = Reconciler.Reconcile(ndjson, csv, bucket);
+
+        var allRows = Reconciler.ReadFrigateRelayNdjson(ndjson).Concat(Reconciler.ReadLegacyCsv(csv)).ToList();
+        var windowStart = allRows.Count > 0 ? allRows.Min(r => r.Timestamp) : DateTimeOffset.MinValue;
+        var windowEnd = allRows.Count > 0 ? allRows.Max(r => r.Timestamp) : DateTimeOffset.MaxValue;
+
+        var md = Reconciler.RenderMarkdown(report, windowStart, windowEnd);
+        File.WriteAllText(output, md);
+
+        Console.Out.WriteLine(
+            $"Reconcile complete. Legacy={report.LegacyCount} FrigateRelay={report.FrigateRelayCount} " +
+            $"Matched={report.MatchedPairs} Missed={report.MissedAlerts.Count} Spurious={report.SpuriousAlerts.Count}");
+        Console.Out.WriteLine($"Wrote {output}.");
+
+        return report.MissedAlerts.Count == 0 && report.SpuriousAlerts.Count == 0 ? 0 : 2;
+    }
 
     private static bool TryGetArg(string[] args, string name, out string value)
     {
