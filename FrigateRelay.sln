@@ -39,6 +39,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.Plugins.CodePr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.Plugins.CodeProjectAi.Tests", "tests\FrigateRelay.Plugins.CodeProjectAi.Tests\FrigateRelay.Plugins.CodeProjectAi.Tests.csproj", "{4992BAB2-2918-4EFE-8A54-FDEFC81BFFDE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{5D20AA90-6969-D8BD-9DCD-8634F4692FDA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.Samples.PluginGuide", "samples\FrigateRelay.Samples.PluginGuide\FrigateRelay.Samples.PluginGuide.csproj", "{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -241,6 +245,18 @@ Global
 		{4992BAB2-2918-4EFE-8A54-FDEFC81BFFDE}.Release|x64.Build.0 = Release|Any CPU
 		{4992BAB2-2918-4EFE-8A54-FDEFC81BFFDE}.Release|x86.ActiveCfg = Release|Any CPU
 		{4992BAB2-2918-4EFE-8A54-FDEFC81BFFDE}.Release|x86.Build.0 = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|x64.Build.0 = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Debug|x86.Build.0 = Debug|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|x64.ActiveCfg = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|x64.Build.0 = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|x86.ActiveCfg = Release|Any CPU
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -262,5 +278,6 @@ Global
 		{EC728A4C-E466-459D-BFF5-7C4C9CCD5743} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{2C1D7DBB-1B95-4576-A8C8-4956143E8831} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{4992BAB2-2918-4EFE-8A54-FDEFC81BFFDE} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal
