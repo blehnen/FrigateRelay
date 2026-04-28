@@ -436,6 +436,20 @@ The example compose file maps `8080:8080` (binds to `0.0.0.0:8080` on the Docker
 
 ---
 
+### ID-28: `tools/FrigateRelay.MigrateConf` accepts unvalidated CLI paths  *[CLOSED 2026-04-28]*
+
+**Source:** auditor (Phase 12 AUDIT-12, 2026-04-28)
+**Severity:** Low / Advisory (CWE-22, operator-self-inflicted)
+**Status:** **Closed** (Phase 12 closeout, 2026-04-28)
+
+**Description:**
+`tools/FrigateRelay.MigrateConf/Program.cs` `RunMigrate` and `RunReconcile` passed `--input`, `--output`, `--frigaterelay`, `--legacy` values directly to `IniReader.Read` / `File.WriteAllText` without canonicalization. The tool is offline and runs as the invoking operator, so no privilege escalation is possible — but path traversal would let an operator-mistake or shell-glob accidentally write to an unintended location. Inconsistent with the `ValidateSerilogPath` hardening precedent established in Phase 10 (ID-21 close).
+
+**Resolution:**
+Phase 12 closeout commit added `Path.GetFullPath(value)` canonicalization at CLI-parse time in both `RunMigrate` and `RunReconcile`. Four lines total. No behavioral change for valid relative paths (they resolve relative to CWD as before); `..` segments are now collapsed to their canonical absolute form, surfacing intent clearly. Mirrors the Phase 11 `check-doc-samples.sh` hardening pattern (CWE-22 path-traversal guard via `(samples_dir / filename).resolve()` containment check).
+
+---
+
 ## Closed Issues
 
 ### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*

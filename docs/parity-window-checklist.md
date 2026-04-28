@@ -99,18 +99,21 @@ FrigateRelay should:
 Sanity-check tail (run in Terminal C):
 
 ```bash
-tail -f logs/frigaterelay-*.log | grep -E '"BlueIrisDryRun"|"PushoverDryRun"'
+tail -f logs/frigaterelay-*.log | grep -E '"BlueIris DryRun would-execute"|"Pushover DryRun would-execute"'
 ```
 
-With `CompactJson: true` the file is NDJSON. The EventId name is rendered at the `"@i"` key by
-Serilog's `CompactJsonFormatter`. Each DryRun line looks like:
+With `CompactJson: true` the file is NDJSON. **`Serilog.Formatting.Compact.CompactJsonFormatter`
+renders `@i` as a hex Murmur3 hash of the message template — NOT the EventId name.** Use the
+`@mt` (message template) field for action discrimination instead. Each DryRun line looks like:
 
 ```json
-{"@t":"2026-04-29T12:34:56.000Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"BlueIrisDryRun","Camera":"driveway","Label":"person","EventId":"abc123"}
+{"@t":"2026-04-29T12:34:56.000Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"a1b2c3d4","Camera":"driveway","Label":"person","EventId":"abc123"}
 ```
 
-If you see lines matching `"BlueIrisDryRun"` or `"PushoverDryRun"` each time a Frigate event
-fires, the parity window is running correctly.
+The reconcile subcommand (`tools/FrigateRelay.MigrateConf reconcile`) keys on `@mt.StartsWith("BlueIris DryRun")`
+and `@mt.StartsWith("Pushover DryRun")` — your grep commands should match those exact prefix strings.
+If you see lines starting with `"BlueIris DryRun"` or `"Pushover DryRun"` in `@mt` each time a
+Frigate event fires, the parity window is running correctly.
 
 Verify the log file exists and is growing:
 

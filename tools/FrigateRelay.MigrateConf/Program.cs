@@ -28,6 +28,12 @@ internal static class Program
             output = "appsettings.Local.json";
         }
 
+        // Canonicalize CLI paths (AUDIT-12 A1 / ID-28). Tool is offline + runs as the operator,
+        // so risk is operator-self-inflicted, but matches the ValidateSerilogPath precedent
+        // (Phase 10 ID-21 close).
+        input = Path.GetFullPath(input);
+        output = Path.GetFullPath(output);
+
         var sections = IniReader.Read(input);
         var json = AppsettingsWriter.Build(sections);
         File.WriteAllText(output, json);
@@ -43,6 +49,11 @@ internal static class Program
         {
             return Fail("Usage: migrate-conf reconcile --frigaterelay <ndjson-path> --legacy <csv-path> --output <md-path> [--bucket-seconds 60]");
         }
+
+        // Canonicalize CLI paths (AUDIT-12 A1 / ID-28).
+        ndjson = Path.GetFullPath(ndjson);
+        csv = Path.GetFullPath(csv);
+        output = Path.GetFullPath(output);
 
         var bucketSeconds = TryGetArg(args, "--bucket-seconds", out var bs) && int.TryParse(bs, out var b) ? b : 60;
         var bucket = TimeSpan.FromSeconds(bucketSeconds);
