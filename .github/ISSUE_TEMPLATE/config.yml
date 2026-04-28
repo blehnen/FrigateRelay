@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    # TODO: replace <owner>/<repo> with the real GitHub slug (e.g. acme/frigaterelay)
+    url: https://github.com/<owner>/<repo>/security/advisories/new
+    about: Report security issues privately via GitHub's security advisory flow. Do not file a public issue.
