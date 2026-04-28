@@ -124,3 +124,20 @@ jobs:
           # If a separate test project lands later, swap to:
           #   dotnet run --project tests/...Samples.Tests -c Release --no-build
           dotnet run --project samples/FrigateRelay.Samples.PluginGuide -c Release --no-build
+
+  doc-samples-rot:
+    name: Doc-sample byte-match check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: hashFiles('docs/plugin-author-guide.md') != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Compare doc fences against samples
+        run: bash .github/scripts/check-doc-samples.sh
