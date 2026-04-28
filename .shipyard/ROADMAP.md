@@ -306,7 +306,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 11 — Open-Source Polish
+## Phase 11 — Open-Source Polish  *[COMPLETE 2026-04-28]*
+
+**Status:** Build complete (6/6 plans PASS across 3 waves, 18 tasks, ~17 implementation commits + 2 inline fix-ups). Verifier verdict COMPLETE — 192/192 tests, 0 build warnings, all 6 ROADMAP success criteria met, all 8 CONTEXT-11 decisions honored. Auditor PASS_WITH_NOTES (Low; 0 critical / 0 important / 3 advisory — A1 path-traversal applied inline, A2 ID-24 carry-over, A3 positive note). Simplifier 0 High / 0 Medium / 3 Low (all Rule-of-Three deferral notes). Documenter ACCEPTABLE (Phase 11 self-CHANGELOG entry added inline). Wave 1 closed the 2 Phase 9 integration regressions; ID-4 closed.
 
 **Goal.** Make the repo contributor-ready and new-user-onboardable in under one hour (Success Criterion #5).
 
