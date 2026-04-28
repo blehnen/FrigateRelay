@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Phase 12 — Parity Cutover (2026-04-28)
+
+#### Added
+
+- `BlueIris:DryRun` and `Pushover:DryRun` per-action config flags. When `true`, the action plugin emits a structured `would-execute` log entry (`BlueIrisDryRun` / `PushoverDryRun` EventId) at Info level and returns success without calling the external API. Used during the parity window for logging-only side-by-side runs against the legacy service; default `false` (production-safe).
+- `tools/FrigateRelay.MigrateConf/` — .NET 10 console app that converts a legacy `FrigateMQTTProcessingService.conf` (hand-rolled INI reader; `Microsoft.Extensions.Configuration.Ini` not used) to a FrigateRelay-shaped `appsettings.Local.json`. Default subcommand: `migrate --input <path> --output <path>`.
+- `tools/FrigateRelay.MigrateConf/` `reconcile` subcommand — pairs FrigateRelay NDJSON audit-log entries against a legacy CSV export of `(timestamp, camera, label, action, outcome)` tuples; produces a counts summary and per-discrepancy detail for `docs/parity-report.md`.
+- `tests/FrigateRelay.MigrateConf.Tests/` — MSTest v4.2.1 round-trip and reconcile coverage; uses `tests/FrigateRelay.MigrateConf.Tests/Fixtures/sanitized-legacy.conf` fixture (secrets and IPs sanitized).
+- `docs/migration-from-frigatemqttprocessing.md` — field-by-field INI → JSON mapping covering `[ServerSettings]`, `[PushoverSettings]`, and `[SubscriptionSettings]` blocks; documents secrets supplied via env vars (`Pushover__AppToken`, `Pushover__UserKey`, `BlueIris__Password`); explains deliberately-dropped fields (`Camera` per-subscription URL → global template, `LocationName`, `CameraShortName`).
+- `docs/parity-window-checklist.md` — operator run book for the ≥48-hour side-by-side parity window: enabling DryRun + NDJSON sink, collecting legacy CSV export, running the reconcile subcommand, interpreting the parity report, and close-out steps before cutover.
+- `docs/parity-report.md` — parity-window reconciliation output (template; populated by the operator after the window closes using the reconcile subcommand).
+- `RELEASING.md` — manual v1.0.0 release run book: pre-flight checklist, CHANGELOG promotion step, `git tag -a v1.0.0` + `git push origin v1.0.0` commands, description of what `release.yml` does automatically after the tag push, post-release verification, and rollback procedure.
+- README "Migrating from FrigateMQTTProcessingService" section linking `tools/FrigateRelay.MigrateConf/`, `docs/migration-from-frigatemqttprocessing.md`, `docs/parity-window-checklist.md`, `docs/parity-report.md`, and `RELEASING.md`.
+
+#### Changed
+
+- `FrigateRelay.Host` rolling file sink (`logs/frigaterelay-.log`) gains an opt-in `Logging:File:CompactJson` config key. When `true`, the file sink uses `Serilog.Formatting.Compact.CompactJsonFormatter` (NDJSON) so the reconcile subcommand can parse structured log output during the parity window. Default `false` — human-readable text format unchanged for production users.
+
+---
+
 ### Phase 11 — Open-Source Polish (2026-04-28)
 
 #### Added
