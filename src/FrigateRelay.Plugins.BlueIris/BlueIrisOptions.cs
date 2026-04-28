@@ -22,4 +22,12 @@ public sealed record BlueIrisOptions
     /// Uses the same 4-token DSL as TriggerUrlTemplate ({camera}, {label}, {event_id}, {zone}).
     /// </summary>
     public string? SnapshotUrlTemplate { get; init; }
+
+    /// <summary>
+    /// When true, the BlueIris plugin emits a structured <c>would-execute</c> log entry
+    /// at Info level (EventId 203, "BlueIrisDryRun") and returns success without
+    /// calling the BlueIris HTTP trigger endpoint. Used during the parity-window
+    /// (Phase 12) to log would-be-actions without firing real triggers. Default false.
+    /// </summary>
+    public bool DryRun { get; init; }
 }

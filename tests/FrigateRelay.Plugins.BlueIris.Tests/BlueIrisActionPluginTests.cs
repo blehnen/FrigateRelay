@@ -7,7 +7,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NSubstitute;
 using Polly;
+using System.Net;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
@@ -215,6 +217,56 @@ public class BlueIrisActionPluginTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DryRunTrue_DoesNotCallHttpClientAndLogsWouldExecute()
+    {
+        var handler = new InvocationCountingHandler();
+        var httpFactory = Substitute.For<IHttpClientFactory>();
+        httpFactory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(handler));
+
+        var logger = new CapturingLogger<BlueIrisActionPlugin>();
+        var template = BlueIrisUrlTemplate.Parse("http://example.invalid/admin?camera={camera}");
+        var options = Microsoft.Extensions.Options.Options.Create(new BlueIrisOptions
+        {
+            TriggerUrlTemplate = "http://example.invalid/admin?camera={camera}",
+            DryRun = true,
+        });
+        var plugin = new BlueIrisActionPlugin(httpFactory, template, logger, options);
+
+        var ctx = NewCtx(camera: "DriveWayHD", label: "person", eventId: "ev-1");
+
+        await plugin.ExecuteAsync(ctx, default, CancellationToken.None);
+
+        handler.SendInvocations.Should().Be(0);
+        logger.Entries.Should()
+            .ContainSingle(e => e.Id.Name == "BlueIrisDryRun")
+            .Which.Message.Should().Contain("DriveWayHD").And.Contain("person").And.Contain("ev-1");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DryRunFalse_CallsHttpClientAsBefore()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK);
+        var httpFactory = Substitute.For<IHttpClientFactory>();
+        httpFactory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(handler));
+
+        var logger = new CapturingLogger<BlueIrisActionPlugin>();
+        var template = BlueIrisUrlTemplate.Parse("http://example.invalid/admin?camera={camera}");
+        var options = Microsoft.Extensions.Options.Options.Create(new BlueIrisOptions
+        {
+            TriggerUrlTemplate = "http://example.invalid/admin?camera={camera}",
+            // DryRun omitted — default false.
+        });
+        var plugin = new BlueIrisActionPlugin(httpFactory, template, logger, options);
+
+        var ctx = NewCtx(camera: "DriveWayHD", label: "person", eventId: "ev-1");
+
+        await plugin.ExecuteAsync(ctx, default, CancellationToken.None);
+
+        handler.SendInvocations.Should().Be(1);
+        logger.Entries.Should().NotContain(e => e.Id.Name == "BlueIrisDryRun");
+    }
+
+    [TestMethod]
     public void Register_AllowInvalidCertificatesTrue_PrimaryHandlerSkipsValidation()
     {
         // Use IHttpMessageHandlerFactory to get the raw handler chain (bypasses resilience wrapper).
@@ -251,5 +303,25 @@ public class BlueIrisActionPluginTests
         handlerWithoutSkip.Should().NotBeNull("SocketsHttpHandler must be the primary handler");
         handlerWithoutSkip!.SslOptions.RemoteCertificateValidationCallback.Should().BeNull(
             "AllowInvalidCertificates=false must leave callback null");
+    }
+
+    private sealed class InvocationCountingHandler : HttpMessageHandler
+    {
+        public int SendInvocations { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            SendInvocations++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
+    private sealed class StubHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        public int SendInvocations { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            SendInvocations++;
+            return Task.FromResult(new HttpResponseMessage(statusCode));
+        }
     }
 }

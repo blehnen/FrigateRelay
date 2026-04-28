@@ -1,5 +1,6 @@
 using FrigateRelay.Abstractions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FrigateRelay.Plugins.BlueIris;
 
@@ -17,24 +18,39 @@ internal sealed class BlueIrisActionPlugin : IActionPlugin
             new EventId(202, "BlueIrisTriggerFailed"),
             "BlueIris trigger failed event_id={EventId} url={Url}");
 
+    private static readonly Action<ILogger, string, string, string, Exception?> LogDryRun =
+        LoggerMessage.Define<string, string, string>(
+            LogLevel.Information,
+            new EventId(203, "BlueIrisDryRun"),
+            "BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}");
+
     private readonly IHttpClientFactory _httpFactory;
     private readonly BlueIrisUrlTemplate _template;
     private readonly ILogger<BlueIrisActionPlugin> _logger;
+    private readonly BlueIrisOptions _options;
 
     public BlueIrisActionPlugin(
         IHttpClientFactory httpFactory,
         BlueIrisUrlTemplate template,
-        ILogger<BlueIrisActionPlugin> logger)
+        ILogger<BlueIrisActionPlugin> logger,
+        IOptions<BlueIrisOptions> options)
     {
         _httpFactory = httpFactory;
         _template = template;
         _logger = logger;
+        _options = options.Value;
     }
 
     public string Name => "BlueIris";
 
     public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
     {
+        if (_options.DryRun)
+        {
+            LogDryRun(_logger, ctx.Camera, ctx.Label, ctx.EventId, null);
+            return;
+        }
+
         var url = _template.Resolve(ctx);
         using var client = _httpFactory.CreateClient("BlueIris");
 
