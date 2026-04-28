@@ -29,7 +29,9 @@ pipeline {
         stage('Build & Coverage') {
             agent {
                 docker {
-                    image 'mcr.microsoft.com/dotnet/sdk:10.0'
+                    // Digest pin: bump manually when Dependabot bumps docker/Dockerfile (Jenkinsfile is not in the Dependabot docker watch).
+                    // To update: docker pull mcr.microsoft.com/dotnet/sdk:10.0 && docker inspect mcr.microsoft.com/dotnet/sdk:10.0 --format '{{index .RepoDigests 0}}'
+                    image 'mcr.microsoft.com/dotnet/sdk:10.0@sha256:DIGEST_PLACEHOLDER'
                     // No args override: NuGet cache is workspace-local (--packages .nuget-cache).
                     // No external Docker volume required on the Jenkins agent host (OQ4).
                     //
