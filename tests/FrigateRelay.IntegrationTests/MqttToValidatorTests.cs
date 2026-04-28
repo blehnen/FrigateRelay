@@ -10,6 +10,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
@@ -230,11 +233,17 @@ public sealed class MqttToValidatorTests
 
         HostBootstrap.ConfigureServices(builder);
 
-        // Register the capture provider AFTER ConfigureServices so it survives
-        // AddSerilog's logging-provider replacement. Service-collection registration
-        // bypasses ILoggingBuilder's pipeline, which AddSerilog clears.
-        // (REVIEW-3.1 Important #3 / Wave 2 regression remediation.)
-        builder.Services.AddSingleton<ILoggerProvider>(capture);
+        // HostBootstrap.ConfigureServices calls AddSerilog which replaces the ILoggerFactory
+        // with Serilog's own factory. ILoggerProvider registrations in DI are ignored by the
+        // Serilog factory regardless of when they are registered (Phase 10 WebApplication pivot
+        // broke the earlier Services.AddSingleton<ILoggerProvider> workaround).
+        // Fix: wire a second AddSerilog call whose only job is to route log events into the
+        // capture sink. The last AddSerilog registration wins in DI. Production sinks (console,
+        // file) are intentionally omitted here — tests only need capture, not output.
+        var captureSink = new CapturingSerilogSink(capture.Entries);
+        builder.Services.AddSerilog((_, lc) =>
+            lc.MinimumLevel.Verbose()
+              .WriteTo.Sink(captureSink));
 
         var app = builder.Build();
         HostBootstrap.ValidateStartup(app.Services);
@@ -281,26 +290,51 @@ public sealed class MqttToValidatorTests
     }
 
     /// <summary>
-    /// Per-test log sink capturing all entries from all categories. Used to assert
-    /// presence/absence of the structured validator_rejected log emitted by
-    /// ChannelActionDispatcher (EventId 20).
+    /// Holds the captured log entries bag. The sink below feeds this provider's Entries.
     /// </summary>
-    private sealed class CapturingLoggerProvider : ILoggerProvider
+    private sealed class CapturingLoggerProvider
     {
         public ConcurrentBag<CapturedEntry> Entries { get; } = new();
+    }
 
-        public ILogger CreateLogger(string categoryName) => new CategoryLogger(categoryName, Entries);
-
-        public void Dispose() { /* no-op */ }
-
-        private sealed class CategoryLogger(string category, ConcurrentBag<CapturedEntry> sink) : ILogger
+    /// <summary>
+    /// Serilog ILogEventSink that translates Serilog LogEvents into CapturedEntry records.
+    /// Wired via a second AddSerilog call so it survives HostBootstrap's AddSerilog replacement
+    /// of the ILoggerFactory (Phase 10 WebApplication pivot broke the ILoggerProvider approach).
+    /// SourceContext property → Category; EventId property (if present) → EventId; rendered
+    /// message → Message.
+    /// </summary>
+    private sealed class CapturingSerilogSink(ConcurrentBag<CapturedEntry> sink) : ILogEventSink
+    {
+        public void Emit(LogEvent logEvent)
         {
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-            public bool IsEnabled(LogLevel logLevel) => true;
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            var category = logEvent.Properties.TryGetValue("SourceContext", out var sc)
+                ? sc.ToString().Trim('"')
+                : string.Empty;
+
+            var eventId = default(EventId);
+            if (logEvent.Properties.TryGetValue("EventId", out var eid) && eid is StructureValue sv)
             {
-                sink.Add(new CapturedEntry(category, logLevel, eventId, formatter(state, exception)));
+                var idProp   = sv.Properties.FirstOrDefault(p => p.Name == "Id");
+                var nameProp = sv.Properties.FirstOrDefault(p => p.Name == "Name");
+                var id   = idProp   is not null && int.TryParse(idProp.Value.ToString(),   out var i) ? i   : 0;
+                var name = nameProp is not null ? nameProp.Value.ToString().Trim('"') : string.Empty;
+                eventId = new EventId(id, name);
             }
+
+            var level = logEvent.Level switch
+            {
+                LogEventLevel.Verbose     => LogLevel.Trace,
+                LogEventLevel.Debug       => LogLevel.Debug,
+                LogEventLevel.Information => LogLevel.Information,
+                LogEventLevel.Warning     => LogLevel.Warning,
+                LogEventLevel.Error       => LogLevel.Error,
+                LogEventLevel.Fatal       => LogLevel.Critical,
+                _                         => LogLevel.None,
+            };
+
+            var message = logEvent.RenderMessage(System.Globalization.CultureInfo.InvariantCulture);
+            sink.Add(new CapturedEntry(category, level, eventId, message));
         }
     }
 
