@@ -49,3 +49,24 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+
+  # ── Docker ───────────────────────────────────────────────────────────────────
+  # Watches docker/Dockerfile for base-image tag AND digest updates (Dependabot
+  # rewrites both atomically when both are present — supply-chain hygiene B2/B3).
+  #
+  # Jenkinsfile SDK pin (mcr.microsoft.com/dotnet/sdk:10.0@sha256:...) is NOT
+  # watched here — Dependabot docker ecosystem only scans Dockerfile-named files,
+  # not Groovy files. Update Jenkinsfile manually when Dependabot bumps the
+  # runtime-deps digest in docker/Dockerfile. See Jenkinsfile comment for the
+  # exact docker pull / docker inspect command.
+  #
+  # docker/docker-compose.example.yml is NOT watched here — Dependabot docker
+  # ecosystem does not reliably handle compose-form image pins. Update manually
+  # when releasing a new version.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
