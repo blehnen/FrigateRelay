@@ -1,5 +1,31 @@
 # Shipyard History
 
+## 2026-04-28 — Phase 12 built (`/shipyard:build 12` — Parity Cutover, final phase before v1.0.0)
+
+- **Layout executed:** 3 waves / 8 plans / 18 tasks / ~14 implementation commits + 2 fix-ups + 1 closeout. Wave 1 (5 parallel team-mode `shipyard-build-phase-12-wave-1`) → Wave 2 (1 plan operator-checklist, agent mode) → Wave 3 (2 parallel team-mode `shipyard-build-phase-12-wave-3`). 48h passive-observation gate explicitly **continued in-session per user choice** — Wave 3 builds the reconcile tooling against synthetic NDJSON+CSV fixtures; the actual parity report is a TEMPLATE the operator fills before tagging v1.0.0.
+- **Wave 1 — 5 parallel doc/tool/code plans (team mode):** PLAN-1.1 BlueIris DryRun (commit `68774d7`, EventId 203, 19/19 plugin tests +2 new), PLAN-1.2 Pushover DryRun (commit `4705f12`, EventId 4, 12/12 +2 new), PLAN-1.3 `tools/FrigateRelay.MigrateConf/` C# console tool with **hand-rolled IniReader** (commits `dccb210`+`491c1f8`, 4 round-trip tests, preserves all 9 repeated `[SubscriptionSettings]` blocks — `Microsoft.Extensions.Configuration.Ini` would have collapsed them), PLAN-1.4 `docs/migration-from-frigatemqttprocessing.md` (commit `8bebf47`, 174 lines, RFC 5737 documentation IPs), PLAN-1.5 NDJSON Serilog audit-log sink with `Logging:File:CompactJson` opt-in (commit `543e639`, `HostBootstrap.ApplyLoggerConfiguration` extracted as internal static for testability, 103/103 Host tests +2 new). All 5 reviewers PASS. Wave 1 fix-up commit `4de0499` addressed REVIEW-1.3 advisories (test method rename `BelowSixty`→`BelowSeventy`, CLAUDE.md staleness on test-project CI integration — Phase 3's run-tests.sh extraction made the hard-coded list paragraph obsolete) plus a heads-up note inside PLAN-3.1 frontmatter about REVIEW-1.5 finding F-1 (CompactJson `@i` is a Murmur3 hash, NOT an action name).
+- **Wave 2 — operator parity-window checklist (agent mode, 1 plan):** PLAN-2.1 produced `docs/parity-window-checklist.md` (commit `1d16ce5`, 254 lines, 9 sections covering pre-flight / overlay config / bringup / CSV export / watch / close-out / Wave 3 expectations / failure modes). Reviewer PASS with 1 minor non-blocking suggestion (JSON-merge instruction wording).
+- **Wave 3 — reconcile + release prep (team mode, 2 parallel):** PLAN-3.1 reconcile subcommand + parity-report.md template (commit `1d18b31`, +6 ReconcilerTests for 10/10 in MigrateConf.Tests). Builder correctly resolved REVIEW-1.5 F-1 by reading the actual NDJSON shape: discriminator is `@mt` (message template prefix `"BlueIris DryRun"` / `"Pushover DryRun"`), NOT `@i`. PLAN-3.2 README migration section + RELEASING.md + CHANGELOG `[Unreleased]` Phase 12 entry (commits `bb556c5` + `ed325d6` + `39c9677`). Both reviewers PASS, 0 critical findings.
+- **Post-build pipeline:**
+  - **Verifier:** verdict **COMPLETE** (`VERIFICATION-12.md`). Build clean (0 errors / 0 warnings). 208/208 tests across 9 projects (+10 net new from Wave 1, +6 from Wave 3). All 6 ROADMAP Phase 12 success criteria fully met (migration tool runs, output passes ConfigSizeParityTest, README migration section, parity-window checklist + report template, RELEASING.md). All 7 CONTEXT-12 D-decisions honored.
+  - **Auditor:** verdict **PASS_WITH_NOTES** / Low risk (`AUDIT-12.md`). 0 critical / 0 important / 3 advisory. **A1 (proposed ID-28)** MigrateConf path-traversal — applied inline this session (commit `4d4db81`) — added `Path.GetFullPath` canonicalization in `RunMigrate`+`RunReconcile`. ID-28 marked CLOSED. **A2** carry-over of ID-19 (DryRun log-payload contains MQTT-sourced camera/label values; existing log-injection concern, no new surface). **A3** informational (RFC 5737 documentation IPs in migration doc are correct, not RFC 1918). CLAUDE.md invariants 4/4 PASS.
+  - **Simplifier:** **0 High / 0 Medium / 2 Low** (`SIMPLIFICATION-12.md`). Patterns avoided positives: hand-rolled IniReader is justified (M.E.C.Ini section-collapse), DryRun copy-paste between BlueIris/Pushover is per-plugin EventId clarity not bloat, MigrateConf 2-verb dispatch fine without CommandLineParser library.
+  - **Documenter:** verdict **NEEDS_DOCS** with 1 blocker — `docs/parity-window-checklist.md` lines 105-109 told operators to grep `@i` for `BlueIrisDryRun`/`PushoverDryRun`. Same F-1 mistake as PLAN-3.1's original spec, baked into the operator-facing checklist. **Applied inline** (commit `4d4db81`) — updated checklist to use `@mt` prefix matching aligned with the reconciler's actual implementation. NDJSON sample line corrected to show `@i` as a hex hash and the `@mt` template prefix as the action discriminator.
+- **Issues closed this phase:** **ID-28** (MigrateConf path canonicalization — opened by AUDIT-12 A1 and closed by inline fix-up commit `4d4db81` in the same closeout session).
+- **Issues opened this phase:** ID-28 (closed same-session — see above).
+- **Lessons-learned drafts (for `/shipyard:ship`):**
+  - **Skeleton-first prompt structure now fully proven across 3 phases.** Every Phase 12 agent that received "write skeleton FIRST" guidance produced a usable artifact even when truncating mid-investigation. The pattern works.
+  - **F-1 (`@i` is a Murmur3 hash) caught in two places.** REVIEW-1.5 caught it in PLAN-3.1 (architect's spec); orchestrator added a heads-up to PLAN-3.1 frontmatter; Wave 3 builder correctly used `@mt` instead. But Wave 2's operator checklist had the SAME wrong assumption and shipped with it; Phase 12 documenter caught it post-build. **Lesson:** when a finding is caught in one plan's review, the orchestrator should grep the rest of the phase artifacts (including operator docs already landed) for the same pattern, not just propagate to one downstream plan.
+  - **In-session continuation of Wave 2's 48h passive observation works.** User chose to continue immediately rather than pause-and-resume after the real window. Wave 3 builds against synthetic fixtures; the operator fills the parity-report template in their own time before running `git tag v1.0.0` per RELEASING.md. Preserves Shipyard's automation envelope without coupling it to wall-clock observation time.
+  - **Hand-rolled IniReader was the right call (twice).** Architect mandated it in PLAN-1.3; builder respected it. The 9-section preservation test caught what M.E.C.Ini would have silently dropped. Had the architect not pre-decided, the builder might have reached for the canonical .NET API and shipped a silent data loss.
+  - **CHANGELOG-during-phase pattern works.** PLAN-3.2 Task 3 added the Phase 12 entry to `[Unreleased]` proactively rather than retroactively. Phase 11's documenter caught Phase 11 missing-from-CHANGELOG; Phase 12 didn't repeat the gap.
+  - **Team-mode for ≥3 parallel plans, agent-mode for 1-plan waves.** This phase used team mode for Wave 1 (5 plans) and Wave 3 (2 plans), agent mode for Wave 2 (1 plan). Both worked. The TeamCreate→spawn→shutdown→TeamDelete cycle adds ~5-10 tool calls of overhead which pays off only when there's parallelism to gain.
+  - **Auditor-proposed ISSUES IDs can land closed-same-session when fix is trivial.** ID-28 was a 4-line `Path.GetFullPath` addition. Cleaner to ship v1.0.0 with the hardening than carry the deferred debt. Pattern: when auditor's "Effort: Trivial" + Phase is final-before-release, fix inline.
+  - **Documenter still finds blockers in operator docs.** Phase 11 documenter found the missing-CHANGELOG; Phase 12 documenter found the wrong-`@i` reference in the operator checklist. Documenter agent is earning its keep — not just generating new docs but verifying the consistency of the docs already written across the phase.
+  - **D7 manual v1.0.0 tag is the right boundary.** Agent never touched `git tag v1.0.0`; RELEASING.md hands the operator the exact commands. Once the operator runs the parity window for real (per Wave 2 checklist), reads the parity report, then runs the tag commands, release.yml auto-builds + pushes the multi-arch GHCR images. Clean operator-controlled release boundary.
+- Checkpoint tags: `pre-build-phase-12` (created at start of build), `post-build-phase-12` (created at end of this session).
+- **All 12 ROADMAP phases now COMPLETE.** Project is `/shipyard:ship`-ready pending the operator's parity window + manual `git tag v1.0.0` + `git push origin v1.0.0`.
+
 ## 2026-04-28 — Phase 12 planned (`/shipyard:plan 12` — Parity Cutover, final phase before v1.0.0)
 
 - **Discussion capture (CONTEXT-12.md):** 7 user-locked decisions across 2 AskUserQuestion rounds:
@@ -696,3 +722,18 @@
 - [2026-04-28T18:05:54Z] Session ended during build (may need /shipyard:resume)
 - [2026-04-28T18:06:27Z] Session ended during build (may need /shipyard:resume)
 - [2026-04-28T18:06:34Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:31:26Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:33:30Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:35:17Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:38:33Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:45:50Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:46:43Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:47:21Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T19:48:58Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:09:58Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:15:48Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:17:16Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:34:28Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:44:58Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:49:22Z] Session ended during build (may need /shipyard:resume)
+- [2026-04-28T20:49:51Z] Session ended during build (may need /shipyard:resume)

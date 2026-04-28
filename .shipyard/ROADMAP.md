@@ -334,7 +334,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 12 — Parity Cutover
+## Phase 12 — Parity Cutover  *[COMPLETE 2026-04-28]*
+
+**Status:** Build complete (8/8 plans PASS across 3 waves, 18 tasks, ~14 implementation commits + 2 inline fix-ups). Verifier verdict COMPLETE — 208/208 tests, 0 build warnings, all ROADMAP success criteria delivered, all 7 CONTEXT-12 D-decisions honored. Auditor PASS_WITH_NOTES (Low; 0 critical / 0 important / 3 advisory — A1 path-traversal applied inline + closed as ID-28, A2 ID-19 carry-over, A3 informational). Simplifier 0H/0M/2L (cross-doc duplication note + CLI dispatch confirmation). Documenter NEEDS_DOCS verdict resolved inline — parity-window-checklist.md `@i` / `@mt` mix-up corrected. **v1.0.0 release tag is the operator's manual step per CONTEXT-12 D7** (see `RELEASING.md`); release.yml auto-builds + pushes multi-arch GHCR images on `v*` tag push.
 
 **Goal.** Run FrigateRelay side-by-side with `FrigateMQTTProcessingService` against the same MQTT broker, prove behavioral parity, document migration.
 
