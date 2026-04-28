@@ -119,7 +119,9 @@ public sealed class TraceSpansCoverFullPipelineTests
                 $"action span '{a.DisplayName}' must be Consumer kind"));
 
         // 5b. validator.<name>.check span is parented to its action span (REVIEW-3.1 Important #2).
-        var validatorSpan = allSpans.FirstOrDefault(a => a.DisplayName == "validator.codeprojectai.check");
+        // Span name uses the validator instance key from config (e.g. "strict-person"),
+        // not the plugin type name. See ChannelActionDispatcher: $"validator.{validator.Name.ToLowerInvariant()}.check"
+        var validatorSpan = allSpans.FirstOrDefault(a => a.DisplayName == "validator.strict-person.check");
         validatorSpan.Should().NotBeNull("validator span must be emitted under its action span");
         var pushoverSpan = actionSpans.FirstOrDefault(a => a.DisplayName == "action.pushover.execute");
         if (pushoverSpan is not null && validatorSpan is not null)
