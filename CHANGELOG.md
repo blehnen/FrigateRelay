@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Phase 11 — Open-Source Polish (2026-04-28)
+
+#### Added
+
+- `LICENSE` — MIT License, Copyright (c) 2026 Brian Lehnen.
+- `README.md` — overview, Docker quickstart (`docker compose -f docker/docker-compose.example.yml up`), config layering, `/healthz` semantics, plugin scaffold pointer.
+- `CONTRIBUTING.md` — coding standards, test commands (MSTest v4.2.1 + MTP `--filter`), PR checklist, `FrigateRelay.TestHelpers` + FluentAssertions 6.12.2 pin, SECURITY.md pointer.
+- `SECURITY.md` — vulnerability disclosure via GitHub private security advisories (no email exposure); maintainer Settings flag note.
+- `templates/FrigateRelay.Plugins.Template/` — `dotnet new` template (`.template.config/template.json` with short-name `frigaterelay-plugin`); seeds a buildable `IActionPlugin` + `IPluginRegistrar` scaffold mirroring the BlueIris/Pushover layout.
+- `docs/plugin-author-guide.md` — tutorial-first 11-section guide covering all four contract interfaces (`IActionPlugin`, `IValidationPlugin`, `ISnapshotProvider`, `IPluginRegistrar`).
+- `samples/FrigateRelay.Samples.PluginGuide/` — buildable companion project with one sample per contract; wired into `FrigateRelay.sln` for IDE intellisense.
+- `.github/workflows/docs.yml` — new dedicated docs-CI workflow with three jobs: `scaffold-smoke` (dotnet new install + build), `samples-build`, `doc-samples-rot` (verifies guide code blocks match samples verbatim).
+- `.github/ISSUE_TEMPLATE/bug_report.yml` + `feature_request.yml` + `config.yml` — GitHub Issue Forms with self-cert checkboxes; blank issues disabled; security advisory redirect.
+- `.github/pull_request_template.md` — checklist (build clean, tests green, secret-scan, CHANGELOG entry, plugin-author convention).
+- `.github/scripts/check-doc-samples.sh` — bash + Python heredoc enforcing verbatim copy of `csharp filename=…` fences from `plugin-author-guide.md` against the samples project (doc-rot prevention).
+
+#### Fixed
+
+- Phase 9 integration regressions: `Validator_ShortCircuits_OnlyAttachedAction` log capture (replaced `ILoggerProvider` workaround with a `Serilog.ILogEventSink` — Phase 10's Web SDK pivot rendered the previous fix ineffective) and `TraceSpans_CoverFullPipeline` validator span name assertion (`validator.<instance>.check`, not `validator.<plugin-type>.check`). Test suite restored to 192/192 passing.
+- Closes **ID-4**: CLAUDE.md / CONTRIBUTING.md test-running examples updated from stale `--filter-query` to MSTest v4.2.1's `--filter`.
+
+#### Changed
+
+- `CLAUDE.md` — "Project state" section updated (no longer says "pre-implementation"); Jenkinsfile description corrected to reflect Phase 10's digest pin + Dependabot docker ecosystem closures.
+- README, CONTRIBUTING, `.github/ISSUE_TEMPLATE/config.yml` — `<owner>/frigaterelay` placeholders replaced with `blehnen/FrigateRelay` (the published GitHub slug confirmed via `git remote -v`).
+
 ### Phase 10 — Dockerfile and multi-arch release workflow (2026-04-28)
 
 #### Added

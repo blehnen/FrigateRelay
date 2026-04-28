@@ -48,11 +48,41 @@ pat = re.compile(
 failures = 0
 checked = 0
 
+samples_root = samples_dir.resolve()
+
 for match in pat.finditer(doc_text):
     filename = match.group(1)
     doc_body = match.group(2)
-    sample_path = samples_dir / filename
     checked += 1
+
+    # Reject filenames that could escape the samples directory (CWE-22).
+    # The fence filename is operator-controlled (anyone editing the doc),
+    # so sanitize before any filesystem access. AUDIT-11 A1.
+    parts = re.split(r"[\\/]", filename)
+    if (
+        "\x00" in filename
+        or filename.startswith("/")
+        or filename.startswith("\\")
+        or any(p in ("..", "") for p in parts)
+    ):
+        print(
+            f"::error file={doc_path}::"
+            f"rejected unsafe fence filename: {filename!r}"
+        )
+        failures += 1
+        continue
+
+    sample_path = (samples_dir / filename).resolve()
+
+    # Defense-in-depth: even with the textual checks above, confirm the
+    # resolved path stays within samples_dir (catches symlink trickery).
+    if samples_root not in sample_path.parents and sample_path != samples_root:
+        print(
+            f"::error file={doc_path}::"
+            f"resolved sample path escapes samples dir: {sample_path}"
+        )
+        failures += 1
+        continue
 
     if not sample_path.exists():
         print(
