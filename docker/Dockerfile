@@ -9,9 +9,11 @@
 # Dependabot docker ecosystem will rewrite both atomically on image updates.
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-# Debian-based SDK: cross-compiles to musl via -r linux-musl-x64 / linux-musl-arm64.
-# Using sdk:10.0-alpine here would require Alpine-in-Alpine toolchain; Debian SDK
-# is the recommended cross-compile path (RESEARCH.md C3).
+# Alpine SDK: cross-compiles to musl via -r linux-musl-x64 / linux-musl-arm64.
+# (Architect digest-pinned the Alpine SDK; equivalent in publish output to the
+# Debian SDK that RESEARCH.md C3 originally recommended — the -r RID flag
+# determines the publish target, not the build host's libc. Empirically verified
+# 2026-04-27: docker build succeeded on amd64 producing a 106 MB runtime image.)
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:0191ff386e93923edf795d363ea0ae0669ce467ada4010b370644b670fa495c1 AS build
 
 # BuildKit TARGETARCH is injected by `docker buildx build --platform linux/amd64|arm64`.
