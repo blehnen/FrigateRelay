@@ -10,6 +10,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using Serilog.Formatting.Compact;
 
 namespace FrigateRelay.Host;
 
@@ -34,30 +35,7 @@ internal static class HostBootstrap
         // AddSerilog handles provider replacement — do NOT call builder.Logging.ClearProviders().
         builder.Services.AddSerilog((services, lc) =>
         {
-            lc.ReadFrom.Configuration(builder.Configuration)
-              .ReadFrom.Services(services)
-              .Enrich.FromLogContext()
-              .WriteTo.Console(
-                  outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}",
-                  formatProvider: null);
-
-            // File sink is suppressed in container deployments (ASPNETCORE_ENVIRONMENT=Docker).
-            // Containers should rely on `docker logs` (stdout capture) — writing to the writable
-            // container layer defeats log capture and fills the layer. Console sink is always active.
-            // Closes ID-23 (PLAN-2.1). Non-Docker deploys (Production, Development) retain the file sink.
-            if (!string.Equals(builder.Environment.EnvironmentName, "Docker",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                lc.WriteTo.File(
-                    path: "logs/frigaterelay-.log",
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 7,
-                    formatProvider: null);
-            }
-
-            var seqUrl = builder.Configuration["Serilog:Seq:ServerUrl"];
-            if (!string.IsNullOrWhiteSpace(seqUrl))
-                lc.WriteTo.Seq(seqUrl, formatProvider: null);
+            ApplyLoggerConfiguration(lc, builder.Configuration, builder.Environment.EnvironmentName, services);
         });
 
         // OpenTelemetry registration (D2 — ActivitySource + Meter always registered;
@@ -161,5 +139,67 @@ internal static class HostBootstrap
     {
         var subsOpts = services.GetRequiredService<IOptions<HostSubscriptionsOptions>>().Value;
         StartupValidation.ValidateAll(services, subsOpts);
+    }
+
+    /// <summary>
+    /// Applies the full Serilog sink configuration to <paramref name="lc"/>.
+    /// Extracted for testability — tests can call this directly without a full host.
+    /// </summary>
+    /// <param name="lc">The <see cref="LoggerConfiguration"/> to configure.</param>
+    /// <param name="configuration">Application configuration (reads Serilog and Logging sections).</param>
+    /// <param name="environmentName">
+    /// ASPNETCORE_ENVIRONMENT value; pass <c>"Docker"</c> to suppress the file sink.
+    /// </param>
+    /// <param name="services">
+    /// Optional service provider for <c>ReadFrom.Services</c>; pass <c>null</c> in tests.
+    /// </param>
+    internal static void ApplyLoggerConfiguration(
+        LoggerConfiguration lc,
+        IConfiguration configuration,
+        string environmentName,
+        IServiceProvider? services = null)
+    {
+        var configured = lc.ReadFrom.Configuration(configuration)
+            .Enrich.FromLogContext()
+            .WriteTo.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}",
+                formatProvider: null);
+
+        if (services is not null)
+            configured = configured.ReadFrom.Services(services);
+
+        // File sink is suppressed in container deployments (ASPNETCORE_ENVIRONMENT=Docker).
+        // Containers should rely on `docker logs` (stdout capture) — writing to the writable
+        // container layer defeats log capture and fills the layer. Console sink is always active.
+        // Closes ID-23 (PLAN-2.1). Non-Docker deploys (Production, Development) retain the file sink.
+        if (!string.Equals(environmentName, "Docker", StringComparison.OrdinalIgnoreCase))
+        {
+            var useCompactJson = string.Equals(
+                configuration["Logging:File:CompactJson"],
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (useCompactJson)
+            {
+                configured.WriteTo.File(
+                    formatter: new CompactJsonFormatter(),
+                    path: "logs/frigaterelay-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 7);
+            }
+            else
+            {
+                configured.WriteTo.File(
+                    path: "logs/frigaterelay-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 7,
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}",
+                    formatProvider: null);
+            }
+        }
+
+        var seqUrl = configuration["Serilog:Seq:ServerUrl"];
+        if (!string.IsNullOrWhiteSpace(seqUrl))
+            configured.WriteTo.Seq(seqUrl, formatProvider: null);
     }
 }
