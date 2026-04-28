@@ -3,6 +3,7 @@ using System.Globalization;
 using FluentAssertions;
 using FrigateRelay.Host;
 using FrigateRelay.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,8 +13,6 @@ using MQTTnet;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
-
-using MsHost = Microsoft.Extensions.Hosting.Host;
 
 namespace FrigateRelay.IntegrationTests;
 
@@ -192,7 +191,7 @@ public sealed class MqttToValidatorTests
         WireMockServer codeProject,
         CapturingLoggerProvider capture)
     {
-        var builder = MsHost.CreateApplicationBuilder(Array.Empty<string>());
+        var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BlueIris:TriggerUrlTemplate"] = $"{blueIris.Urls[0]}/admin?camera={{camera}}&trigger=1",

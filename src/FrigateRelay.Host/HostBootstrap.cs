@@ -25,9 +25,9 @@ internal static class HostBootstrap
     /// Registers all host-scope and plugin services on <paramref name="builder"/>.
     /// Must be called before <c>builder.Build()</c>.
     /// </summary>
-    public static void ConfigureServices(HostApplicationBuilder builder)
+    public static void ConfigureServices(WebApplicationBuilder builder)
     {
-        // Serilog wiring (Worker SDK pattern — Serilog.Extensions.Hosting, NOT Serilog.AspNetCore).
+        // Serilog wiring (Serilog.Extensions.Hosting works with both Worker and Web SDK).
         // AddSerilog on IServiceCollection is the correct API for HostApplicationBuilder in .NET 10.
         // ReadFrom.Configuration picks up Serilog:MinimumLevel overrides from appsettings.json.
         // Console + File sinks are always active; Seq is conditional on Serilog:Seq:ServerUrl (D7).
@@ -77,6 +77,11 @@ internal static class HostBootstrap
         // resolve it when constructing FrigateMqttEventSource (which injects IMqttConnectionStatus).
         // MqttConnectionStatus is the concrete impl; IMqttConnectionStatus is the Abstractions contract.
         builder.Services.AddSingleton<IMqttConnectionStatus, MqttConnectionStatus>();
+
+        // Health checks — /healthz returns 200 only when MQTT connected AND host past ApplicationStarted.
+        // ResponseWriter is HealthzResponseWriter (System.Text.Json, no UI package).
+        builder.Services.AddHealthChecks()
+            .AddCheck<MqttHealthCheck>("mqtt-and-startup");
 
         // Host-scope services.
         builder.Services.AddOptions<HostSubscriptionsOptions>()

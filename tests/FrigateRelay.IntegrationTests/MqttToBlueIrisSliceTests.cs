@@ -2,16 +2,14 @@ using System.Globalization;
 using FluentAssertions;
 using FrigateRelay.Host;
 using FrigateRelay.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
-
-using MsHost = Microsoft.Extensions.Hosting.Host;
 
 namespace FrigateRelay.IntegrationTests;
 
@@ -36,7 +34,7 @@ public sealed class MqttToBlueIrisSliceTests
             .RespondWith(Response.Create().WithStatusCode(200));
 
         // 3. Build host with in-memory config pointing at both containers.
-        var builder = MsHost.CreateApplicationBuilder(Array.Empty<string>());
+        var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BlueIris:TriggerUrlTemplate"] = $"{wireMock.Urls[0]}/admin?camera={{camera}}&trigger=1",

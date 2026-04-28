@@ -4,6 +4,7 @@ using System.Globalization;
 using FluentAssertions;
 using FrigateRelay.Host;
 using FrigateRelay.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,8 +17,6 @@ using OpenTelemetry.Trace;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
-
-using MsHost = Microsoft.Extensions.Hosting.Host;
 
 namespace FrigateRelay.IntegrationTests.Observability;
 
@@ -281,7 +280,7 @@ public sealed class TraceSpansCoverFullPipelineTests
         WireMockServer codeProject,
         BaseProcessor<Activity>? traceProcessor)
     {
-        var builder = MsHost.CreateApplicationBuilder(Array.Empty<string>());
+        var builder = WebApplication.CreateBuilder(Array.Empty<string>());
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
