@@ -266,16 +266,29 @@ if (uri.Scheme is not ("http" or "https" or "grpc"))
 
 ---
 
-### ID-21: Serilog file sink path is operator-controlled without validation
+### ID-21: Serilog file sink path is operator-controlled without validation  *[CLOSED 2026-04-27]*
 
 **Source:** auditor (Phase 9 AUDIT-9, 2026-04-27)
 **Severity:** Low (advisory; CWE-22, future-tense)
-**Status:** Open — deferred to Phase 10 Docker work
+**Status:** **Closed** (commits `506999d` + `c3294b9`, Phase 10 PLAN-1.2)
 
 **Description:**
 The file sink path is hard-coded `"logs/frigaterelay-.log"` (relative, safe) currently. But `Serilog:File:Path` is honored by `ReadFrom.Configuration` if set in env vars or `appsettings.Local.json`. On a container running as root (Phase 10 concern), this could redirect log output to arbitrary paths and overwrite system files.
 
 **Mitigation:** Phase 10 Dockerfile MUST run as non-root user (already in CLAUDE.md). Optionally validate `Serilog:File:Path` for `..` segments at startup.
+
+**Resolution:**
+`StartupValidation.ValidateSerilogPath(IConfiguration, ICollection<string>)` added in Phase 10
+PLAN-1.2 Task 1 (commit `506999d`). The pass iterates every `Serilog:WriteTo:*:Args:path` value
+and rejects: `..` path-traversal segments (CWE-22), UNC paths beginning with `\\`, and absolute
+paths outside the allowlist (`/var/log/frigaterelay/`, `/app/logs/`). Relative paths and absent
+values pass through without error. The pass is wired into `ValidateAll` immediately after
+`ValidateObservability` (Pass 0 cluster); follows the D7 collect-all pattern — appends to the
+shared `errors` accumulator, never throws inline. Nine unit tests in
+`tests/FrigateRelay.Host.Tests/Configuration/SerilogPathValidationTests.cs` cover all rejection
+and acceptance cases plus a `ValidateAll` integration assertion (commit `c3294b9`). The residual
+risk from container-as-root is addressed in combination with the non-root `USER` directive in the
+Phase 10 Dockerfile (PLAN-2.1).
 
 ---
 
