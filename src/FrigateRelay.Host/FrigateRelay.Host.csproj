@@ -49,6 +49,25 @@
     <ProjectReference Include="..\FrigateRelay.Plugins.CodeProjectAi\FrigateRelay.Plugins.CodeProjectAi.csproj" />
   </ItemGroup>
 
+  <!-- Publish flags: self-contained, untrimmed, no AOT, no single-file (CONTEXT-10 D3).
+       No RID set here — multi-arch publish passes -r <rid> per invocation.
+       SelfContained is guarded so plain `dotnet build` (no RID) stays framework-dependent,
+       avoiding NETSDK1151 when test projects reference this project without an RID. -->
+  <PropertyGroup>
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- appsettings.Docker.json loaded when ASPNETCORE_ENVIRONMENT=Docker (CONTEXT-10 B4). -->
+    <None Update="appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="FrigateRelay.Host.Tests" />
     <InternalsVisibleTo Include="FrigateRelay.IntegrationTests" />

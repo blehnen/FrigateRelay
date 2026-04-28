@@ -35,7 +35,10 @@ internal static class StartupValidation
         // without IConfiguration still exercise passes 1-4 without failure.
         var configuration = services.GetService<IConfiguration>();
         if (configuration is not null)
+        {
             ValidateObservability(configuration, errors);
+            ValidateSerilogPath(configuration, errors);   // ID-21: reject path-traversal / UNC / off-allowlist absolute paths
+        }
 
         // Pass 1 — profile resolution (D1 mutex + undefined-profile guard).
         var resolved = ProfileResolver.Resolve(options, errors);
@@ -76,6 +79,39 @@ internal static class StartupValidation
         var seq = config["Serilog:Seq:ServerUrl"];
         if (!string.IsNullOrWhiteSpace(seq) && !Uri.TryCreate(seq, UriKind.Absolute, out _))
             errors.Add($"Serilog:Seq:ServerUrl '{seq}' is not a valid absolute URI.");
+    }
+
+    /// <summary>
+    /// Validates that every <c>Serilog:WriteTo:*:Args:path</c> value is safe to open at startup.
+    /// Rejects paths that contain <c>..</c> (path traversal), start with <c>\\</c> (UNC), or are
+    /// absolute paths outside the allowed prefixes (<c>/var/log/frigaterelay/</c>, <c>/app/logs/</c>).
+    /// Relative paths and absent/empty values are accepted without error.
+    /// Accumulates into <paramref name="errors"/> — never throws (D7 collect-all, ID-21 closure).
+    /// </summary>
+    /// <remarks>
+    /// Windows-style absolute paths (e.g. <c>C:\Windows\...</c>) are not explicitly blocked here
+    /// because the container target is Linux-only (Alpine, non-root). They will either be accepted
+    /// (treated as relative) or fall through as harmless on non-Windows hosts. A future hardening
+    /// pass may add a <c>Path.IsPathRooted</c> check with OS guard for broader coverage.
+    /// Do NOT log the raw path value via <c>ILogger</c> — it is operator-controlled and could
+    /// contain log-spoofing payloads (ID-13). It surfaces only in the aggregated exception message.
+    /// </remarks>
+    internal static void ValidateSerilogPath(IConfiguration config, ICollection<string> errors)
+    {
+        var allowlist = new[] { "/var/log/frigaterelay/", "/app/logs/" };
+        foreach (var sink in config.GetSection("Serilog:WriteTo").GetChildren())
+        {
+            var path = sink["Args:path"];
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            if (path.Contains(".."))
+                errors.Add($"Serilog:WriteTo path '{path}' contains '..' path traversal segments and is rejected.");
+            else if (path.StartsWith(@"\\", StringComparison.Ordinal))
+                errors.Add($"Serilog:WriteTo path '{path}' is a UNC path and is not permitted.");
+            else if (path.StartsWith('/') &&
+                     !allowlist.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
+                errors.Add($"Serilog:WriteTo path '{path}' is an absolute path outside the allowed prefixes ({string.Join(", ", allowlist)}).");
+        }
     }
 
     /// <summary>
