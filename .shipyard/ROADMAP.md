@@ -279,7 +279,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 10 — Dockerfile and Multi-Arch Release Workflow
+## Phase 10 — Dockerfile and Multi-Arch Release Workflow  *[COMPLETE_WITH_GAPS 2026-04-28]*
+
+**Status:** Build complete (5/5 plans PASS + 4 fix-ups). Verifier verdict COMPLETE_WITH_GAPS — 192/194 tests pass (2 pre-existing Phase 9 integration regressions, not Phase 10), build clean (0 warnings); 3/4 ROADMAP success criteria verified, 1 blocked (`docker build` image-size check requires a Docker daemon, deferred to first real release tag). Auditor PASS_WITH_NOTES (Low risk, 0 critical / 0 important / 4 advisory tracked as ID-24..27). Simplifier 0 High / 2 Medium (both applied inline) / 3 Low (deferred). Documenter ACCEPTABLE / DEFER_TO_DOCS_SPRINT.
 
 **Goal.** One `docker pull` install path, signed images, multi-arch support.
 

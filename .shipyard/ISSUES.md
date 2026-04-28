@@ -38,16 +38,19 @@ Replace the above with the one-liner above, or similar.
 
 ---
 
-### ID-4: `--filter-query` flag in CLAUDE.md may be stale for MSTest v4.2.1
+### ID-4: `--filter-query` flag in CLAUDE.md may be stale for MSTest v4.2.1  *[CLOSED 2026-04-28]*
 
 **Source:** verifier (Phase 4 post-build review, REVIEW-1.2)
 **Severity:** Minor
-**Status:** Open
+**Status:** **Closed** (Phase 10 closeout, 2026-04-28)
 
 **Description:**
 CLAUDE.md documents `--filter-query` as the MTP single-test filter flag. The installed runner is MSTest v4.2.1 (confirmed in test output). The correct flag for this version should be verified and CLAUDE.md updated if it differs.
 
 **Impact:** Developer friction when running a single test by name. No test-correctness impact.
+
+**Resolution:**
+Phase 10 documenter (DOCUMENTATION-10.md) confirmed `--filter-query` is not honored by MSTest v4.2.1 / MTP. CLAUDE.md "Single test by name" example replaced with `--filter "PluginRegistrarRunnerTests"` (class-name form), which works on the installed runner. Comment also updated to specify the runner version explicitly.
 
 ---
 
@@ -378,6 +381,58 @@ output. Non-Docker deploys (Production, Development) continue to receive the rol
 Bundled with the Dockerfile because the env-var convention is established there; the two changes form
 a single cohesive unit. `<InvariantGlobalization>false</InvariantGlobalization>` (redundant .NET 10
 default) also removed from `Host.csproj` in the same commit.
+
+---
+
+### ID-24: `release.yml` GitHub Actions are tag-pinned, not SHA-pinned
+
+**Source:** auditor (Phase 10 AUDIT-10, 2026-04-28)
+**Severity:** Low / Advisory (CWE-829, SLSA L2+)
+**Status:** Open (deferred)
+
+**Description:**
+Every third-party action in `.github/workflows/release.yml` (`actions/checkout`, `docker/setup-qemu-action`, `docker/setup-buildx-action`, `docker/login-action`, `docker/metadata-action`, `docker/build-push-action`) is pinned to a major-version tag rather than a commit SHA. Mutable tags can be force-pushed by the action maintainer; a supply-chain compromise of any of these would execute arbitrary code in the release job with `packages: write` permission. The existing `ci.yml` has the same pattern.
+
+**Mitigation:** Replace each `uses: action@vN` with `uses: action@<full-SHA>  # vN`. Dependabot `github-actions` ecosystem (already configured) maintains the SHA pins automatically. One-time find-and-replace; track as pre-v1.0 release hardening.
+
+---
+
+### ID-25: `mosquitto-smoke.conf` warning could be more prominent
+
+**Source:** auditor (Phase 10 AUDIT-10, 2026-04-28)
+**Severity:** Low / Advisory (documentation; CWE-306 surface)
+**Status:** Open (deferred)
+
+**Description:**
+`docker/mosquitto-smoke.conf` runs Mosquitto with `allow_anonymous true` on `0.0.0.0` for the release-pipeline smoke gate. The combination is contained within the ephemeral GitHub Actions runner VM and `--network host`, so the smoke setup itself is not exposed externally. However the file is committed to the repo; an operator copying it as a starting point for their own broker config could inadvertently deploy an unauthenticated MQTT listener. Existing single-line warning is present but easily overlooked.
+
+**Mitigation:** Add a second `# WARNING: anonymous + bind-all — CI use ONLY` line with a divider at the top of the file. No code change required.
+
+---
+
+### ID-26: `docker-compose.example.yml` exposes /healthz on all host interfaces by default
+
+**Source:** auditor (Phase 10 AUDIT-10, 2026-04-28)
+**Severity:** Low / Advisory (CWE-200; OWASP A05:2021)
+**Status:** Open (deferred)
+
+**Description:**
+The example compose file maps `8080:8080` (binds to `0.0.0.0:8080` on the Docker host). The `/healthz` endpoint exposes only boolean operational state (`status`, `started`, `mqttConnected`) — no credentials, no PII — so the disclosure is informational only. Acceptable for the home-lab target audience; problematic on internet-exposed hosts.
+
+**Mitigation:** Add a comment in the compose example noting that operators on untrusted networks should bind to `127.0.0.1:8080:8080` and front the service with a reverse proxy + auth. Not a correctness fix.
+
+---
+
+### ID-27: `ValidateSerilogPath` does not block Windows absolute paths (accepted gap)
+
+**Source:** auditor (Phase 10 AUDIT-10, 2026-04-28)
+**Severity:** Low / Advisory (CWE-22, residual)
+**Status:** Open (deferred — accepted by design for the Linux/container target)
+
+**Description:**
+`StartupValidation.ValidateSerilogPath` rejects `..` traversal, UNC paths, and absolute paths outside the Linux allowlist (`/var/log/frigaterelay/`, `/app/logs/`). It does not reject Windows-style absolute paths (e.g., `C:\Windows\…`), which is documented as an accepted gap in the implementation comment. If the service is run on Windows in `Production` (non-Docker) with a malicious `appsettings.Local.json`, log output could be redirected to arbitrary Windows filesystem locations. Exploitability is negligible — the attacker must already control the config file.
+
+**Mitigation:** Add a `Path.IsPathRooted` + `RuntimeInformation.IsOSPlatform(OSPlatform.Windows)` guard in a future hardening pass. No change required for v1; the Docker target is Linux-only.
 
 ---
 

@@ -19,9 +19,5 @@ services:
       - ./config/appsettings.Local.json:/app/appsettings.Local.json:ro
     ports:
       - "8080:8080"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+    # healthcheck inherited from the image's HEALTHCHECK directive.
+    # Override here only if your environment needs different interval/timeout.

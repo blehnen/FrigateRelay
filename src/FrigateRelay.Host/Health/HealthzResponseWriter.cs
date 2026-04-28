@@ -3,23 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace FrigateRelay.Host.Health;
 
-/// <summary>
-/// Writes a <see cref="HealthReport"/> as compact JSON to the HTTP response.
-/// Used as the <c>ResponseWriter</c> for the <c>/healthz</c>
-/// <see cref="Microsoft.AspNetCore.Builder.HealthCheckEndpointRouteBuilderExtensions.MapHealthChecks(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder, string)"/>
-/// endpoint.
-/// </summary>
-/// <remarks>
-/// Output format (machine-consumed only — no UI dependency):
-/// <code>
-/// {
-///   "status": "Healthy" | "Unhealthy" | "Degraded",
-///   "checks": [
-///     { "name": "mqtt-and-startup", "status": "Unhealthy", "data": { "started": false, "mqttConnected": false } }
-///   ]
-/// }
-/// </code>
-/// </remarks>
+/// <summary>Writes a <see cref="HealthReport"/> as compact JSON to the HTTP response (used as the <c>ResponseWriter</c> for the <c>/healthz</c> endpoint).</summary>
 internal static class HealthzResponseWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
