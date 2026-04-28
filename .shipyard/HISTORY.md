@@ -1,5 +1,39 @@
 # Shipyard History
 
+## 2026-04-27 — Phase 10 planned (Docker + Multi-Arch Release)
+
+- 5 plans across 2 waves, 14 tasks total. All plans ≤ 3 tasks; all acceptance criteria runnable from repo root.
+  - **Wave 1 (parallel-safe; file-disjoint with explicit `Host.csproj` section partition):**
+    - PLAN-1.1 (3 tasks) — Host pivot from `Microsoft.NET.Sdk.Worker` to `Microsoft.NET.Sdk.Web` + `WebApplication.CreateBuilder`; new `IMqttConnectionStatus`/`MqttConnectionStatus` driven by `FrigateMqttEventSource._client.IsConnected`; `MqttHealthCheck` + `StartupHealthCheck` composed into single `/healthz`; integration test asserts 503→200 transition. **Risk: HIGH** (SDK pivot).
+    - PLAN-1.2 (3 tasks) — `ValidateSerilogPath` startup pass following Phase 8 D7 collect-all pattern; rejects `..` traversal, off-allowlist absolute paths, UNC; closes **ID-21**.
+    - PLAN-1.3 (3 tasks) — Publish flags (`SelfContained=true`, `PublishTrimmed=false`, `PublishAot=false`) added to `Host.csproj` `<PropertyGroup>` only; `appsettings.Docker.json` (Console-only Serilog — B4); `appsettings.Smoke.json` (minimal config validated against `ValidateActions` empty-actions tolerance); `.dockerignore`.
+  - **Wave 2 (depends on all of Wave 1):**
+    - PLAN-2.1 (3 tasks) — Multi-stage `docker/Dockerfile` on `runtime-deps:10.0-alpine` (digest-pinned, debian-slim fallback documented inline); non-root `USER 10001`; `HEALTHCHECK` via `wget --spider`; `docker/docker-compose.example.yml` (FR-only per D6); `.env.example`; `docker/mosquitto-smoke.conf` for PLAN-2.2 smoke. Image budget ≤ 120 MB (ROADMAP).
+    - PLAN-2.2 (3 tasks) — New `.github/workflows/release.yml` on tag `v*` (setup-qemu-action@v3 + setup-buildx-action@v3 + login-action@v3 + metadata-action@v5); amd64 build → Mosquitto-sidecar smoke (HARD-FAIL on /healthz != 200) → multi-arch buildx push to GHCR; `Jenkinsfile` SDK base digest-pinned; `docker:` block added to `dependabot.yml`. **Risk: HIGH**.
+- **Researcher** (sonnet) — initial run truncated mid-investigation; resumed via SendMessage with explicit "write file as final action" budget directive. Final RESEARCH.md cites `Program.cs`/`HostBootstrap.cs`/`FrigateMqttEventSource.cs`/`StartupValidation.cs` line numbers + Microsoft Learn URLs for ASP.NET Core HealthChecks + GHA buildx multi-platform docs + the OTel-on-Alpine known-issue context.
+- **Architect** (opus) — produced all 5 plan files first pass. Resolved researcher's 5 blockers: (R1) `StartupValidation.cs` confirmed at `src/FrigateRelay.Host/StartupValidation.cs` with `ValidateAll(IServiceProvider, HostSubscriptionsOptions)` already pulling `IConfiguration`; (R2) Mosquitto smoke uses bind-mounted `docker/mosquitto-smoke.conf`, not bundled `mosquitto-no-auth.conf`, for self-documentation parity with compose; (R3) digest pins fetched live by builder, NOT frozen in plans; (R4) `ValidateActions` only errors on unknown plugin names, empty `Actions: []` is fine for smoke config; (R5) full pivot to `WebApplication.CreateBuilder` (researcher's option a), single task.
+- **Verifier — Step 6** (haiku): **PASS**. All 9 ROADMAP success criteria + 10 CONTEXT-10 decisions covered; 5 plans / ≤3 tasks each / wave ordering correct / `Host.csproj` section partition documented in both PLAN-1.1 and PLAN-1.3.
+- **Verifier — Step 6a critique** (haiku): **READY**. Six dimensions clean. Confirmed `_client.IsConnected` exists at `FrigateMqttEventSource.cs:216`; zero integration-test callsites for `HostBootstrap.ConfigureServices` (so `WebApplicationBuilder` swap is local); `ValidateActions` empty-actions tolerance matches the smoke config assumption. PLAN-1.1 flagged CAUTION (10 files, SDK pivot) but bounded by acceptance criteria.
+- Open issues: only ID-21 closes this phase. ID-1/3/4/5/7/8/9/13/14/15/18/19/20/22 stay deferred.
+- STATE → phase=10, status=planned. Native tasks #2–#6 created with Wave 2 (#5, #6) blocked-by Wave 1 (#2, #3, #4).
+
+## 2026-04-27 — Phase 10 planning kicked off (Docker + Multi-Arch Release)
+
+- Discussion-capture pass produced `.shipyard/phases/10/CONTEXT-10.md` with 6 explicit decisions + 4 bundled adjacent items.
+  - **D1** Base image: **Alpine** (`runtime-deps:10.0-alpine`), with documented debian-slim fallback path inline in Dockerfile.
+  - **D2** `/healthz` transport: **ASP.NET Core minimal API** (`AddHealthChecks`/`MapHealthChecks`).
+  - **D3** Publish: **self-contained, untrimmed** (trim/AOT explicitly deferred — MQTTnet/OTel/Serilog reflection is hostile to both).
+  - **D4** `/healthz` semantics: single endpoint, ready-state — 200 only when MQTT connected AND all `IHostedService` started.
+  - **D5** Release-time smoke: `docker run` + `/healthz` GET against a Mosquitto sidecar in the release workflow; fail release if not 200. Smoke runs on amd64 only (ARM64 via QEMU is built but not smoked).
+  - **D6** Compose example scope: **FrigateRelay only** (no bundled Mosquitto/WireMock); secrets via `.env`.
+  - **B1** ID-21 mitigation (Serilog file sink path validation, CWE-22) bundled — pairs with non-root `USER` directive.
+  - **B2** Dependabot `docker` ecosystem added — pairs with B3.
+  - **B3** Tag + sha256 digest pin of base image (Dockerfile + Jenkinsfile SDK base).
+  - **B4** Container-friendly logging — Console-only sink in `appsettings.Docker.json`; rolling file off by default in container.
+- Defaulted (NOT asked) per ROADMAP/PROJECT.md: linux/amd64+arm64 via setup-qemu+buildx, GHCR public, `:semver`+`:latest`+`:major` tags, ≤120 MB image budget, non-root UID 10001, `linux-musl-x64`/`linux-musl-arm64` RIDs, `wget --spider` for `HEALTHCHECK` (Alpine ships wget, not curl).
+- Out of scope reaffirmed: Helm/k8s manifests, Prometheus pull endpoint, cosign/sigstore, SBOM, trim/AOT, hot-reload, in-image broker. Open issues other than ID-21 (ID-13/14/15/18/19/20/22) stay deferred.
+- STATE → phase=10, status=planning. Researcher dispatch next.
+
 ## 2026-04-26 — Phase 8 planned (Profiles in Configuration)
 
 - 4 plans across 3 waves, 11 tasks total. All plans ≤ 3 tasks; all acceptance criteria measurable.
