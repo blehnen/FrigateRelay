@@ -26,7 +26,7 @@ bash .github/scripts/run-tests.sh
 **Filter to a single test:**
 
 ```bash
-dotnet run --project tests/FrigateRelay.Host.Tests -c Release -- --filter-query "/*/*/PluginRegistrarRunnerTests/RunAll_EmptyRegistrars_DoesNothing"
+dotnet run --project tests/FrigateRelay.Host.Tests -c Release -- --filter "PluginRegistrarRunnerTests"
 ```
 
 **Integration tests** require Docker (Testcontainers spins up Mosquitto and WireMock stubs automatically).
@@ -79,4 +79,4 @@ See `docs/plugin-author-guide.md` for the full walkthrough — contract interfac
 
 ## Reporting issues
 
-For security vulnerabilities, see `SECURITY.md` — do not open a public issue. For all other bugs and feature requests, open a [GitHub Issue](https://github.com/<owner>/frigaterelay/issues).
+For security vulnerabilities, see `SECURITY.md` — do not open a public issue. For all other bugs and feature requests, open a [GitHub Issue](https://github.com/blehnen/FrigateRelay/issues).

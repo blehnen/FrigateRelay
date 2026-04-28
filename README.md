@@ -7,7 +7,7 @@ FrigateRelay is a .NET 10 background service that consumes MQTT events from [Fri
 **Prerequisites:** Docker with Compose plugin, a running Frigate NVR + MQTT broker.
 
 ```bash
-git clone https://github.com/<owner>/frigaterelay.git
+git clone https://github.com/blehnen/FrigateRelay.git
 cd frigaterelay
 cp docker/.env.example .env
 ```
