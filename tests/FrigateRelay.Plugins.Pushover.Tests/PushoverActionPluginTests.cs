@@ -310,4 +310,106 @@ public class PushoverActionPluginTests
         public ValueTask<SnapshotResult?> ResolveAsync(EventContext context, string? perActionProviderName, string? subscriptionDefaultProviderName, CancellationToken cancellationToken) =>
             ValueTask.FromResult(toReturn);
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Test 7: DryRun=true — does NOT call HttpClient, logs would-execute entry
+    // ──────────────────────────────────────────────────────────────────────────
+    [TestMethod]
+    public async Task ExecuteAsync_DryRunTrue_DoesNotCallHttpClientAndLogsWouldExecute()
+    {
+        var handler = new InvocationCountingHandler();
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.pushover.invalid") };
+        var httpFactory = Substitute.For<IHttpClientFactory>();
+        httpFactory.CreateClient(Arg.Any<string>()).Returns(httpClient);
+
+        var logger = new CapturingLogger<PushoverActionPlugin>();
+        var options = Options.Create(new PushoverOptions
+        {
+            AppToken = "stub-token-not-real",
+            UserKey = "stub-user-not-real",
+            DryRun = true,
+        });
+        var template = EventTokenTemplate.Parse("{label} detected on {camera}", "Pushover.MessageTemplate");
+        var plugin = new PushoverActionPlugin(httpFactory, options, template, logger);
+
+        var ctx = new EventContext
+        {
+            EventId = "ev-1",
+            Camera = "DriveWayHD",
+            Label = "person",
+            RawPayload = "{}",
+            StartedAt = DateTimeOffset.UtcNow,
+            SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
+        };
+
+        await plugin.ExecuteAsync(ctx, default, CancellationToken.None);
+
+        handler.SendInvocations.Should().Be(0);
+        logger.Entries.Should()
+            .ContainSingle(e => e.Id.Name == "PushoverDryRun")
+            .Which.Message.Should().Contain("DriveWayHD").And.Contain("person").And.Contain("ev-1");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Test 8: DryRun=false — calls HttpClient as before (no DryRun log entry)
+    // ──────────────────────────────────────────────────────────────────────────
+    [TestMethod]
+    public async Task ExecuteAsync_DryRunFalse_CallsHttpClientAsBefore()
+    {
+        var handler = new StubHttpHandler(System.Net.HttpStatusCode.OK, """{"status":1}""");
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.pushover.invalid") };
+        var httpFactory = Substitute.For<IHttpClientFactory>();
+        httpFactory.CreateClient(Arg.Any<string>()).Returns(httpClient);
+
+        var logger = new CapturingLogger<PushoverActionPlugin>();
+        var options = Options.Create(new PushoverOptions
+        {
+            AppToken = "stub-token-not-real",
+            UserKey = "stub-user-not-real",
+            // DryRun omitted — default false.
+        });
+        var template = EventTokenTemplate.Parse("{label} detected on {camera}", "Pushover.MessageTemplate");
+        var plugin = new PushoverActionPlugin(httpFactory, options, template, logger);
+
+        var ctx = new EventContext
+        {
+            EventId = "ev-1",
+            Camera = "DriveWayHD",
+            Label = "person",
+            RawPayload = "{}",
+            StartedAt = DateTimeOffset.UtcNow,
+            SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
+        };
+
+        await plugin.ExecuteAsync(ctx, default, CancellationToken.None);
+
+        handler.SendInvocations.Should().Be(1);
+        logger.Entries.Should().NotContain(e => e.Id.Name == "PushoverDryRun");
+    }
+
+    private sealed class InvocationCountingHandler : HttpMessageHandler
+    {
+        public int SendInvocations { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            SendInvocations++;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        }
+    }
+
+    private sealed class StubHttpHandler(System.Net.HttpStatusCode statusCode, string body) : HttpMessageHandler
+    {
+        public int SendInvocations { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            SendInvocations++;
+            var response = new HttpResponseMessage(statusCode)
+            {
+                Content = new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+            };
+            return Task.FromResult(response);
+        }
+    }
 }

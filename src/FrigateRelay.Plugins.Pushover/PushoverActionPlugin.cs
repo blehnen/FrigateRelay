@@ -30,6 +30,12 @@ internal sealed class PushoverActionPlugin : IActionPlugin
 
     public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken cancellationToken)
     {
+        if (_options.Value.DryRun)
+        {
+            Log.WouldExecute(_logger, ctx.Camera, ctx.Label, ctx.EventId);
+            return;
+        }
+
         var opts = _options.Value;
         var client = _httpFactory.CreateClient("Pushover");
 
@@ -102,6 +108,15 @@ internal sealed class PushoverActionPlugin : IActionPlugin
 
     private static class Log
     {
+        private static readonly Action<ILogger, string, string, string, Exception?> _wouldExecute =
+            LoggerMessage.Define<string, string, string>(
+                LogLevel.Information,
+                new EventId(4, "PushoverDryRun"),
+                "Pushover DryRun would-execute for camera={Camera} label={Label} event_id={EventId}");
+
+        public static void WouldExecute(ILogger logger, string camera, string label, string eventId)
+            => _wouldExecute(logger, camera, label, eventId, null);
+
         private static readonly Action<ILogger, string, Exception?> _sendSucceeded =
             LoggerMessage.Define<string>(
                 LogLevel.Information,

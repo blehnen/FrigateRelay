@@ -33,4 +33,12 @@ internal sealed class PushoverOptions
 
     /// <summary>Gets the dispatch queue capacity.</summary>
     public int QueueCapacity { get; init; } = 256;
+
+    /// <summary>
+    /// When true, the Pushover plugin emits a structured <c>would-execute</c> log entry
+    /// at Info level (EventId 4, "PushoverDryRun") and returns success without
+    /// calling the Pushover API. Used during the parity-window (Phase 12) to log
+    /// would-be-actions without firing real notifications. Default false.
+    /// </summary>
+    public bool DryRun { get; init; }
 }
