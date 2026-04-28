@@ -49,6 +49,7 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     private readonly MqttClientFactory _factory;
     private readonly FrigateMqttOptions _options;
     private readonly ILogger<FrigateMqttEventSource> _logger;
+    private readonly IMqttConnectionStatus _connectionStatus;
     private readonly Channel<EventContext> _channel =
         Channel.CreateUnbounded<EventContext>(new UnboundedChannelOptions
         {
@@ -61,17 +62,19 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     private int _started;
     private int _disposed;
 
-    /// <summary>Creates the event source with the supplied client, factory, options, and logger.</summary>
+    /// <summary>Creates the event source with the supplied client, factory, options, logger, and connection-status tracker.</summary>
     public FrigateMqttEventSource(
         IMqttClient client,
         MqttClientFactory factory,
         IOptions<FrigateMqttOptions> options,
-        ILogger<FrigateMqttEventSource> logger)
+        ILogger<FrigateMqttEventSource> logger,
+        IMqttConnectionStatus connectionStatus)
     {
         _client = client;
         _factory = factory;
         _options = options.Value;
         _logger = logger;
+        _connectionStatus = connectionStatus;
         _client.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
     }
 
@@ -111,6 +114,7 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
                 {
                     await _client.ConnectAsync(clientOptions, ct).ConfigureAwait(false);
                     await _client.SubscribeAsync(subOptions, ct).ConfigureAwait(false);
+                    _connectionStatus.SetConnected(true);
                     LogMqttConnected(_logger, null);
                 }
             }
@@ -120,6 +124,7 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
             }
             catch (Exception ex)
             {
+                _connectionStatus.SetConnected(false);
                 LogMqttConnectFailed(_logger, ex, null);
             }
 
@@ -224,6 +229,8 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
             LogMqttReceiveFailed(_logger, $"disconnect: {ex.Message}", ex);
         }
 
+        // Mark disconnected on the way out so the health check reflects shutdown state.
+        _connectionStatus.SetConnected(false);
         LogMqttDisconnected(_logger, null);
     }
 }

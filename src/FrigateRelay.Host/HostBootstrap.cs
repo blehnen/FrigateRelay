@@ -1,6 +1,7 @@
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
+using FrigateRelay.Host.Health;
 using FrigateRelay.Host.Matching;
 using FrigateRelay.Host.Snapshots;
 using Microsoft.Extensions.Caching.Memory;
@@ -71,6 +72,11 @@ internal static class HostBootstrap
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                     b.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
             });
+
+        // MQTT connection status singleton — registered before plugin registrars so DI can
+        // resolve it when constructing FrigateMqttEventSource (which injects IMqttConnectionStatus).
+        // MqttConnectionStatus is the concrete impl; IMqttConnectionStatus is the Abstractions contract.
+        builder.Services.AddSingleton<IMqttConnectionStatus, MqttConnectionStatus>();
 
         // Host-scope services.
         builder.Services.AddOptions<HostSubscriptionsOptions>()

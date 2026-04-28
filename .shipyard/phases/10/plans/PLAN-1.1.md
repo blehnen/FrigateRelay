@@ -12,7 +12,7 @@ files_touched:
   - src/FrigateRelay.Host/FrigateRelay.Host.csproj  # owns: SDK attribute + PackageReference block ONLY
   - src/FrigateRelay.Host/Program.cs
   - src/FrigateRelay.Host/HostBootstrap.cs
-  - src/FrigateRelay.Host/Health/IMqttConnectionStatus.cs
+  - src/FrigateRelay.Abstractions/IMqttConnectionStatus.cs  # ADJUSTED 2026-04-27: interface in Abstractions to avoid Sources->Host circular dep; impl stays in Host/Health/
   - src/FrigateRelay.Host/Health/MqttConnectionStatus.cs
   - src/FrigateRelay.Host/Health/MqttHealthCheck.cs
   - src/FrigateRelay.Host/Health/HealthzResponseWriter.cs
@@ -45,11 +45,11 @@ None (Wave 1).
 ### Task 1: Add IMqttConnectionStatus + wire FrigateMqttEventSource updates
 
 **Files:**
-- `src/FrigateRelay.Host/Health/IMqttConnectionStatus.cs` (create)
-- `src/FrigateRelay.Host/Health/MqttConnectionStatus.cs` (create)
+- `src/FrigateRelay.Abstractions/IMqttConnectionStatus.cs` (create) — ADJUSTED 2026-04-27: interface lives in Abstractions, not Host/Health/, so the Sources project can consume it via DI without taking a dependency on the Host project (would be circular).
+- `src/FrigateRelay.Host/Health/MqttConnectionStatus.cs` (create — concrete implementation)
+- `src/FrigateRelay.Host/HostBootstrap.cs` (modify — register `IMqttConnectionStatus` -> `MqttConnectionStatus` as singleton). ADJUSTED 2026-04-27: registration moved from `Sources.FrigateMqtt/PluginRegistrar.cs` to `HostBootstrap` because (a) the singleton's identity must be host-owned for the health-check to share the same instance, and (b) keeps the Source registrar focused on `IEventSource` registration.
 - `src/FrigateRelay.Sources.FrigateMqtt/FrigateMqttEventSource.cs` (modify — inject `IMqttConnectionStatus`, call `SetConnected(true)` after successful `_client.ConnectAsync`, `SetConnected(false)` on disconnect / in `DisposeAsync`)
-- `src/FrigateRelay.Sources.FrigateMqtt/PluginRegistrar.cs` (modify — register `IMqttConnectionStatus` -> `MqttConnectionStatus` as singleton)
-- `tests/FrigateRelay.Host.Tests/Health/MqttHealthCheckTests.cs` (create — covers status flag transitions in isolation via the concrete `MqttConnectionStatus`)
+- `tests/FrigateRelay.Host.Tests/Health/MqttConnectionStatusTests.cs` (create — covers status flag transitions in isolation via the concrete `MqttConnectionStatus`)
 
 **Action:** create + modify
 
@@ -57,9 +57,9 @@ None (Wave 1).
 Define `IMqttConnectionStatus` with a single `bool IsConnected { get; }` member. Implement `MqttConnectionStatus` with thread-safe (`Volatile.Read`/`Volatile.Write` over a `bool` field, OR `Interlocked` + `int`) `SetConnected(bool)`. Register as singleton in the FrigateMqtt `PluginRegistrar`. Inject into `FrigateMqttEventSource` ctor; call `SetConnected(true)` immediately after the existing successful `_client.ConnectAsync(...)` call in the reconnect loop and `SetConnected(false)` in the disconnect path / `DisposeAsync`. Write tests against `MqttConnectionStatus` directly (no DI, no mocks) covering: default = false; SetConnected(true) -> IsConnected true; SetConnected(false) -> IsConnected false; concurrent read/write does not throw.
 
 **Acceptance Criteria:**
-- `test -f src/FrigateRelay.Host/Health/IMqttConnectionStatus.cs && test -f src/FrigateRelay.Host/Health/MqttConnectionStatus.cs`
+- `test -f src/FrigateRelay.Abstractions/IMqttConnectionStatus.cs && test -f src/FrigateRelay.Host/Health/MqttConnectionStatus.cs` (ADJUSTED 2026-04-27 per architecture deviation note above)
 - `grep -n 'IMqttConnectionStatus' src/FrigateRelay.Sources.FrigateMqtt/FrigateMqttEventSource.cs` returns at least one ctor-injection line and two `SetConnected(` call sites.
-- `grep -n 'IMqttConnectionStatus' src/FrigateRelay.Sources.FrigateMqtt/PluginRegistrar.cs` returns one `AddSingleton` registration.
+- `grep -n 'IMqttConnectionStatus' src/FrigateRelay.Host/HostBootstrap.cs` returns one `AddSingleton` registration. (ADJUSTED — was `Sources.FrigateMqtt/PluginRegistrar.cs`)
 - `dotnet build FrigateRelay.sln -c Release` exits 0.
 - `dotnet run --project tests/FrigateRelay.Host.Tests -c Release --no-build -- --filter-query "/*/*/MqttConnectionStatusTests/*"` exits 0 with all tests passing.
 

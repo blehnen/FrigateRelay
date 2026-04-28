@@ -51,7 +51,8 @@ public sealed class FrigateMqttEventSourceTests
             ClientId = "frigate-relay-test",
             Topic = "frigate/events",
         });
-        return new FrigateMqttEventSource(client, factory, options, NullLogger<FrigateMqttEventSource>.Instance);
+        var connectionStatus = Substitute.For<IMqttConnectionStatus>();
+        return new FrigateMqttEventSource(client, factory, options, NullLogger<FrigateMqttEventSource>.Instance, connectionStatus);
     }
 
     [TestMethod]
