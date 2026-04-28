@@ -1,0 +1,126 @@
+# Docs workflow — FrigateRelay
+#
+# D4: NEW workflow (not an extension of ci.yml).
+#     Validates docs artifacts: dotnet new template smoke + samples project build.
+#     Split-CI invariant: no metrics collection, no artifact upload (see CLAUDE.md D1).
+#
+# scaffold-smoke: installs PLAN-2.3 template, renders to scratch, copies into
+#   in-repo tree for relative ProjectReference resolution, builds + runs test,
+#   then restores tree. Skips gracefully until template lands (PLAN-2.3).
+# samples-build: builds PLAN-3.1 samples project. Conditional on directory
+#   existence — no-op until PLAN-3.1 lands.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'samples/**'
+      - 'templates/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'samples/**'
+      - 'templates/**'
+      - '.github/workflows/docs.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  scaffold-smoke:
+    name: Scaffold smoke (dotnet new frigaterelay-plugin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: hashFiles('templates/**/template.json') != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install plugin template
+        run: dotnet new install templates/FrigateRelay.Plugins.Template/
+
+      - name: Render scaffold to scratch dir
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/smoke-render
+          dotnet new frigaterelay-plugin -n FrigateRelay.Plugins.SmokeScaffold -o /tmp/smoke-render
+
+      - name: Copy scaffold into in-repo tree (for relative ProjectReference resolution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -r /tmp/smoke-render/src/FrigateRelay.Plugins.SmokeScaffold src/
+          cp -r /tmp/smoke-render/tests/FrigateRelay.Plugins.SmokeScaffold.Tests tests/
+
+      - name: Build scaffolded plugin + tests
+        run: |
+          dotnet build src/FrigateRelay.Plugins.SmokeScaffold/FrigateRelay.Plugins.SmokeScaffold.csproj -c Release
+          dotnet build tests/FrigateRelay.Plugins.SmokeScaffold.Tests/FrigateRelay.Plugins.SmokeScaffold.Tests.csproj -c Release
+
+      - name: Run scaffolded test
+        run: dotnet run --project tests/FrigateRelay.Plugins.SmokeScaffold.Tests -c Release --no-build
+
+      - name: Cleanup (restore tree, uninstall template)
+        if: always()
+        shell: bash
+        run: |
+          dotnet new uninstall templates/FrigateRelay.Plugins.Template/ || true
+          rm -rf /tmp/smoke-render \
+            src/FrigateRelay.Plugins.SmokeScaffold \
+            tests/FrigateRelay.Plugins.SmokeScaffold.Tests
+
+  samples-build:
+    name: Build + test samples project
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Detect samples project
+        id: detect
+        shell: bash
+        run: |
+          if [ -d samples/FrigateRelay.Samples.PluginGuide ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "samples/FrigateRelay.Samples.PluginGuide not found (PLAN-3.1 not yet landed — skipping)."
+          fi
+
+      - name: Build samples project
+        if: steps.detect.outputs.exists == 'true'
+        run: dotnet build samples/FrigateRelay.Samples.PluginGuide -c Release
+
+      - name: Run samples tests
+        if: steps.detect.outputs.exists == 'true'
+        shell: bash
+        run: |
+          # Samples project ships a tiny self-test entry point (PLAN-3.1).
+          # If a separate test project lands later, swap to:
+          #   dotnet run --project tests/...Samples.Tests -c Release --no-build
+          dotnet run --project samples/FrigateRelay.Samples.PluginGuide -c Release --no-build
