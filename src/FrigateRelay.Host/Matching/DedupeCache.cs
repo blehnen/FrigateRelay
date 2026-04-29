@@ -52,8 +52,17 @@ internal sealed class DedupeCache
     /// <para>
     /// Atomic against concurrent callers: the check-and-insert pair runs under a single lock so
     /// two concurrent events for the same (sub, camera, label) cannot both see a cache miss and
-    /// both return <see langword="true"/>. Event throughput is dozens/minute; lock contention is
-    /// negligible.
+    /// both return <see langword="true"/>.
+    /// </para>
+    /// <para>
+    /// Why a lock and not a lock-free path: <c>IMemoryCache.GetOrCreate</c> is documented as
+    /// non-atomic (the factory can run twice for concurrent misses on the same key), and
+    /// <c>TryGetValue</c> + <c>Set</c> is a TOCTOU race. The two lock-free alternatives
+    /// (per-key <c>SemaphoreSlim</c> in a <c>ConcurrentDictionary</c>, or a separate
+    /// <c>ConcurrentDictionary&lt;string, DateTimeOffset&gt;</c> for cooldown tracking) both
+    /// add complexity that doesn't pay off at the actual workload: a busy NVR sees a few
+    /// events/second at peak, the critical section is a hash lookup plus a cache write, and
+    /// contention is dominated by IMemoryCache's own internal synchronization either way.
     /// </para>
     /// </summary>
     /// <param name="sub">The matching subscription whose <see cref="SubscriptionOptions.CooldownSeconds"/> sets the TTL.</param>

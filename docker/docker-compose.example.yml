@@ -6,7 +6,7 @@
 
 services:
   frigaterelay:
-    image: ghcr.io/<owner>/frigaterelay:latest
+    image: ghcr.io/blehnen/frigaterelay:latest
     restart: unless-stopped
     env_file:
       - .env

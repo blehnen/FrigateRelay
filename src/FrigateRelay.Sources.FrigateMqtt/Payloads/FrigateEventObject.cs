@@ -2,12 +2,20 @@ namespace FrigateRelay.Sources.FrigateMqtt.Payloads;
 
 /// <summary>
 /// Represents a single detected object snapshot within a Frigate MQTT event.
-/// Used for both the <c>before</c> and <c>after</c> fields of <see cref="FrigateEvent"/>
-/// — the schema is identical for both.
+/// Used for both the <c>before</c> and <c>after</c> fields of <see cref="FrigateEvent"/>;
+/// the schema is identical for both.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Frigate emits one MQTT event per tracked object. A single video frame containing a
+/// person and a car produces two separate Frigate events with two distinct <see cref="Id"/>s
+/// and one <see cref="Label"/> each, which means two independent <c>EventContext</c>
+/// instances downstream. There is no multi-label payload for FrigateRelay to fan out.
+/// </para>
+/// <para>
 /// Wire format is snake_case JSON; deserialized via <see cref="FrigateJsonOptions.Default"/>
 /// which applies <c>JsonNamingPolicy.SnakeCaseLower</c> globally.
+/// </para>
 /// </remarks>
 internal sealed record FrigateEventObject
 {
