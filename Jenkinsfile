@@ -52,28 +52,10 @@ pipeline {
                     // 281 matches the agent template's "Extra group GIDs"; verify on the
                     // host with `stat -c '%g' /var/run/docker.sock`.
                     args '-v /var/run/docker.sock:/var/run/docker.sock --group-add 281'
-
-                    // Diagnostics: if Testcontainers still can't reach the daemon, the
-                    // first `sh` step in the build will print `id` and `ls -l` of the
-                    // socket to confirm the mount and group are in place.
                 }
             }
 
             steps {
-                // Diagnostic: prove the socket mount and group membership took effect.
-                // Cheap, prints once per build, removable once CI is consistently green.
-                sh '''
-                    set +e
-                    echo "--- id ---"
-                    id
-                    echo "--- /var/run/docker.sock ---"
-                    ls -l /var/run/docker.sock 2>&1
-                    echo "--- writable? ---"
-                    test -w /var/run/docker.sock && echo "YES" || echo "NO"
-                    echo "--- DOCKER_* env ---"
-                    env | grep -iE 'DOCKER|TESTCONTAINER' | sort || true
-                '''
-
                 sh 'dotnet restore FrigateRelay.sln --packages .nuget-cache'
 
                 sh 'dotnet build FrigateRelay.sln -c Release --no-restore'
