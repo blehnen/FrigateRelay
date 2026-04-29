@@ -1,0 +1,28 @@
+# Codecov configuration for FrigateRelay
+# Reference: https://docs.codecov.com/docs/codecov-yaml
+#
+# Why this file exists alongside the ReportGenerator -assemblyfilters in
+# Jenkinsfile: ReportGenerator filters by ASSEMBLY name, but Codecov
+# bookkeeping is path-based. Some cobertura XMLs include assemblies under
+# package names that don't match the assembly filter exactly, so the
+# tests/ and tools/ source paths still appeared on the Codecov dashboard.
+# The path-based ignore here is the durable fix and stays correct even
+# if the upstream coverage tooling changes its package-naming convention.
+
+ignore:
+  - "tests/**"
+  - "tools/**"
+
+coverage:
+  status:
+    project:
+      default:
+        # Allow a 1% drift before failing the project status check.
+        # Trivial coverage wiggles (e.g. a one-line refactor) shouldn't
+        # block PRs; substantive regressions still will.
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
