@@ -11,11 +11,14 @@ internal sealed class MosquittoFixture : IAsyncDisposable
     public MosquittoFixture()
     {
         var conf = "listener 1883\nallow_anonymous true\n";
-        _container = new ContainerBuilder()
-            .WithImage("eclipse-mosquitto:2")
+        // Testcontainers 4.10+ requires an explicit image at builder construction
+        // (parameterless ctor + chained .WithImage(...) is obsolete and slated for removal).
+        // The wait strategy renamed UntilPortIsAvailable → UntilExternalTcpPortIsAvailable
+        // in 4.7.0 and the old name was removed in a later patch; semantics still apply.
+        _container = new ContainerBuilder("eclipse-mosquitto:2")
             .WithPortBinding(1883, true)
             .WithResourceMapping(Encoding.UTF8.GetBytes(conf), "/mosquitto/config/mosquitto.conf")
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1883))
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilExternalTcpPortIsAvailable(1883))
             .Build();
     }
 
