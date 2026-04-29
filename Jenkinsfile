@@ -83,9 +83,15 @@ pipeline {
                             -reports:"coverage/**/coverage.cobertura.xml" \
                             -targetdir:coverage/report \
                             -reporttypes:"Html;Cobertura;Badges" \
+                            -assemblyfilters:"-FrigateRelay.TestHelpers;-FrigateRelay.MigrateConf" \
                             -license:"$REPORTGENERATOR_LICENSE"
                     '''
                 }
+                // -assemblyfilters: TestHelpers is shared test-utility code (CapturingLogger
+                // and friends), MigrateConf is a one-shot migration console tool. Neither is
+                // part of the runtime service surface, so neither belongs in the production
+                // coverage metric. The filter applies to BOTH the merged HTML report and the
+                // merged Cobertura.xml that Codecov ingests — single point of exclusion.
 
                 // Upload the merged Cobertura.xml to Codecov for trend tracking.
                 // codecov-token-frigaterelay is FrigateRelay-specific (separate from
