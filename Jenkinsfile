@@ -104,6 +104,18 @@ pipeline {
                             -license:"$REPORTGENERATOR_LICENSE"
                     '''
                 }
+
+                // Upload the merged Cobertura.xml to Codecov for trend tracking.
+                // codecov-token-frigaterelay is FrigateRelay-specific (separate from
+                // DotNetWorkQueue's codecov-token so the projects don't clobber).
+                // Upload failures are non-fatal — Codecov flakes shouldn't break CI.
+                withCredentials([string(credentialsId: 'codecov-token-frigaterelay', variable: 'CODECOV_TOKEN')]) {
+                    sh '''
+                        curl -Os https://cli.codecov.io/latest/linux/codecov
+                        chmod +x codecov
+                        ./codecov upload-process --file coverage/report/Cobertura.xml --token "$CODECOV_TOKEN" || echo "Codecov upload failed (non-fatal)"
+                    '''
+                }
             }
 
             post {
