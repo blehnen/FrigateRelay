@@ -47,7 +47,7 @@ jobs:
     if: hashFiles('templates/**/template.json') != ''
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -94,7 +94,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -132,7 +132,7 @@ jobs:
     if: hashFiles('docs/plugin-author-guide.md') != ''
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
