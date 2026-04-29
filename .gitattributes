@@ -1,26 +1,69 @@
-# Auto-detect text files and normalize to LF in the repo
-* text=auto
+# Normalize line endings to LF in both the index AND the working tree.
+#
+# Previous policy: forced CRLF for *.cs / *.csproj / *.yml / etc. That worked
+# when the repo was Windows-only, but it breaks the moment Linux tooling
+# enters the picture: Jenkins agents (Linux), Dependabot (Linux), GitHub
+# Actions runners (often Linux), and any *nix editor write LF, which then
+# disagrees with the `eol=crlf` attribute on every checkout. Result: every
+# Dependabot PR shows whole-file diffs as line-ending churn, and Jenkins's
+# pre-merge step refuses to merge `main` into a PR branch because the
+# working tree comes out "dirty" on every fresh checkout.
+#
+# This policy pins LF for all text files. Windows editors handle LF fine
+# (Visual Studio / VS Code / Rider all preserve existing line endings;
+# `core.autocrlf=true` no longer fights with the attribute either).
+# `text=auto` auto-detects binary vs text via content inspection so we
+# don't have to enumerate every binary type. Per-extension entries are
+# belt-and-suspenders and serve as documentation for "yes, this is text".
 
-# Force these to always use CRLF in working tree (Windows .NET project)
-*.cs text eol=crlf
-*.csproj text eol=crlf
-*.sln text eol=crlf
-*.config text eol=crlf
-*.json text eol=crlf
-*.xml text eol=crlf
-*.md text eol=crlf
-*.razor text eol=crlf
-*.css text eol=crlf
-*.js text eol=crlf
-*.txt text eol=crlf
-*.yml text eol=crlf
-*.yaml text eol=crlf
+* text=auto eol=lf
 
-# Binary files
-*.dll binary
-*.exe binary
-*.png binary
-*.jpg binary
-*.gif binary
-*.ico binary
-*.nupkg binary
+# Source code
+*.cs           text eol=lf
+*.csproj       text eol=lf
+*.sln          text eol=lf
+*.props        text eol=lf
+*.targets      text eol=lf
+*.razor        text eol=lf
+*.cshtml       text eol=lf
+*.css          text eol=lf
+*.js           text eol=lf
+*.ts           text eol=lf
+
+# Scripts
+*.sh           text eol=lf
+*.ps1          text eol=lf
+
+# CI / config
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.json         text eol=lf
+*.toml         text eol=lf
+*.config       text eol=lf
+*.xml          text eol=lf
+
+# Docs
+*.md           text eol=lf
+*.txt          text eol=lf
+
+# Editor / VCS metadata
+*.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Container / infra
+Dockerfile     text eol=lf
+*.dockerfile   text eol=lf
+*.conf         text eol=lf
+
+# Explicit binary markers (also auto-detected, listed for clarity)
+*.dll          binary
+*.exe          binary
+*.nupkg        binary
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.ico          binary
+*.snk          binary
+*.pfx          binary
