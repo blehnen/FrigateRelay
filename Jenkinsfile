@@ -29,6 +29,13 @@ pipeline {
         stage('Build & Coverage') {
             agent {
                 docker {
+                    // Pin to a cloud template whose Remote File System Root matches the
+                    // host bind-mount path, and whose agent image (jenkins-agent-with-docker)
+                    // ships a Docker CLI. Required because `agent { docker { } }` runs the
+                    // SDK image as a SIBLING on the chosen agent — not nested — so the
+                    // agent's workspace path must exist on the Docker daemon's host. The
+                    // shared/default cloud template doesn't satisfy either constraint.
+                    label 'frigaterelay'
                     // Digest pin: bump manually when Dependabot bumps docker/Dockerfile (Jenkinsfile is not in the Dependabot docker watch).
                     // To update: docker pull mcr.microsoft.com/dotnet/sdk:10.0 && docker inspect mcr.microsoft.com/dotnet/sdk:10.0 --format '{{index .RepoDigests 0}}'
                     image 'mcr.microsoft.com/dotnet/sdk:10.0@sha256:8a90a473da5205a16979de99d2fc20975e922c68304f5c79d564e666dc3982fc'
