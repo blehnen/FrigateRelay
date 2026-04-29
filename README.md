@@ -1,5 +1,6 @@
 # FrigateRelay
 
+[![CI](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml/badge.svg)](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg)](https://codecov.io/gh/blehnen/FrigateRelay)
 
 FrigateRelay is a .NET 10 background service that consumes MQTT events from [Frigate NVR](https://frigate.video/) and fans them out to a pluggable set of notification and automation targets. Each action can have independent pre-action validators (e.g. CodeProject.AI confidence checks) that short-circuit only that action, leaving others unaffected. Plugins ship for [Blue Iris](https://blueirissoftware.com/) (trigger + snapshot), [Pushover](https://pushover.net/) (notification + snapshot), [CodeProject.AI](https://www.codeproject.com/ai/docs/) (validation), and Frigate snapshot.
