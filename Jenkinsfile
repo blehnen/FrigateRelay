@@ -84,28 +84,48 @@ pipeline {
                 //   coverage/<TestProjectName>/coverage.cobertura.xml
                 // so adding a new test project requires no Jenkinsfile edit.
                 sh 'bash .github/scripts/run-tests.sh --coverage'
+
+                // Merge per-project cobertura XMLs into a single browsable HTML report
+                // (and a unified Cobertura.xml) using ReportGenerator. Mirrors the
+                // DotNetWorkQueue pipeline pattern. publishHTML in post-always picks
+                // up coverage/report/index.html.
+                //
+                // Tool is installed workspace-locally (--tool-path) rather than -g so we
+                // don't depend on $HOME being set inside the SDK container under the
+                // -u 1000:1000 override. `|| true` handles the "already installed" case
+                // when reportgenerator is cached from a prior run that wasn't cleanWs'd.
+                withCredentials([string(credentialsId: 'reportgenerator-license', variable: 'REPORTGENERATOR_LICENSE')]) {
+                    sh '''
+                        dotnet tool install --tool-path .dotnet-tools dotnet-reportgenerator-globaltool || true
+                        .dotnet-tools/reportgenerator \
+                            -reports:"coverage/**/coverage.cobertura.xml" \
+                            -targetdir:coverage/report \
+                            -reporttypes:"Html;Cobertura;Badges" \
+                            -license:"$REPORTGENERATOR_LICENSE"
+                    '''
+                }
             }
 
             post {
                 always {
-                    // Archive raw cobertura XML so it survives the workspace cleanup below.
-                    // allowEmptyArchive: false — a missing XML means the coverage run silently
-                    // failed; treat that as a pipeline error rather than swallowing it.
+                    // Archive raw per-project cobertura XML so it survives the workspace
+                    // cleanup below. allowEmptyArchive: false — a missing XML means the
+                    // coverage run silently failed; treat as a pipeline error.
                     archiveArtifacts artifacts: 'coverage/**/coverage.cobertura.xml',
                                      allowEmptyArchive: false,
                                      fingerprint: true
 
-                    // Publish coverage trends in Jenkins UI.
-                    // Requires the modern "Coverage" plugin (jenkinsci/coverage-plugin).
-                    // See: https://plugins.jenkins.io/coverage/
-                    //
-                    // Fallback for Jenkins instances still on the legacy Cobertura plugin:
-                    // coberturaPublisher(coberturaReportFile: 'coverage/**/*.cobertura.xml')
-                    recordCoverage(
-                        tools: [[parser: 'COBERTURA', pattern: 'coverage/**/coverage.cobertura.xml']],
-                        id:   'cobertura',
-                        name: 'FrigateRelay Coverage'
-                    )
+                    // Publish the merged HTML coverage report into the Jenkins UI via
+                    // the HTML Publisher plugin (already installed). Replaces the
+                    // recordCoverage step that needed the Coverage plugin.
+                    publishHTML(target: [
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'coverage/report',
+                        reportFiles: 'index.html',
+                        reportName: 'FrigateRelay Coverage'
+                    ])
 
                     // Remove workspace after archiving to keep agent disk clean.
                     cleanWs()
