@@ -46,13 +46,19 @@ public sealed class ChannelActionDispatcherTests
     [TestMethod]
     public async Task EnqueueAsync_WhenChannelFull_IncrementsDropsCounter_LogsWarning()
     {
-        // BlockingPlugin's ExecuteAsync blocks until released — keeps items in the queue.
+        // BlockingPlugin's ExecuteAsync blocks until released — items the consumers
+        // pull are pinned inside ExecuteAsync rather than draining away, but the
+        // dispatcher runs 2 consumer tasks per plugin (ChannelActionDispatcher.cs:113-114),
+        // so up to (capacity + 2) items can be absorbed before drop-oldest fires.
+        // Enqueue well past that bound so at least one drop is guaranteed regardless
+        // of how aggressively the runtime schedules the consumer reads.
         var blockingTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var blueIris = new BlockingPlugin("BlueIris", blockingTcs.Task);
 
         var logger = new CapturingLogger<ChannelActionDispatcher>();
-        // Capacity=2 so the 3rd enqueue triggers drop-oldest.
-        using var dispatcher = BuildDispatcher(new IActionPlugin[] { blueIris }, capacity: 2, logger: logger);
+        const int capacity = 2;
+        const int enqueueCount = 12; // > capacity + 2 consumers + comfortable slack
+        using var dispatcher = BuildDispatcher(new IActionPlugin[] { blueIris }, capacity: capacity, logger: logger);
 
         long dropsObserved = 0;
         using var meterListener = new MeterListener();
@@ -71,33 +77,36 @@ public sealed class ChannelActionDispatcherTests
 
         try
         {
-            var ctx1 = MakeContext("e1");
-            var ctx2 = MakeContext("e2");
-            var ctx3 = MakeContext("e3");
-
-            // Fill the channel (capacity=2) then overflow with a 3rd write.
-            // WriteAsync with a timeout ct so the test doesn't hang if the channel
-            // unexpectedly blocks (it shouldn't — capacity=2, first two fit immediately).
             using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await dispatcher.EnqueueAsync(ctx1, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
-            await dispatcher.EnqueueAsync(ctx2, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
-            // This 3rd enqueue should trigger drop-oldest (evicts ctx1) and fire the callback.
-            await dispatcher.EnqueueAsync(ctx3, blueIris, Array.Empty<IValidationPlugin>(), ct: writeCts.Token);
+            for (var i = 0; i < enqueueCount; i++)
+            {
+                await dispatcher.EnqueueAsync(
+                    MakeContext($"e{i}"),
+                    blueIris,
+                    Array.Empty<IValidationPlugin>(),
+                    ct: writeCts.Token);
+            }
 
-            // Give the MeterListener callback a moment to fire (it's synchronous on the
-            // itemDropped callback which fires inside WriteAsync on the same thread, but
-            // RecordObservableInstruments is needed for observable counters — for Add-based
-            // counters the callback is invoked inline, so a tiny yield is sufficient).
+            // The drop-oldest callback (Channel.CreateBounded's evicted lambda) runs
+            // synchronously inside WriteAsync, so both Drops.Add and LogDropped fire
+            // before EnqueueAsync returns. A yield is enough to let the MeterListener's
+            // continuation flush.
             await Task.Yield();
             meterListener.RecordObservableInstruments();
 
-            dropsObserved.Should().Be(1, "exactly one item should have been dropped");
+            dropsObserved.Should().BeGreaterThanOrEqualTo(1,
+                "drop-oldest must fire at least once when {0} items are enqueued against capacity={1}",
+                enqueueCount, capacity);
 
-            logger.Entries
+            var dropEntries = logger.Entries
                 .Where(e => e.Level == LogLevel.Warning
                             && e.Message.Contains("event_id=")
                             && e.Message.Contains("queue_full"))
-                .Should().HaveCount(1, "one structured drop warning expected");
+                .ToList();
+
+            dropEntries.Should().NotBeEmpty("at least one structured drop warning expected");
+            dropEntries.Count.Should().Be((int)dropsObserved,
+                "the dispatcher emits exactly one warning log per counter increment (same callback)");
         }
         finally
         {
