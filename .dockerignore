@@ -1,0 +1,35 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Test projects (not needed in image)
+tests/
+
+# Shipyard planning docs (not shipped)
+.shipyard/
+
+# Developer overrides — secrets must not enter image
+**/appsettings.Local.json
+**/*.user
+.env
+.env.*
+
+# Editor / IDE
+.vs/
+.vscode/
+*.DotSettings*
+
+# Coverage output
+coverage/
+
+# NuGet caches
+.nuget-cache/
+
+# CI scripts (not needed in image)
+.github/
+Jenkinsfile

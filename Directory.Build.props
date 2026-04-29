@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Warnings-as-errors applies globally including tests per CLAUDE.md invariant;
+    per-project NoWarn overrides are acceptable, blanket false is not.
+  -->
+  <PropertyGroup>
+    <!-- Target framework for all projects in this solution -->
+    <TargetFramework>net10.0</TargetFramework>
+
+    <!-- Enforce nullability analysis solution-wide -->
+    <Nullable>enable</Nullable>
+
+    <!-- Treat all compiler warnings as errors in every project -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- Always use the latest C# language version available on the SDK -->
+    <LangVersion>latest</LangVersion>
+
+    <!-- Implicit usings reduce boilerplate -->
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Enforce code-style rules during build (IDE diagnostics become build diagnostics) -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Use the latest recommended analyzer rule set -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+</Project>

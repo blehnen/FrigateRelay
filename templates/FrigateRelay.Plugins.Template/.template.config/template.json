@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Brian Lehnen",
+  "classifications": ["FrigateRelay", "Plugin"],
+  "identity": "FrigateRelay.Plugins.Template",
+  "name": "FrigateRelay Plugin",
+  "shortName": "frigaterelay-plugin",
+  "sourceName": "FrigateRelay.Plugins.Example",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}

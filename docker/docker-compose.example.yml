@@ -1,0 +1,23 @@
+# FrigateRelay — example Docker Compose.
+# This file does NOT bundle a broker. Point FrigateMqtt__Server at your
+# existing Mosquitto / Frigate broker (e.g. a service name on the same
+# Docker network, or a hostname reachable from this container).
+# Copy .env.example to .env and fill in the secrets before `docker compose up`.
+
+services:
+  frigaterelay:
+    image: ghcr.io/blehnen/frigaterelay:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      FrigateMqtt__Server: mosquitto         # service name on YOUR network
+      FrigateMqtt__Port: "1883"
+    volumes:
+      - ./config/appsettings.Local.json:/app/appsettings.Local.json:ro
+    ports:
+      - "8080:8080"
+    # healthcheck inherited from the image's HEALTHCHECK directive.
+    # Override here only if your environment needs different interval/timeout.

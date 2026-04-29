@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/blehnen/FrigateRelay/security/advisories/new
+    about: Report security issues privately via GitHub's security advisory flow. Do not file a public issue.

@@ -1,0 +1,154 @@
+# .github/workflows/release.yml
+#
+# Release workflow — builds multi-arch Docker image, runs Mosquitto-sidecar smoke
+# gate against amd64 image, then pushes to GHCR on success.
+#
+# Trigger: push of a git tag matching v* (e.g. v1.0.0, v1.2.3-rc1)
+#
+# Smoke gate (CONTEXT-10 D5):
+#   1. Build linux/amd64 image and load into runner's local Docker daemon.
+#   2. Start eclipse-mosquitto:2 sidecar inline (bind-mount docker/mosquitto-smoke.conf
+#      so Mosquitto 2.x accepts anonymous connections on port 1883).
+#   3. Start FrigateRelay container on --network host with FrigateMqtt__Server=127.0.0.1.
+#   4. Poll http://localhost:8080/healthz every 1 s for up to 30 s.
+#   5. HARD-FAIL (exit 1) if /healthz does not return 200 — multi-arch push does NOT happen.
+#
+# Arm64 note (CONTEXT-10 D5): ARM64 image is built via QEMU emulation but is NOT
+# smoke-tested (too slow under emulation). The amd64 smoke is the release gate.
+#
+# Base image: mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine (D1).
+# Fallback to runtime-deps:10.0-bookworm-slim documented in docker/Dockerfile.
+#
+# Registry: ghcr.io/<owner>/frigaterelay — public (PROJECT.md, MIT/OSS).
+# Secrets: GITHUB_TOKEN only (no PAT required).
+
+name: release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+# REVIEW-2.2 fix: serialize releases on the same tag — prevents :latest race
+# if the same tag is force-pushed or pushed twice in quick succession.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Enable QEMU for ARM64 cross-compilation
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      # Buildx required for multi-platform manifest push
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate :semver, :major, :latest tags from the git tag (e.g. v1.2.3 → 1.2.3, 1, latest)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          # REVIEW-2.2 fix: derive image name from repo, not hardcoded — fork-safe.
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      # ── Smoke gate (amd64 only) ─────────────────────────────────────────────
+      # Build the amd64 image and load it into the local Docker daemon for smoke.
+      # `load: true` is incompatible with multi-platform push, so this is a
+      # separate build step from the final multi-arch push below.
+      - name: Build amd64 image for smoke
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: fr-smoke:local
+
+      # Start Mosquitto 2.x sidecar inline (not as a services: block — services:
+      # containers cannot bind-mount workspace files cleanly).
+      # docker/mosquitto-smoke.conf sets: listener 1883 0.0.0.0 + allow_anonymous true
+      - name: Start Mosquitto sidecar
+        run: |
+          docker run -d --name mosquitto --network host \
+            -v "$PWD/docker/mosquitto-smoke.conf:/mosquitto/config/mosquitto.conf:ro" \
+            eclipse-mosquitto:2
+
+      # Start FrigateRelay on the host network so it can reach Mosquitto on 127.0.0.1:1883.
+      # docker/appsettings.Smoke.json is bind-mounted as appsettings.Local.json so the
+      # host reads a minimal valid config (no plugin secrets, empty Actions list).
+      - name: Start FrigateRelay
+        run: |
+          docker run -d --name fr --network host \
+            -e ASPNETCORE_ENVIRONMENT=Docker \
+            -e ASPNETCORE_URLS=http://+:8080 \
+            -e FrigateMqtt__Server=127.0.0.1 \
+            -e FrigateMqtt__Port=1883 \
+            -v "$PWD/docker/appsettings.Smoke.json:/app/appsettings.Local.json:ro" \
+            fr-smoke:local
+
+      # Hard-fail smoke: poll /healthz every 1 s for up to 30 s.
+      # On failure: dump docker logs from both containers, then exit 1.
+      # Multi-arch push DOES NOT happen if this step fails.
+      - name: Smoke /healthz
+        run: |
+          set -e
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/healthz; then
+              echo
+              echo "healthz OK after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "healthz did not return 200 within 30s"
+          echo "--- FrigateRelay logs ---"
+          docker logs fr || true
+          echo "--- Mosquitto logs ---"
+          docker logs mosquitto || true
+          exit 1
+
+      # Always clean up smoke containers, even on failure (so the runner stays tidy).
+      - name: Cleanup smoke containers
+        if: always()
+        run: |
+          docker rm -f fr mosquitto || true
+
+      # ── Multi-arch push (only reached if smoke passed) ──────────────────────
+      # Build both platforms via QEMU + buildx and push the multi-arch manifest.
+      # Uses the metadata-action tags computed above.
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

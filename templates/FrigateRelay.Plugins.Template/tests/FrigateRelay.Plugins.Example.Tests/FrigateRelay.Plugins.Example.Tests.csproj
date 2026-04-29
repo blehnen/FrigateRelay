@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CA1707: DAMP underscore naming is the standard test convention; CS1591: test projects need no XML docs -->
+    <NoWarn>$(NoWarn);CA1707;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.2.1" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="1.0.17">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+  </ItemGroup>
+
+  <!--
+    ProjectReference paths are relative to the template's location inside the FrigateRelay repo.
+    Out-of-repo authors: replace the Abstractions ProjectReference with a PackageReference once
+    FrigateRelay.Abstractions is published to NuGet.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FrigateRelay.Plugins.Example\FrigateRelay.Plugins.Example.csproj" />
+    <ProjectReference Include="..\..\..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+</Project>

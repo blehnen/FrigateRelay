@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>FrigateRelay.Host</RootNamespace>
+    <AssemblyName>FrigateRelay.Host</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>9a7f6e02-3c8b-4d2e-9b17-afb4c6e03a10</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- appsettings.Local.json is an optional developer-only override; never committed. -->
+    <Content Include="appsettings.Local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Local.json')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Microsoft.Extensions.Hosting, Configuration.UserSecrets, and Caching.Memory are provided
+         transitively by Microsoft.NET.Sdk.Web — explicit references here trigger NU1510
+         (warnings-as-errors). Removed when SDK changed from Worker to Web (PLAN-1.1 Task 2). -->
+
+    <!-- OpenTelemetry (D2 — registration always; export conditional on Otel:OtlpEndpoint / OTEL_EXPORTER_OTLP_ENDPOINT) -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+
+    <!-- Serilog Worker SDK host wiring (D7 — Seq is conditional on Serilog:Seq:ServerUrl) -->
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="2.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <!--
+      Program.cs (composition root) directly `new`s plugin registrars per Approach A (build-time DI).
+      The rest of the Host assembly (EventPump, SubscriptionMatcher, DedupeCache) depends only on
+      Abstractions. A future AssemblyLoadContext-based loader (Phase "B") would replace these
+      direct references with runtime discovery against a plugins/ folder.
+    -->
+    <ProjectReference Include="..\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.BlueIris\FrigateRelay.Plugins.BlueIris.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.FrigateSnapshot\FrigateRelay.Plugins.FrigateSnapshot.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.CodeProjectAi\FrigateRelay.Plugins.CodeProjectAi.csproj" />
+  </ItemGroup>
+
+  <!-- Publish flags: self-contained, untrimmed, no AOT, no single-file (CONTEXT-10 D3).
+       No RID set here — multi-arch publish passes -r <rid> per invocation.
+       SelfContained is guarded so plain `dotnet build` (no RID) stays framework-dependent,
+       avoiding NETSDK1151 when test projects reference this project without an RID. -->
+  <PropertyGroup>
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+    <!-- InvariantGlobalization omitted: false is the .NET 10 default for non-AOT builds (PLAN-2.1 noise cleanup). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- appsettings.Docker.json loaded when ASPNETCORE_ENVIRONMENT=Docker (CONTEXT-10 B4). -->
+    <None Update="appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FrigateRelay.Host.Tests" />
+    <InternalsVisibleTo Include="FrigateRelay.IntegrationTests" />
+    <!-- Required by NSubstitute to create proxy substitutes for internal interfaces/classes. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+</Project>
