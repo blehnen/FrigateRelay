@@ -3,7 +3,9 @@
 [![CI](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml/badge.svg)](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg)](https://codecov.io/gh/blehnen/FrigateRelay)
 
-FrigateRelay is a .NET 10 background service that consumes MQTT events from [Frigate NVR](https://frigate.video/) and fans them out to a pluggable set of notification and automation targets. Each action can have independent pre-action validators (e.g. CodeProject.AI confidence checks) that short-circuit only that action, leaving others unaffected. Plugins ship for [Blue Iris](https://blueirissoftware.com/) (trigger + snapshot), [Pushover](https://pushover.net/) (notification + snapshot), [CodeProject.AI](https://www.codeproject.com/ai/docs/) (validation), and Frigate snapshot.
+FrigateRelay is a .NET 10 background service that listens to [Frigate NVR](https://frigate.video/) MQTT events and dispatches them to action plugins. Each action can sit behind its own pre-action validators, like a CodeProject.AI confidence check. If a validator fails, that action is skipped, but other actions on the same event still fire.
+
+Plugins ship for [Blue Iris](https://blueirissoftware.com/) (trigger + snapshot), [Pushover](https://pushover.net/) (notification + snapshot), [CodeProject.AI](https://www.codeproject.com/ai/docs/) (validation), and Frigate snapshot.
 
 ## Quickstart (Docker)
 
@@ -25,7 +27,7 @@ PUSHOVER__APITOKEN=your-api-token
 PUSHOVER__USERKEY=your-user-key
 ```
 
-See `SECURITY.md` — do not commit `.env` to source control.
+See `SECURITY.md`. Do not commit `.env` to source control.
 
 Start the service:
 
@@ -37,7 +39,7 @@ Verify readiness:
 
 ```bash
 curl -i http://localhost:8080/healthz
-# HTTP/1.1 200 OK  (or 503 if MQTT is unreachable — check FrigateMqtt__Server)
+# HTTP/1.1 200 OK  (or 503 if MQTT is unreachable; check FrigateMqtt__Server)
 ```
 
 ## Configuration
@@ -82,10 +84,10 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 
 **Key concepts:**
 
-- **Profiles** — reusable action lists referenced by name from subscriptions. Define once, use across many subscriptions.
-- **Subscriptions** — match events by camera name, object label, and optional zone. Each subscription uses a profile or declares its own inline action list.
-- **SnapshotProvider override** — `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
-- **Validators** — attach to specific action entries to gate that action independently.
+- **Profiles** are reusable action lists, referenced by name from subscriptions. Define once, use across many subscriptions.
+- **Subscriptions** match events by camera name, object label, and optional zone. Each subscription uses a profile or declares its own inline action list.
+- **SnapshotProvider override:** `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
+- **Validators** attach to specific action entries and gate that action independently.
 
 ## Migrating from FrigateMQTTProcessingService
 
@@ -93,16 +95,16 @@ If you are migrating from the author's earlier `FrigateMQTTProcessingService`
 (.NET Framework 4.8 / Topshelf / SharpConfig INI) to FrigateRelay v1.0.0, the
 project ships a one-shot conversion tool plus a field-by-field mapping doc:
 
-- **Tool:** [`tools/FrigateRelay.MigrateConf/`](tools/FrigateRelay.MigrateConf/) — a .NET 10 console app that reads the legacy `.conf` and writes a FrigateRelay-shaped `appsettings.Local.json`.
+- **Tool:** [`tools/FrigateRelay.MigrateConf/`](tools/FrigateRelay.MigrateConf/), a .NET 10 console app that reads the legacy `.conf` and writes a FrigateRelay-shaped `appsettings.Local.json`.
   ```bash
   dotnet run --project tools/FrigateRelay.MigrateConf -c Release -- \
     --input /path/to/FrigateMQTTProcessingService.conf \
     --output appsettings.Local.json
   ```
-- **Field-by-field mapping:** [`docs/migration-from-frigatemqttprocessing.md`](docs/migration-from-frigatemqttprocessing.md) — covers `[ServerSettings]`, `[PushoverSettings]`, `[SubscriptionSettings]` blocks; documents the secrets you must supply via env vars (`Pushover__AppToken`, `Pushover__UserKey`); explains the deliberately-dropped per-subscription `Camera` URL field.
-- **Side-by-side parity window (recommended):** [`docs/parity-window-checklist.md`](docs/parity-window-checklist.md) — the 48-hour run book for verifying behavioral parity in DryRun mode before flipping to production.
-- **Parity report:** [`docs/parity-report.md`](docs/parity-report.md) — the reconciliation output the operator reviews before declaring cutover.
-- **Release procedure:** [`RELEASING.md`](RELEASING.md) — the manual `git tag v1.0.0` run book, including the pre-flight checklist and what `release.yml` does automatically after the tag push.
+- **Field-by-field mapping:** [`docs/migration-from-frigatemqttprocessing.md`](docs/migration-from-frigatemqttprocessing.md). Covers `[ServerSettings]`, `[PushoverSettings]`, and `[SubscriptionSettings]`; documents the secrets you must supply via env vars (`Pushover__AppToken`, `Pushover__UserKey`); explains the deliberately-dropped per-subscription `Camera` URL field.
+- **Side-by-side parity window (recommended):** [`docs/parity-window-checklist.md`](docs/parity-window-checklist.md), the 48-hour run book for verifying behavioral parity in DryRun mode before flipping to production.
+- **Parity report:** [`docs/parity-report.md`](docs/parity-report.md), the reconciliation output the operator reviews before declaring cutover.
+- **Release procedure:** [`RELEASING.md`](RELEASING.md), the manual `git tag v1.0.0` run book, including the pre-flight checklist and what `release.yml` does automatically after the tag push.
 
 ## Adding a new action plugin
 
@@ -113,7 +115,7 @@ dotnet new install templates/FrigateRelay.Plugins.Template
 dotnet new frigaterelay-plugin -n FrigateRelay.Plugins.MyPlugin -o src/FrigateRelay.Plugins.MyPlugin
 ```
 
-See `docs/plugin-author-guide.md` for the full walkthrough — contract interfaces, options binding, registrar pattern, test setup, and wiring into the host.
+See `docs/plugin-author-guide.md` for the full walkthrough: contract interfaces, options binding, the registrar pattern, test setup, and wiring into the host.
 
 ## Project status
 
@@ -121,4 +123,4 @@ Pre-1.0; Phase 11 is the OSS-polish gate before v1.0.0 cutover. See `.shipyard/R
 
 ## License
 
-[MIT](LICENSE) — Copyright 2026 Brian Lehnen.
+[MIT](LICENSE). Copyright 2026 Brian Lehnen.
