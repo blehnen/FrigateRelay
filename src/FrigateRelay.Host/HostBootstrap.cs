@@ -71,8 +71,18 @@ internal static class HostBootstrap
             .AddCheck<MqttHealthCheck>("mqtt-and-startup");
 
         // Host-scope services.
+        // PostConfigure expands SubscriptionOptions.Profile references into resolved
+        // Actions lists so EventPump's runtime read of IOptionsMonitor.CurrentValue
+        // sees fully-resolved subscriptions. Errors are re-surfaced by
+        // StartupValidation.ValidateAll (idempotent on already-resolved inputs); the
+        // local accumulator here is discarded.
         builder.Services.AddOptions<HostSubscriptionsOptions>()
-            .Bind(builder.Configuration);
+            .Bind(builder.Configuration)
+            .PostConfigure(opts =>
+            {
+                var resolveErrors = new List<string>();
+                opts.Subscriptions = ProfileResolver.Resolve(opts, resolveErrors);
+            });
 
         builder.Services.AddSingleton<IMemoryCache>(new MemoryCache(new MemoryCacheOptions()));
         builder.Services.AddSingleton<DedupeCache>();
