@@ -23,5 +23,13 @@ internal sealed record HostSubscriptionsOptions
     /// Gets the list of subscription rules. Defaults to an empty array when the configuration
     /// section is absent or contains no entries.
     /// </summary>
-    public IReadOnlyList<SubscriptionOptions> Subscriptions { get; init; } = Array.Empty<SubscriptionOptions>();
+    /// <remarks>
+    /// Settable (not <c>init</c>) so the <c>IPostConfigureOptions</c> registered in
+    /// <c>HostBootstrap</c> can replace the bound list with the profile-resolved version
+    /// (Profile references expanded into concrete Actions). Without that mutation,
+    /// runtime consumers see the raw bound list where <see cref="SubscriptionOptions.Profile"/>
+    /// is set and <see cref="SubscriptionOptions.Actions"/> is empty, which causes the
+    /// dispatcher's per-action loop to silently no-op.
+    /// </remarks>
+    public IReadOnlyList<SubscriptionOptions> Subscriptions { get; set; } = Array.Empty<SubscriptionOptions>();
 }

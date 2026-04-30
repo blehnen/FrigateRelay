@@ -9,11 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- appsettings.Local.json is an optional developer-only override; never committed. -->
-    <Content Include="appsettings.Local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Local.json')" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Microsoft.Extensions.Hosting, Configuration.UserSecrets, and Caching.Memory are provided
          transitively by Microsoft.NET.Sdk.Web — explicit references here trigger NU1510
          (warnings-as-errors). Removed when SDK changed from Worker to Web (PLAN-1.1 Task 2). -->
