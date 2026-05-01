@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tests/FrigateRelay.IntegrationTests.RealBroker/` — opt-in integration-test project that runs against an operator-supplied MQTT broker rather than the in-process Testcontainers Mosquitto. Tests self-skip via `Assert.Inconclusive` unless `FRIGATERELAY_TEST_REAL_BROKER=1` is set; broker host/port and optional credentials come from `FRIGATERELAY_TEST_MQTT_HOST`/`_PORT`/`_USERNAME`/`_PASSWORD`. Topic prefix is `frigaterelay-test/<guid>/events` (never `frigate/events`) so a misconfigured test cannot trigger production action plugins. The project is not auto-discovered by `.github/scripts/run-tests.sh` — invoke it explicitly via `dotnet run --project tests/FrigateRelay.IntegrationTests.RealBroker`. See CONTRIBUTING.md for the operator run-book. Closes the harness portion of #17; the silent-SUBACK regression test (acceptance criterion 3) lands with the #16 fix in a follow-up PR.
 
+### Fixed
+
+- `.github/workflows/docs.yml` — removed two job-level `if: hashFiles(...) != ''` guards that caused every triggered run to fail with `startup_failure` ("Unrecognized function: 'hashFiles'") since the workflow first landed. `hashFiles()` is only allowed in step-level expressions, not in job-level `if:`. The guards were defensive "skip until file lands" checks added during Phase 11 while templates/docs/samples were being built out; vestigial post-v1.0.0. The workflow's top-level `paths:` filter already restricts triggers correctly. Side effect: the `scaffold-smoke`, `samples-build`, and `doc-samples-rot` validators have been silent no-ops since v1.0.0 — the first PR after this fix that touches `docs/`, `samples/`, or `templates/` will exercise them for real for the first time. Closes #26.
+
 ## [1.0.0] — 2026-05-03
 
 Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProcessingService` verified via a 24-hour live A/B window across all production cameras with zero missed alerts and zero spurious alerts — see `docs/parity-report.md`.
