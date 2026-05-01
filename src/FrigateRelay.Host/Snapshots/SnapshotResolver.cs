@@ -105,7 +105,7 @@ internal sealed class SnapshotResolver : ISnapshotResolver
             LoggerMessage.Define<string>(
                 LogLevel.Warning,
                 new EventId(1, "snapshot_provider_unresolved"),
-                "snapshot_provider_unresolved event_id={EventId}");
+                "snapshot_provider_unresolved event_id={FrigateEventId}");
 
         private static readonly Action<ILogger, string, Exception?> _snapshotProviderUnknown =
             LoggerMessage.Define<string>(
@@ -117,7 +117,7 @@ internal sealed class SnapshotResolver : ISnapshotResolver
             LoggerMessage.Define<string, string, string, string>(
                 LogLevel.Debug,
                 new EventId(3, "snapshot_resolved"),
-                "snapshot_resolved provider={ProviderName} tier={Tier} event_id={EventId} cache={CacheStatus}");
+                "snapshot_resolved provider={ProviderName} tier={Tier} event_id={FrigateEventId} cache={CacheStatus}");
 
         public static void SnapshotProviderUnresolved(ILogger logger, string eventId) =>
             _snapshotProviderUnresolved(logger, eventId, null);

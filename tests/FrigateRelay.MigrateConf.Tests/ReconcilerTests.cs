@@ -15,15 +15,15 @@ public sealed class ReconcilerTests
 
     // Real NDJSON shape: @mt contains the message template (e.g., "BlueIris DryRun would-execute ...").
     // @i is a hex Murmur3 hash of the template and is NEVER the action name.
-    // Camera, Label, EventId are top-level string properties from LoggerMessage.Define named params.
+    // Camera, Label, FrigateEventId are top-level string properties from LoggerMessage.Define named params.
 
     [TestMethod]
     public void Reconcile_PerfectMatch_ReturnsZeroMissedAndZeroSpurious()
     {
         var ndjson = WriteTemp(
             """
-            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"a1b2c3d4","Camera":"DriveWayHD","Label":"person","EventId":"ev-1"}
-            {"@t":"2026-04-29T12:00:05Z","@mt":"Pushover DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"e5f6a7b8","Camera":"DriveWayHD","Label":"person","EventId":"ev-1"}
+            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}","@i":"a1b2c3d4","Camera":"DriveWayHD","Label":"person","FrigateEventId":"ev-1"}
+            {"@t":"2026-04-29T12:00:05Z","@mt":"Pushover DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}","@i":"e5f6a7b8","Camera":"DriveWayHD","Label":"person","FrigateEventId":"ev-1"}
             """, "log");
         var csv = WriteTemp(
             """
@@ -64,7 +64,7 @@ public sealed class ReconcilerTests
     {
         var ndjson = WriteTemp(
             """
-            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"a1b2c3d4","Camera":"BackYard","Label":"car","EventId":"ev-9"}
+            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}","@i":"a1b2c3d4","Camera":"BackYard","Label":"car","FrigateEventId":"ev-9"}
             """, "log");
         var csv = WriteTemp("timestamp,camera,label,action,outcome", "csv");
 
@@ -80,7 +80,7 @@ public sealed class ReconcilerTests
     {
         var ndjson = WriteTemp(
             """
-            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}","@i":"a1b2c3d4","Camera":"DriveWayHD","Label":"person","EventId":"ev-1"}
+            {"@t":"2026-04-29T12:00:05Z","@mt":"BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}","@i":"a1b2c3d4","Camera":"DriveWayHD","Label":"person","FrigateEventId":"ev-1"}
             """, "log");
         var csv = WriteTemp(
             """
@@ -102,7 +102,7 @@ public sealed class ReconcilerTests
         // Lines with @mt that doesn't match either DryRun template should be ignored.
         var ndjson = WriteTemp(
             """
-            {"@t":"2026-04-29T12:00:05Z","@mt":"some other log message","@i":"deadbeef","Camera":"DriveWayHD","Label":"person","EventId":"ev-x"}
+            {"@t":"2026-04-29T12:00:05Z","@mt":"some other log message","@i":"deadbeef","Camera":"DriveWayHD","Label":"person","FrigateEventId":"ev-x"}
             """, "log");
         var csv = WriteTemp("timestamp,camera,label,action,outcome", "csv");
 

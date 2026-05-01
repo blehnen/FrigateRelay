@@ -57,9 +57,18 @@ public sealed class EventPumpTests
         await cts.CancelAsync();
         await pump.StopAsync(CancellationToken.None);
 
-        logger.Entries
+        var matchedEntries = logger.Entries
             .Where(e => e.Level == LogLevel.Information && e.Message.Contains("Matched event"))
-            .Should().HaveCount(1, "one subscription matched the one event; one log line expected");
+            .ToList();
+        matchedEntries.Should().HaveCount(1, "one subscription matched the one event; one log line expected");
+
+        // Regression for #22: the {EventId} placeholder used to collide with Serilog's
+        // bridge-enriched property derived from the LoggerMessage.Define EventId argument
+        // ("MatchedEvent"). Renamed to {FrigateEventId} so the call-site value renders.
+        // Operators / log dashboards will now see the actual Frigate event id.
+        matchedEntries[0].Message.Should().Contain("event_id=e1",
+            "the rendered message must surface the call-site EventId value, not the " +
+            "LoggerMessage.Define EventId struct that the placeholder used to collide with");
     }
 
     [TestMethod]

@@ -23,7 +23,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         LoggerMessage.Define<string, string, int>(
             LogLevel.Warning,
             new EventId(10, "DispatchItemDropped"),
-            "Dropped event_id={EventId} action={Action} queue_full capacity={Capacity}. Downstream may be unhealthy.");
+            "Dropped event_id={FrigateEventId} action={Action} queue_full capacity={Capacity}. Downstream may be unhealthy.");
 
     private static readonly Action<ILogger, string, Exception?> LogPluginNotRegistered =
         LoggerMessage.Define<string>(
@@ -35,7 +35,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         LoggerMessage.Define<string, string>(
             LogLevel.Warning,
             new EventId(101, "DispatchRetryExhausted"),
-            "Dropped event_id={EventId} action={Action} after retry exhaustion. Downstream may be unhealthy.");
+            "Dropped event_id={FrigateEventId} action={Action} after retry exhaustion. Downstream may be unhealthy.");
 
     // CONTEXT-7 D6 + D7: a failing validator short-circuits THIS action only; structured
     // state must carry event_id, camera, label, action, validator, reason for operator alerting.
@@ -43,7 +43,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         LoggerMessage.Define<string, string, string, string, string, string>(
             LogLevel.Warning,
             new EventId(20, "ValidatorRejected"),
-            "validator_rejected event_id={EventId} camera={Camera} label={Label} action={Action} validator={Validator} reason={Reason}");
+            "validator_rejected event_id={FrigateEventId} camera={Camera} label={Label} action={Action} validator={Validator} reason={Reason}");
 
     private readonly List<IActionPlugin> _plugins;
     private readonly ILogger<ChannelActionDispatcher> _logger;

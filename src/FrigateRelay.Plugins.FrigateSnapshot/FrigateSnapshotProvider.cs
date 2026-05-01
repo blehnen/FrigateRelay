@@ -144,25 +144,25 @@ internal sealed class FrigateSnapshotProvider : ISnapshotProvider
             LoggerMessage.Define<string, int>(
                 LogLevel.Debug,
                 new EventId(1, "frigate_snapshot_success"),
-                "Frigate snapshot fetched for event {EventId}: {Bytes} bytes");
+                "Frigate snapshot fetched for event {FrigateEventId}: {Bytes} bytes");
 
         private static readonly Action<ILogger, string, int, Exception?> _snapshot404Retry =
             LoggerMessage.Define<string, int>(
                 LogLevel.Debug,
                 new EventId(2, "frigate_snapshot_404_retry"),
-                "Frigate snapshot 404 for event {EventId}; retry attempt {Attempt}");
+                "Frigate snapshot 404 for event {FrigateEventId}; retry attempt {Attempt}");
 
         private static readonly Action<ILogger, string, string, Exception?> _snapshotFailedMessage =
             LoggerMessage.Define<string, string>(
                 LogLevel.Warning,
                 new EventId(4, "frigate_snapshot_failed"),
-                "Frigate snapshot fetch failed for event {EventId}: {Reason}");
+                "Frigate snapshot fetch failed for event {FrigateEventId}: {Reason}");
 
         private static readonly Action<ILogger, string, int, Exception?> _snapshotFailedStatus =
             LoggerMessage.Define<string, int>(
                 LogLevel.Warning,
                 new EventId(3, "frigate_snapshot_failed"),
-                "Frigate snapshot fetch failed for event {EventId}: HTTP {StatusCode}");
+                "Frigate snapshot fetch failed for event {FrigateEventId}: HTTP {StatusCode}");
 
         public static void SnapshotSuccess(ILogger logger, string eventId, int byteCount)
             => _snapshotSuccess(logger, eventId, byteCount, null);

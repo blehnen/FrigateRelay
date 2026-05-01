@@ -232,7 +232,9 @@ public sealed class ChannelActionDispatcherTests
                 // Structured state must carry EventId and Action keys (ROADMAP criterion).
                 entry.State.Should().NotBeNull();
                 var keys = entry.State!.Select(kv => kv.Key).ToList();
-                keys.Should().Contain("EventId", "structured state must have EventId");
+                keys.Should().Contain("FrigateEventId",
+                    "structured state must have FrigateEventId — renamed from EventId in #22 " +
+                    "to avoid colliding with Serilog's bridge-enriched EventId property");
                 keys.Should().Contain("Action", "structured state must have Action");
             }
 
@@ -321,9 +323,11 @@ public sealed class ChannelActionDispatcherTests
 
             // CONTEXT-7 D7: structured state must carry event_id, camera, label, action,
             // validator, reason — operators key alerts off these fields, so coverage is mandatory.
+            // EventId was renamed to FrigateEventId in #22 to avoid Serilog's bridge enrichment
+            // collision with the LoggerMessage.Define EventId argument.
             entry.State.Should().NotBeNull();
             var keys = entry.State!.Select(kv => kv.Key).ToList();
-            keys.Should().Contain("EventId");
+            keys.Should().Contain("FrigateEventId");
             keys.Should().Contain("Camera");
             keys.Should().Contain("Label");
             keys.Should().Contain("Action");

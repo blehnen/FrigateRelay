@@ -22,7 +22,7 @@ internal sealed class EventPump : BackgroundService
         LoggerMessage.Define<string, string, string, string, string>(
             LogLevel.Information,
             new EventId(1, "MatchedEvent"),
-            "Matched event: source={Source} subscription={Subscription} camera={Camera} label={Label} event_id={EventId}");
+            "Matched event: source={Source} subscription={Subscription} camera={Camera} label={Label} event_id={FrigateEventId}");
 
     private static readonly Action<ILogger, string, Exception?> LogPumpStopped =
         LoggerMessage.Define<string>(
@@ -40,7 +40,7 @@ internal sealed class EventPump : BackgroundService
         LoggerMessage.Define<string, string, string>(
             LogLevel.Debug,
             new EventId(4, "DispatchEnqueued"),
-            "Enqueued action={Action} subscription={Subscription} event_id={EventId}");
+            "Enqueued action={Action} subscription={Subscription} event_id={FrigateEventId}");
 
     private readonly List<IEventSource> _sources;
     private readonly DedupeCache _dedupe;
