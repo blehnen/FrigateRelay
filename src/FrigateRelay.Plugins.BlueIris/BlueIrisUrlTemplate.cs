@@ -10,7 +10,8 @@ internal sealed partial class BlueIrisUrlTemplate
     private static partial Regex TokenRegex();
 
     private static readonly FrozenSet<string> AllowedTokens =
-        new[] { "camera", "label", "event_id", "zone" }.ToFrozenSet(StringComparer.Ordinal);
+        new[] { "camera", "camera_shortname", "label", "event_id", "zone" }
+            .ToFrozenSet(StringComparer.Ordinal);
 
     private readonly string _template;
 
@@ -33,7 +34,7 @@ internal sealed partial class BlueIrisUrlTemplate
             if (!AllowedTokens.Contains(name))
                 throw new ArgumentException(
                     $"BlueIris.TriggerUrlTemplate contains unknown placeholder '{{{name}}}'. " +
-                    $"Allowed placeholders: {{camera}}, {{label}}, {{event_id}}, {{zone}}.",
+                    $"Allowed placeholders: {{camera}}, {{camera_shortname}}, {{label}}, {{event_id}}, {{zone}}.",
                     nameof(template));
         }
         return new BlueIrisUrlTemplate(template);
@@ -43,11 +44,15 @@ internal sealed partial class BlueIrisUrlTemplate
     {
         return TokenRegex().Replace(_template, m => m.Groups["name"].Value switch
         {
-            "camera"   => Uri.EscapeDataString(ctx.Camera),
-            "label"    => Uri.EscapeDataString(ctx.Label),
-            "event_id" => Uri.EscapeDataString(ctx.EventId),
-            "zone"     => Uri.EscapeDataString(ctx.Zones.Count > 0 ? ctx.Zones[0] : ""),
-            _          => m.Value, // unreachable — Parse() guards
+            "camera"           => Uri.EscapeDataString(ctx.Camera),
+            "camera_shortname" => Uri.EscapeDataString(
+                                      string.IsNullOrWhiteSpace(ctx.CameraShortName)
+                                          ? ctx.Camera
+                                          : ctx.CameraShortName),
+            "label"            => Uri.EscapeDataString(ctx.Label),
+            "event_id"         => Uri.EscapeDataString(ctx.EventId),
+            "zone"             => Uri.EscapeDataString(ctx.Zones.Count > 0 ? ctx.Zones[0] : ""),
+            _                  => m.Value, // unreachable — Parse() guards
         });
     }
 }

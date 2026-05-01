@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-05-01
+
+**P0 hotfix on v1.0.2.** The v1.0.2 release shipped the new `{camera_shortname}` token in `EventTokenTemplate.AllowedTokens` and updated the README + migration tool to recommend it, but missed updating `BlueIrisUrlTemplate`'s separate `AllowedTokens` list. Result: any operator who upgraded to v1.0.2 and used `{camera_shortname}` in their `BlueIris.TriggerUrlTemplate` (i.e. anyone following the v1.0.2 README) crashed at startup with:
+
+```
+System.ArgumentException: BlueIris.TriggerUrlTemplate contains unknown placeholder '{camera_shortname}'.
+Allowed placeholders: {camera}, {label}, {event_id}, {zone}.
+```
+
+`BlueIrisUrlTemplate` is the per-plugin URL template wrapper for `BlueIrisActionPlugin` (trigger URL) and `BlueIrisSnapshotProvider` (snapshot URL); it has its own allowlist separate from `EventTokenTemplate`'s. The PR #33 sweep updated the latter but not the former, and no test exercised the BlueIris parse path against the new token.
+
+### Fixed
+
+- Added `"camera_shortname"` to `BlueIrisUrlTemplate.AllowedTokens` and the `Resolve` switch (with the same `IsNullOrWhiteSpace`-fall-through-to-`Camera` logic as `EventTokenTemplate`). Updated the unknown-token error message to list `{camera_shortname}` so operators triaging template errors see the new token in the suggestion list. Both `BlueIris.TriggerUrlTemplate` and `BlueIris.SnapshotUrlTemplate` use this template type, so one fix covers both.
+- 4 new regression tests in `tests/FrigateRelay.Plugins.BlueIris.Tests/BlueIrisUrlTemplateTests.cs` covering parse acceptance, override resolution, fall-through when blank, and the error-message contract.
+
+### Operator guidance
+
+If you pulled `ghcr.io/blehnen/frigaterelay:1.0.2` and hit the crash:
+- **Quickest unblock without re-pulling:** revert your `BlueIris.TriggerUrlTemplate` from `{camera_shortname}` back to `{camera}`. Host boots, BI triggers go back to silent no-op (same broken state as v1.0.0/v1.0.1) — not worse.
+- **Real fix:** pull `ghcr.io/blehnen/frigaterelay:1.0.3` and restart with `{camera_shortname}` + `CameraShortName` set per subscription.
+
+The `:1` and `:latest` rolling tags now point at v1.0.3.
+
 ## [1.0.2] — 2026-05-01
 
 P0 hotfix for the silent-no-op BlueIris trigger that affected any operator whose Frigate camera ids and Blue Iris shortnames diverge (the common case for operators with a pre-existing BI install). Bundles the Blue Onyx-as-supported-backend docs work too.
@@ -278,7 +302,8 @@ Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProces
 - `appsettings.json`, `appsettings.Local.json` (gitignored), `appsettings.Development.json` — base configuration layering.
 - `UserSecretsId` pinned to a stable GUID for consistent contributor experience.
 
-[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.2...HEAD
+[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.3
 [1.0.2]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.2
 [1.0.1]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.1
 [1.0.0]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.0

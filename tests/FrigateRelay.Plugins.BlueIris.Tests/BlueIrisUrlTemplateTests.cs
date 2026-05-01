@@ -9,7 +9,8 @@ namespace FrigateRelay.Plugins.BlueIris.Tests;
 public class BlueIrisUrlTemplateTests
 {
     private static EventContext NewCtx(string camera = "front", string label = "person",
-        string eventId = "ev-1", IReadOnlyList<string>? zones = null) => new()
+        string eventId = "ev-1", IReadOnlyList<string>? zones = null,
+        string? cameraShortName = null) => new()
     {
         EventId = eventId,
         Camera = camera,
@@ -18,7 +19,64 @@ public class BlueIrisUrlTemplateTests
         StartedAt = DateTimeOffset.UnixEpoch,
         RawPayload = "{}",
         SnapshotFetcher = static _ => ValueTask.FromResult<byte[]?>(null),
+        CameraShortName = cameraShortName,
     };
+
+    // ---------- {camera_shortname} regression for v1.0.2 → v1.0.3 (#32 follow-up) ----------
+    //
+    // PR #33 added {camera_shortname} to EventTokenTemplate but missed BlueIrisUrlTemplate's
+    // own AllowedTokens list. Result: v1.0.2 host crashed at startup with
+    // "BlueIris.TriggerUrlTemplate contains unknown placeholder '{camera_shortname}'".
+    // The README + migration tool both pointed operators at the new token, so any operator
+    // who upgraded was crash-looped on first launch. These tests pin both the parse and
+    // resolve paths so the next release that touches BlueIrisUrlTemplate cannot regress.
+
+    [TestMethod]
+    public void Parse_CameraShortnameToken_AcceptedWithoutThrowing()
+    {
+        var act = () => BlueIrisUrlTemplate.Parse(
+            "http://bi/admin?trigger&camera={camera_shortname}");
+        act.Should().NotThrow();
+    }
+
+    [TestMethod]
+    public void Resolve_CameraShortnameSet_UsesOverrideInUrl()
+    {
+        var tmpl = BlueIrisUrlTemplate.Parse(
+            "http://bi/admin?trigger&camera={camera_shortname}");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: "DriveWayHD");
+
+        var url = tmpl.Resolve(ctx);
+
+        url.Should().Be("http://bi/admin?trigger&camera=DriveWayHD",
+            "Blue Iris's HTTP API silently no-ops on unknown camera names — the URL " +
+            "must carry the BI shortname, not Frigate's id");
+    }
+
+    [TestMethod]
+    public void Resolve_CameraShortnameUnsetOrBlank_FallsThroughToCamera()
+    {
+        var tmpl = BlueIrisUrlTemplate.Parse(
+            "http://bi/admin?trigger&camera={camera_shortname}");
+        // Operators whose Frigate id and BI shortname already match leave CameraShortName
+        // unset; substituting an empty string here would produce "camera=" and BI would
+        // silently no-op exactly like the unconfigured-Frigate-id case.
+        var ctx = NewCtx(camera: "driveway", cameraShortName: null);
+
+        var url = tmpl.Resolve(ctx);
+
+        url.Should().Be("http://bi/admin?trigger&camera=driveway");
+    }
+
+    [TestMethod]
+    public void Parse_UnknownToken_ErrorMessageListsCameraShortname()
+    {
+        var act = () => BlueIrisUrlTemplate.Parse("http://bi/admin?trigger&camera={nope}");
+        act.Should().Throw<ArgumentException>()
+            .Which.Message.Should().Contain("{camera_shortname}",
+                "operators triaging an unknown-placeholder error need to see the new token " +
+                "in the suggestions list, otherwise they retry with {camera} and stay broken");
+    }
 
     [TestMethod]
     public void Parse_WithKnownPlaceholders_ReturnsInstance()
