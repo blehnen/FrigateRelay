@@ -31,6 +31,22 @@ dotnet run --project tests/FrigateRelay.Host.Tests -c Release -- --filter "Plugi
 
 **Integration tests** require Docker (Testcontainers spins up Mosquitto and WireMock stubs automatically).
 
+**Real-broker integration tests (opt-in)** live in `tests/FrigateRelay.IntegrationTests.RealBroker/` and run against an operator-supplied MQTT broker — useful as a final confidence check before tagging a release. They are **not** auto-discovered by `run-tests.sh`, and individual tests self-skip when the opt-in env var is not set, so neither CI nor a casual `dotnet run` will accidentally try to reach a broker that isn't there.
+
+To run them against your own broker (host must be reachable from the machine running the test):
+
+```bash
+export FRIGATERELAY_TEST_REAL_BROKER=1
+export FRIGATERELAY_TEST_MQTT_HOST=mosquitto.lan
+export FRIGATERELAY_TEST_MQTT_PORT=1883          # optional; default 1883
+export FRIGATERELAY_TEST_MQTT_USERNAME=relay     # optional
+export FRIGATERELAY_TEST_MQTT_PASSWORD=secret    # optional
+
+dotnet run --project tests/FrigateRelay.IntegrationTests.RealBroker -c Release
+```
+
+The tests publish on a unique-per-run topic under `frigaterelay-test/<guid>/events` (never on `frigate/events`), so a misconfigured run cannot trigger production action plugins listening on the real Frigate topic. Each test also uses a unique-per-run MQTT ClientId so two concurrent runs don't kick each other off the broker.
+
 ## Coding standards
 
 The full set of architecture invariants is in `CLAUDE.md` — treat it as authoritative. Contributor-relevant highlights:
