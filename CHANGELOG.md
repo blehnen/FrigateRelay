@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Validator engine status** section in `README.md` and `CodeProjectAiOptions` XML doc remarks rewritten to hard-confirm Blue Onyx as a supported backend (no separate plugin needed — point `Validators:<name>:BaseUrl` at the Blue Onyx host and the existing CPAI plugin handles it). Verified end-to-end by an operator on 2026-05-01. Also documented the concrete performance caveat: Blue Onyx GPU acceleration is available only via its Windows EXE/service distribution; the Docker image is CPU-only and slower than CPAI's CUDA-enabled Docker image on the same hardware. Closes #12 (the original "add Blue Onyx validator" ask reduces to docs work since the existing plugin already handles it).
+
 ## [1.0.1] — 2026-05-01
 
 Maintenance release — operator-reported MQTT bugs from the v1.0.0 parity-window debugging session, plus docs accuracy fixes. No breaking config changes; one operator-action item (rename `PUSHOVER__APITOKEN` → `PUSHOVER__APPTOKEN` in `.env` and update Seq/Loki queries keyed on `EventId` → `FrigateEventId`).

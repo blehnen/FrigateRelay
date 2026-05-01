@@ -15,13 +15,29 @@ namespace FrigateRelay.Plugins.CodeProjectAi;
 /// <see cref="MinConfidence"/> + <see cref="AllowedLabels"/> (CONTEXT-7 D2 / D3).
 /// </para>
 /// <para>
-/// <strong>Upstream status note.</strong> Active CodeProject.AI development has stopped
-/// upstream. This plugin remains supported because (a) older CPAI installs still work, and
-/// (b) the plugin's <c>/v1/vision/detection</c> request shape is API-compatible with
-/// <see href="https://github.com/MikeLud/CodeProject.AI-Custom-IPcam-Models/discussions">Blue Onyx</see>,
-/// so existing users on either backend should keep using it. Operators standing up a
-/// <em>new</em> validator setup are encouraged to evaluate alternatives — see the
-/// "Validator engine status" section in the project README.
+/// <strong>Backend support.</strong> This plugin works against two server-side backends
+/// that share the <c>POST /v1/vision/detection</c> request shape:
+/// </para>
+/// <list type="bullet">
+/// <item>
+/// <description>
+/// <strong>CodeProject.AI</strong> — the historical default. Active upstream development
+/// has stopped, but current and older installs continue to work unchanged.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// <strong><see href="https://github.com/xnorpx/blue-onyx">Blue Onyx</see></strong> —
+/// verified working through this plugin with no code change; only <see cref="BaseUrl"/>
+/// needs to point at the Blue Onyx host. Note that NVIDIA GPU acceleration is available
+/// only via Blue Onyx's Windows EXE/service distribution; the Docker image is CPU-only.
+/// </description>
+/// </item>
+/// </list>
+/// <para>
+/// See the "Validator engine status" section in the project README for the full
+/// alternative-backends roadmap (Roboflow Inference, DOODS2 — each needs its own plugin
+/// since the API shapes differ from CPAI/Blue Onyx).
 /// </para>
 /// </remarks>
 public sealed class CodeProjectAiOptions

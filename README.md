@@ -97,13 +97,30 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 
 ## Validator engine status
 
-FrigateRelay ships with one validator plugin today — **CodeProject.AI** — but **active CodeProject.AI development has stopped upstream** (see the project README on GitHub). Existing installs against current and older CPAI versions still work, and the plugin is **API-compatible with [Blue Onyx](https://github.com/MikeLud/CodeProject.AI-Custom-IPcam-Models/discussions)**, so most operators won't notice in the short term. Don't pick CPAI for a *new* setup without checking these alternatives first:
+FrigateRelay ships with one validator plugin today — **CodeProject.AI** — but **active CodeProject.AI development has stopped upstream**. The plugin's request shape (`POST /v1/vision/detection`) is also the API exposed by **[Blue Onyx](https://github.com/xnorpx/blue-onyx)**, so the existing plugin is the supported path to either backend.
 
-- **Blue Onyx** (#12) — drop-in API-compatible replacement for CPAI. Likely usable through the existing `FrigateRelay.Plugins.CodeProjectAi` plugin unchanged today; a dedicated `FrigateRelay.Plugins.BlueOnyx` plugin is on the v1.1 roadmap.
-- **Roboflow Inference / RF-DETR** (#13) — a different detection model architecture; needs its own plugin (planned for v1.1).
-- **DOODS2** (#14) — TFLite / TensorFlow / YOLOv5 detector hub; needs its own plugin (planned for v1.1).
+### Supported backends (verified)
 
-The CPAI plugin is **not marked obsolete** — older CPAI installs and Blue Onyx-via-CPAI-API users still need it. The deprecation is about the upstream service, not the plugin contract.
+- **CodeProject.AI** — the historical default. Existing installs (current and older versions) keep working with no FrigateRelay change.
+- **Blue Onyx** — verified working through the existing `FrigateRelay.Plugins.CodeProjectAi` plugin with **no code change**, only a config swap. Point your validator's `BaseUrl` at the Blue Onyx host and port:
+  ```jsonc
+  "Validators": {
+    "Person": {
+      "Type": "CodeProjectAi",          // plugin type — same plugin, different backend
+      "BaseUrl": "http://blueonyx-host:32168",
+      "MinConfidence": 0.5,
+      "OnError": "FailClosed"
+    }
+  }
+  ```
+  **Performance caveat:** Blue Onyx supports NVIDIA GPU acceleration **only via its Windows EXE/service distribution**. The Docker image is CPU-only — slower than CPAI's CUDA-enabled Docker image on the same hardware. Acceptable for event-driven validation in the FrigateRelay pipeline (sub-real-time, one inference per matched event); operators with high event rates and no Windows GPU host should benchmark before swapping.
+
+### Future backends (v1.1 roadmap)
+
+- **Roboflow Inference / RF-DETR** (#13) — different detection model architecture; needs its own plugin.
+- **DOODS2** (#14) — TFLite / TensorFlow / YOLOv5 detector hub; needs its own plugin.
+
+The CPAI plugin is **not marked obsolete** — both CPAI users and Blue Onyx users depend on it. The deprecation is about the upstream CodeProject.AI *service*, not the plugin contract or the API shape.
 
 ## Migrating from FrigateMQTTProcessingService
 
