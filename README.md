@@ -26,12 +26,12 @@ cp docker/.env.example .env
 Edit `.env` and fill in your secrets:
 
 ```
-BLUEIRIS__BASEURL=http://your-blueiris-host:81
-BLUEIRIS__USERNAME=your-username
-BLUEIRIS__PASSWORD=your-password
-PUSHOVER__APITOKEN=your-api-token
+BLUEIRIS__TRIGGERURLTEMPLATE=http://your-blueiris-host:81/admin?camera={camera}&trigger=1
+PUSHOVER__APPTOKEN=your-app-token
 PUSHOVER__USERKEY=your-user-key
 ```
+
+Blue Iris auth is expressed inside the trigger URL template — either by IP-whitelisting the FrigateRelay container on the Blue Iris side (preferred; the template needs no credentials), or by appending `&user=<USER>&pw=<PW>` to the template. There is no separate `BLUEIRIS__USERNAME` / `BLUEIRIS__PASSWORD` config. See `docker/.env.example` for the fully annotated example, including optional Frigate-snapshot and CodeProject.AI validator vars.
 
 See `SECURITY.md`. Do not commit `.env` to source control.
 
@@ -95,6 +95,16 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 - **SnapshotProvider override:** `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
 - **Validators** attach to specific action entries and gate that action independently.
 
+## Validator engine status
+
+FrigateRelay ships with one validator plugin today — **CodeProject.AI** — but **active CodeProject.AI development has stopped upstream** (see the project README on GitHub). Existing installs against current and older CPAI versions still work, and the plugin is **API-compatible with [Blue Onyx](https://github.com/MikeLud/CodeProject.AI-Custom-IPcam-Models/discussions)**, so most operators won't notice in the short term. Don't pick CPAI for a *new* setup without checking these alternatives first:
+
+- **Blue Onyx** (#12) — drop-in API-compatible replacement for CPAI. Likely usable through the existing `FrigateRelay.Plugins.CodeProjectAi` plugin unchanged today; a dedicated `FrigateRelay.Plugins.BlueOnyx` plugin is on the v1.1 roadmap.
+- **Roboflow Inference / RF-DETR** (#13) — a different detection model architecture; needs its own plugin (planned for v1.1).
+- **DOODS2** (#14) — TFLite / TensorFlow / YOLOv5 detector hub; needs its own plugin (planned for v1.1).
+
+The CPAI plugin is **not marked obsolete** — older CPAI installs and Blue Onyx-via-CPAI-API users still need it. The deprecation is about the upstream service, not the plugin contract.
+
 ## Migrating from FrigateMQTTProcessingService
 
 If you are migrating from the author's earlier `FrigateMQTTProcessingService`
@@ -125,7 +135,7 @@ See `docs/plugin-author-guide.md` for the full walkthrough: contract interfaces,
 
 ## Project status
 
-Pre-1.0; Phase 11 is the OSS-polish gate before v1.0.0 cutover. See `.shipyard/ROADMAP.md` for the build plan and `CHANGELOG.md` for history.
+`v1.0.0` shipped 2026-05-03 — see [`CHANGELOG.md`](CHANGELOG.md) and the [release page](https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.0). Multi-arch images are published to `ghcr.io/blehnen/frigaterelay:1.0.0`, `:1`, and `:latest`. v1.0.1 is in progress (operator-reported bugs + docs cleanup); the v1.1 plan adds the alternative validator plugins listed under "Validator engine status" above.
 
 ## License
 
