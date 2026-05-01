@@ -152,6 +152,25 @@ public class EventTokenTemplateTests
     }
 
     [TestMethod]
+    public void AllowedTokens_IncludesCameraShortname()
+    {
+        // Pins the public surface so a future refactor that drops {camera_shortname}
+        // from AllowedTokens fails immediately, not silently.
+        EventTokenTemplate.AllowedTokens.Should().Contain("camera_shortname");
+    }
+
+    [TestMethod]
+    public void Parse_UnknownToken_ErrorMessageListsCameraShortname()
+    {
+        // Covers the modified allowed-placeholders text in the Parse error path.
+        // Operators triaging a "{nope} unknown" config error see {camera_shortname} in
+        // the suggestions list, which is itself the affordance that surfaces the new field.
+        var act = () => EventTokenTemplate.Parse("https://x/{nope}", "Caller=Test");
+        act.Should().Throw<ArgumentException>()
+            .Which.Message.Should().Contain("{camera_shortname}");
+    }
+
+    [TestMethod]
     public void Resolve_CameraShortnameUrlEncoded()
     {
         var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");
