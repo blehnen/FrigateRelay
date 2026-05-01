@@ -9,9 +9,20 @@ namespace FrigateRelay.Plugins.CodeProjectAi;
 /// <c>AddOptions&lt;T&gt;(name).Bind(...)</c> named-options pattern.
 /// </summary>
 /// <remarks>
+/// <para>
 /// One <see cref="CodeProjectAiOptions"/> instance per named validator entry — operators
 /// express per-label tuning by creating multiple validator instances with different
 /// <see cref="MinConfidence"/> + <see cref="AllowedLabels"/> (CONTEXT-7 D2 / D3).
+/// </para>
+/// <para>
+/// <strong>Upstream status note.</strong> Active CodeProject.AI development has stopped
+/// upstream. This plugin remains supported because (a) older CPAI installs still work, and
+/// (b) the plugin's <c>/v1/vision/detection</c> request shape is API-compatible with
+/// <see href="https://github.com/MikeLud/CodeProject.AI-Custom-IPcam-Models/discussions">Blue Onyx</see>,
+/// so existing users on either backend should keep using it. Operators standing up a
+/// <em>new</em> validator setup are encouraged to evaluate alternatives — see the
+/// "Validator engine status" section in the project README.
+/// </para>
 /// </remarks>
 public sealed class CodeProjectAiOptions
 {
