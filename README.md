@@ -1,7 +1,13 @@
-# FrigateRelay
+<p align="center">
+  <img src="assets/logo.png" alt="FrigateRelay logo" width="128" height="128">
+</p>
 
-[![CI](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml/badge.svg)](https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg)](https://codecov.io/gh/blehnen/FrigateRelay)
+<h1 align="center">FrigateRelay</h1>
+
+<p align="center">
+  <a href="https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml"><img src="https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/blehnen/FrigateRelay"><img src="https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg" alt="codecov"></a>
+</p>
 
 FrigateRelay is a .NET 10 background service that listens to [Frigate NVR](https://frigate.video/) MQTT events and dispatches them to action plugins. Each action can sit behind its own pre-action validators, like a CodeProject.AI confidence check. If a validator fails, that action is skipped, but other actions on the same event still fire.
 
