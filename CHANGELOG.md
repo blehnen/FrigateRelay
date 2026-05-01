@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-05-01
+
+P0 hotfix for the silent-no-op BlueIris trigger that affected any operator whose Frigate camera ids and Blue Iris shortnames diverge (the common case for operators with a pre-existing BI install). Bundles the Blue Onyx-as-supported-backend docs work too.
+
 ### Fixed
 
 - **P0 for operators with diverging Frigate ↔ Blue Iris camera names.** Restored legacy `FrigateMQTTProcessingService.CameraShortName` semantics that the v1.0.0 → v1.0.1 migration tool dropped. Blue Iris's HTTP trigger API returns 200 OK on unknown camera names but **silently does nothing** — so URL templates that send Frigate's lowercase id (e.g. `driveway`) to a Blue Iris install expecting its own shortname (e.g. `DriveWayHD`) appeared to succeed but never actually triggered the recording. The bug went unnoticed during the v1.0.0 parity window because the legacy service was running concurrently and firing the trigger with the correct name; once an operator stopped legacy, BI triggers stopped. (#32, verified end-to-end on 2026-05-01.) The fix:
@@ -274,6 +278,7 @@ Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProces
 - `appsettings.json`, `appsettings.Local.json` (gitignored), `appsettings.Development.json` — base configuration layering.
 - `UserSecretsId` pinned to a stable GUID for consistent contributor experience.
 
-[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.1...HEAD
+[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.2
 [1.0.1]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.1
 [1.0.0]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.0
