@@ -31,7 +31,7 @@ PUSHOVER__APPTOKEN=your-app-token
 PUSHOVER__USERKEY=your-user-key
 ```
 
-Blue Iris auth is expressed inside the trigger URL template — either by IP-whitelisting the FrigateRelay container on the Blue Iris side (preferred; the template needs no credentials), or by appending `&user=<USER>&pw=<PW>` to the template. There is no separate `BLUEIRIS__USERNAME` / `BLUEIRIS__PASSWORD` config. See `docker/.env.example` for the fully annotated example, including optional Frigate-snapshot and CodeProject.AI validator vars.
+Blue Iris auth is expressed inside the trigger URL template — either by IP-whitelisting the FrigateRelay container on the Blue Iris side (preferred; the template needs no credentials), or by appending `&user=<USER>&pw=<PW>` to the template. See `docker/.env.example` for the fully annotated example, including optional Frigate-snapshot and CodeProject.AI validator vars.
 
 See `SECURITY.md`. Do not commit `.env` to source control.
 
