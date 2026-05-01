@@ -26,10 +26,21 @@ public sealed record FrigateMqttOptions
 
     /// <summary>
     /// MQTT client identifier sent to the broker on connect.
-    /// Must be unique per connected client; duplicate client IDs cause broker disconnects.
-    /// Default: <c>"frigate-relay"</c>.
+    /// Must be unique per connected client; duplicate client IDs cause broker takeover loops
+    /// (the broker disconnects whichever instance was already connected, the reconnect loop
+    /// re-establishes, and the cycle thrashes — see issue #18 for the symptom pattern).
     /// </summary>
-    public string ClientId { get; init; } = "frigate-relay";
+    /// <remarks>
+    /// Default is <c>"frigate-relay-{MachineName}-{ProcessId}"</c> so two instances launched
+    /// with default config (e.g. production container plus a developer's local debug run, or
+    /// two HA replicas) get distinct ClientIds out of the box. Operators on strict MQTT 3.1.1
+    /// brokers that enforce the 23-character ClientId limit should override this with a
+    /// shorter explicit value.
+    /// </remarks>
+    public string ClientId { get; init; } = DefaultClientId;
+
+    private static readonly string DefaultClientId =
+        $"frigate-relay-{Environment.MachineName}-{Environment.ProcessId}";
 
     /// <summary>
     /// MQTT topic to subscribe to for Frigate event messages.

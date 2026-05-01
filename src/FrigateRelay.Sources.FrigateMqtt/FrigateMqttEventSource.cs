@@ -45,6 +45,18 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     private static readonly Action<ILogger, string, Exception?> LogMqttReceiveFailed =
         LoggerMessage.Define<string>(LogLevel.Warning, new EventId(4, "MqttReceiveFailed"), "Failed to process MQTT message: {Reason}");
 
+    private static readonly Action<ILogger, string, int, string, Exception?> LogMqttSubscribeDenied =
+        LoggerMessage.Define<string, int, string>(
+            LogLevel.Warning,
+            new EventId(5, "MqttSubscribeDenied"),
+            "MQTT subscribe denied: topic={Topic} reason_code={ReasonCode} ({ReasonName})");
+
+    private static readonly Action<ILogger, Exception?> LogMqttConnectInflight =
+        LoggerMessage.Define(
+            LogLevel.Debug,
+            new EventId(6, "MqttConnectInflight"),
+            "MQTT connect already in flight; deferring this attempt to the in-flight call");
+
     private readonly IMqttClient _client;
     private readonly MqttClientFactory _factory;
     private readonly FrigateMqttOptions _options;
@@ -110,17 +122,44 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
         {
             try
             {
-                if (!await _client.TryPingAsync(ct).ConfigureAwait(false))
+                // #19: short-circuit when already connected. Without this guard, a healthy
+                // connection still fired a TryPingAsync every 5s — and during slow CONNACK,
+                // a second ConnectAsync could race against the in-flight one and throw
+                // InvalidOperationException("Not allowed to connect while connect/disconnect
+                // is pending."). IsConnected first means we don't even ping when healthy.
+                if (!_client.IsConnected && !await _client.TryPingAsync(ct).ConfigureAwait(false))
                 {
                     await _client.ConnectAsync(clientOptions, ct).ConfigureAwait(false);
-                    await _client.SubscribeAsync(subOptions, ct).ConfigureAwait(false);
-                    _connectionStatus.SetConnected(true);
-                    LogMqttConnected(_logger, null);
+                    var subscribeResult = await _client.SubscribeAsync(subOptions, ct).ConfigureAwait(false);
+
+                    // #16: MQTTnet's SubscribeAsync does NOT throw when the broker returns
+                    // SUBACK with a failure reason code (e.g. ACL-denied SUBSCRIBE). Inspect
+                    // the per-topic result codes; if no topic was granted, treat the
+                    // connection as unhealthy so /healthz returns 503 and the reconnect
+                    // loop retries. Per-denial diagnostics are logged inside the helper.
+                    if (ProcessSubscribeResult(subscribeResult))
+                    {
+                        _connectionStatus.SetConnected(true);
+                        LogMqttConnected(_logger, null);
+                    }
+                    else
+                    {
+                        _connectionStatus.SetConnected(false);
+                    }
                 }
             }
             catch (OperationCanceledException)
             {
                 break;
+            }
+            catch (InvalidOperationException ex) when (
+                ex.Message.Contains("connect/disconnect is pending", StringComparison.Ordinal))
+            {
+                // #19: previous ConnectAsync still mid-handshake — let it finish.
+                // Logged at Debug, not Warning, since this is a self-induced race that
+                // recovers on the next iteration; the connection state is left untouched
+                // because we genuinely don't know its outcome yet.
+                LogMqttConnectInflight(_logger, null);
             }
             catch (Exception ex)
             {
@@ -137,6 +176,40 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// Inspects the SUBACK reason codes returned by the broker. Logs a Warning per topic
+    /// that was denied. Returns <see langword="true"/> when at least one topic was granted
+    /// (any QoS), <see langword="false"/> when every topic in the request was denied.
+    /// </summary>
+    /// <remarks>
+    /// Closes #16: MQTTnet's <c>SubscribeAsync</c> resolves successfully even when the
+    /// broker rejects the SUBSCRIBE — the operator only finds out by digging through
+    /// broker logs. This helper makes the rejection observable on the FrigateRelay side.
+    /// </remarks>
+    internal bool ProcessSubscribeResult(MqttClientSubscribeResult result)
+    {
+        var anyGranted = false;
+        foreach (var item in result.Items)
+        {
+            if (item.ResultCode is MqttClientSubscribeResultCode.GrantedQoS0
+                                 or MqttClientSubscribeResultCode.GrantedQoS1
+                                 or MqttClientSubscribeResultCode.GrantedQoS2)
+            {
+                anyGranted = true;
+            }
+            else
+            {
+                LogMqttSubscribeDenied(
+                    _logger,
+                    item.TopicFilter.Topic,
+                    (int)item.ResultCode,
+                    item.ResultCode.ToString(),
+                    null);
+            }
+        }
+        return anyGranted;
     }
 
     private MqttClientOptions BuildClientOptions()
