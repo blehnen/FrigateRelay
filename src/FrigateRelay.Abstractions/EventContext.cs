@@ -31,4 +31,20 @@ public sealed record EventContext
     /// Callers should not invoke this from a hot path; snapshot fetching typically involves an outbound HTTP call.
     /// </summary>
     public required Func<CancellationToken, ValueTask<byte[]?>> SnapshotFetcher { get; init; }
+
+    /// <summary>
+    /// Optional alternative camera identifier used when the downstream system (e.g. Blue Iris)
+    /// names the camera differently from the originating source. The host's <c>EventPump</c>
+    /// populates this per-dispatch from <c>SubscriptionOptions.CameraShortName</c> via a
+    /// <c>with</c>-clone before invoking action plugins; sources MUST NOT set this field
+    /// (the source-agnostic invariant on <see cref="EventContext"/> is preserved).
+    /// </summary>
+    /// <remarks>
+    /// Resolved by the <c>{camera_shortname}</c> token in <c>EventTokenTemplate</c> with a
+    /// fall-through to <see cref="Camera"/> when null. See issue #32 for the legacy-parity
+    /// motivation: Blue Iris returns 200 OK on unknown camera names but silently does nothing,
+    /// so URL templates that send Frigate's lowercase id to a BI server expecting its own
+    /// shortname (e.g. <c>DriveWayHD</c>) appear to succeed but never trigger the recording.
+    /// </remarks>
+    public string? CameraShortName { get; init; }
 }

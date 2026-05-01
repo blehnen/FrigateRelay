@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **P0 for operators with diverging Frigate ↔ Blue Iris camera names.** Restored legacy `FrigateMQTTProcessingService.CameraShortName` semantics that the v1.0.0 → v1.0.1 migration tool dropped. Blue Iris's HTTP trigger API returns 200 OK on unknown camera names but **silently does nothing** — so URL templates that send Frigate's lowercase id (e.g. `driveway`) to a Blue Iris install expecting its own shortname (e.g. `DriveWayHD`) appeared to succeed but never actually triggered the recording. The bug went unnoticed during the v1.0.0 parity window because the legacy service was running concurrently and firing the trigger with the correct name; once an operator stopped legacy, BI triggers stopped. (#32, verified end-to-end on 2026-05-01.) The fix:
+  - New optional `CameraShortName` field on each subscription in `appsettings.json`. Defaults to null; when set, surfaces through the new `{camera_shortname}` URL-template token. The dedupe-cache and subscription matcher continue to key on `Camera` (Frigate's id) — only template substitution sees the override.
+  - New `{camera_shortname}` token added to `EventTokenTemplate.AllowedTokens` (alongside the existing `{camera}`, `{label}`, `{event_id}`, `{zone}`). Resolution order: `CameraShortName ?? Camera`, so operators whose names already match keep working without setting the override.
+  - `EventContext` gained an optional `CameraShortName` property that the host's `EventPump` populates per-dispatch via a `with`-clone (the source-agnostic invariant on `EventContext` is preserved — `IEventSource` implementations never set this field).
+  - `tools/FrigateRelay.MigrateConf` now preserves the legacy `CameraShortName` value into the new field on each subscription (skipping emit when it equals `CameraName` — the override is redundant in that case). The migrated `BlueIris.TriggerUrlTemplate` now uses `{camera_shortname}` so existing legacy operators get the corrected behaviour automatically.
+  - `README.md` "Key concepts" gains a bullet documenting `CameraShortName` and the silent-no-op trap it solves; the canonical `appsettings.Example.json` is intentionally left minimal (no `CameraShortName`) to preserve the Phase 8 success-criterion ≤60% size-parity gate.
+
+  **Operator-action item for anyone running v1.0.0 / v1.0.1 with diverging Frigate/BI camera names** (this is most operators with a pre-existing BI install): after upgrading to the version with this fix, set `CameraShortName` on each subscription and change your `BlueIris:TriggerUrlTemplate` from `&camera={camera}` to `&camera={camera_shortname}`. If your Frigate camera ids and BI shortnames already match — congratulations, no config change needed.
+
 ### Documentation
 
 - **Validator engine status** section in `README.md` and `CodeProjectAiOptions` XML doc remarks rewritten to hard-confirm Blue Onyx as a supported backend (no separate plugin needed — point `Validators:<name>:BaseUrl` at the Blue Onyx host and the existing CPAI plugin handles it). Verified end-to-end by an operator on 2026-05-01. Also documented the concrete performance caveat: Blue Onyx GPU acceleration is available only via its Windows EXE/service distribution; the Docker image is CPU-only and slower than CPAI's CUDA-enabled Docker image on the same hardware. Closes #12 (the original "add Blue Onyx validator" ask reduces to docs work since the existing plugin already handles it).

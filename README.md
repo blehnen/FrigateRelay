@@ -26,7 +26,7 @@ cp docker/.env.example .env
 Edit `.env` and fill in your secrets:
 
 ```
-BLUEIRIS__TRIGGERURLTEMPLATE=http://your-blueiris-host:81/admin?camera={camera}&trigger=1
+BLUEIRIS__TRIGGERURLTEMPLATE=http://your-blueiris-host:81/admin?camera={camera_shortname}&trigger=1
 PUSHOVER__APPTOKEN=your-app-token
 PUSHOVER__USERKEY=your-user-key
 ```
@@ -92,6 +92,7 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 
 - **Profiles** are reusable action lists, referenced by name from subscriptions. Define once, use across many subscriptions.
 - **Subscriptions** match events by camera name, object label, and optional zone. Each subscription uses a profile or declares its own inline action list.
+- **`CameraShortName` (optional, per subscription):** an alternate camera identifier surfaced through the `{camera_shortname}` URL-template token. Use when the downstream system (typically Blue Iris) names the camera differently from the originating source — e.g. Frigate id `"driveway"` vs Blue Iris shortname `"DriveWayHD"`. Without it, BI's HTTP trigger API returns 200 OK on the wrong name but silently does nothing.
 - **SnapshotProvider override:** `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
 - **Validators** attach to specific action entries and gate that action independently.
 

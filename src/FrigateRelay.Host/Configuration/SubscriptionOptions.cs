@@ -23,6 +23,20 @@ internal sealed record SubscriptionOptions
     /// <summary>Gets the camera name to match (case-insensitive).</summary>
     public required string Camera { get; init; }
 
+    /// <summary>
+    /// Optional alternative camera identifier surfaced through the <c>{camera_shortname}</c>
+    /// token in plugin URL/message templates. When <see langword="null"/>, <c>{camera_shortname}</c>
+    /// falls through to <see cref="Camera"/>.
+    /// </summary>
+    /// <remarks>
+    /// Restores legacy <c>FrigateMQTTProcessingService.CameraShortName</c> semantics (issue #32).
+    /// Use when the downstream system (e.g. Blue Iris) names this camera differently from the
+    /// originating source — e.g. Frigate id <c>"driveway"</c> vs Blue Iris shortname
+    /// <c>"DriveWayHD"</c>. The dedupe-cache and matcher continue to key on <see cref="Camera"/>;
+    /// only template substitution sees this value.
+    /// </remarks>
+    public string? CameraShortName { get; init; }
+
     /// <summary>Gets the detection label to match (e.g. <c>"person"</c>, <c>"car"</c>) (case-insensitive).</summary>
     public required string Label { get; init; }
 
