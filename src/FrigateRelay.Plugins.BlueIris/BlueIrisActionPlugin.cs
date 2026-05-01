@@ -10,19 +10,19 @@ internal sealed class BlueIrisActionPlugin : IActionPlugin
         LoggerMessage.Define<string, string>(
             LogLevel.Information,
             new EventId(201, "BlueIrisTriggerSuccess"),
-            "BlueIris trigger fired event_id={EventId} url={Url}");
+            "BlueIris trigger fired event_id={FrigateEventId} url={Url}");
 
     private static readonly Action<ILogger, string, string, Exception?> LogTriggerFailed =
         LoggerMessage.Define<string, string>(
             LogLevel.Error,
             new EventId(202, "BlueIrisTriggerFailed"),
-            "BlueIris trigger failed event_id={EventId} url={Url}");
+            "BlueIris trigger failed event_id={FrigateEventId} url={Url}");
 
     private static readonly Action<ILogger, string, string, string, Exception?> LogDryRun =
         LoggerMessage.Define<string, string, string>(
             LogLevel.Information,
             new EventId(203, "BlueIrisDryRun"),
-            "BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={EventId}");
+            "BlueIris DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}");
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly BlueIrisUrlTemplate _template;

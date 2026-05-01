@@ -112,7 +112,7 @@ internal sealed class PushoverActionPlugin : IActionPlugin
             LoggerMessage.Define<string, string, string>(
                 LogLevel.Information,
                 new EventId(4, "PushoverDryRun"),
-                "Pushover DryRun would-execute for camera={Camera} label={Label} event_id={EventId}");
+                "Pushover DryRun would-execute for camera={Camera} label={Label} event_id={FrigateEventId}");
 
         public static void WouldExecute(ILogger logger, string camera, string label, string eventId)
             => _wouldExecute(logger, camera, label, eventId, null);
@@ -121,19 +121,19 @@ internal sealed class PushoverActionPlugin : IActionPlugin
             LoggerMessage.Define<string>(
                 LogLevel.Information,
                 new EventId(1, "PushoverSendSucceeded"),
-                "Pushover notification sent for event_id={EventId}");
+                "Pushover notification sent for event_id={FrigateEventId}");
 
         private static readonly Action<ILogger, string, int, string, Exception?> _sendFailed =
             LoggerMessage.Define<string, int, string>(
                 LogLevel.Warning,
                 new EventId(2, "PushoverSendFailed"),
-                "Pushover send failed for event_id={EventId} http_status={Status}: {Errors}");
+                "Pushover send failed for event_id={FrigateEventId} http_status={Status}: {Errors}");
 
         private static readonly Action<ILogger, string, Exception?> _snapshotUnavailable =
             LoggerMessage.Define<string>(
                 LogLevel.Debug,
                 new EventId(3, "pushover_snapshot_unavailable"),
-                "pushover_snapshot_unavailable event_id={EventId}");
+                "pushover_snapshot_unavailable event_id={FrigateEventId}");
 
         public static void SendSucceeded(ILogger logger, string eventId) =>
             _sendSucceeded(logger, eventId, null);

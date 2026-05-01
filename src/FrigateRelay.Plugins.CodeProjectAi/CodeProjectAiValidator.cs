@@ -115,11 +115,11 @@ public sealed partial class CodeProjectAiValidator : IValidationPlugin
     private static partial class Log
     {
         [LoggerMessage(EventId = 7001, Level = LogLevel.Warning,
-            Message = "CodeProject.AI validator '{Validator}' timed out for event {EventId}")]
-        public static partial void ValidatorTimeout(ILogger logger, string validator, string eventId, Exception ex);
+            Message = "CodeProject.AI validator '{Validator}' timed out for event {FrigateEventId}")]
+        public static partial void ValidatorTimeout(ILogger logger, string validator, string frigateEventId, Exception ex);
 
         [LoggerMessage(EventId = 7002, Level = LogLevel.Warning,
-            Message = "CodeProject.AI validator '{Validator}' unavailable for event {EventId}")]
-        public static partial void ValidatorUnavailable(ILogger logger, string validator, string eventId, Exception ex);
+            Message = "CodeProject.AI validator '{Validator}' unavailable for event {FrigateEventId}")]
+        public static partial void ValidatorUnavailable(ILogger logger, string validator, string frigateEventId, Exception ex);
     }
 }
