@@ -49,6 +49,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.MigrateConf", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.MigrateConf.Tests", "tests\FrigateRelay.MigrateConf.Tests\FrigateRelay.MigrateConf.Tests.csproj", "{32DFD307-D93B-4794-9D36-B5EF1208C361}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrigateRelay.IntegrationTests.RealBroker", "tests\FrigateRelay.IntegrationTests.RealBroker\FrigateRelay.IntegrationTests.RealBroker.csproj", "{C15C8832-0CFD-4A10-860C-2D8243BECD67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -287,6 +289,18 @@ Global
 		{32DFD307-D93B-4794-9D36-B5EF1208C361}.Release|x64.Build.0 = Release|Any CPU
 		{32DFD307-D93B-4794-9D36-B5EF1208C361}.Release|x86.ActiveCfg = Release|Any CPU
 		{32DFD307-D93B-4794-9D36-B5EF1208C361}.Release|x86.Build.0 = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|x64.Build.0 = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Debug|x86.Build.0 = Debug|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|x64.ActiveCfg = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|x64.Build.0 = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|x86.ActiveCfg = Release|Any CPU
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -311,5 +325,6 @@ Global
 		{F995253A-EFEA-44C0-88EB-6BF2CF4BEA96} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{9D1D5315-0F8B-4932-9522-0B56F8D8D8EE} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{32DFD307-D93B-4794-9D36-B5EF1208C361} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{C15C8832-0CFD-4A10-860C-2D8243BECD67} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
