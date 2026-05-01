@@ -72,6 +72,120 @@ public sealed class EventPumpTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SubscriptionWithCameraShortName_PropagatesToDispatchedContext()
+    {
+        // Regression for #32: when a subscription declares CameraShortName, the EventContext
+        // delivered to the dispatcher must carry the override. Plugins resolve {camera_shortname}
+        // off this field; if it doesn't propagate, BlueIris URL substitution silently sends
+        // Frigate's id and BI's HTTP API no-ops without surfacing.
+        var logger = new CapturingLogger();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var dedupe = new DedupeCache(cache);
+        var subs = new HostSubscriptionsOptions
+        {
+            Subscriptions = new[]
+            {
+                new SubscriptionOptions
+                {
+                    Name = "front_person",
+                    Camera = "driveway",            // Frigate's lowercase id
+                    CameraShortName = "DriveWayHD", // Blue Iris's shortname
+                    Label = "person",
+                    CooldownSeconds = 30,
+                    Actions = new[] { new ActionEntry("BlueIris") },
+                },
+            },
+        };
+        var monitor = new StaticMonitor<HostSubscriptionsOptions>(subs);
+
+        var context = new EventContext
+        {
+            EventId = "e1",
+            Camera = "driveway",
+            Label = "person",
+            Zones = new[] { "driveway_zone" },
+            StartedAt = DateTimeOffset.UtcNow,
+            RawPayload = "{}",
+            SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
+            // Source never sets CameraShortName — host augments it on dispatch.
+        };
+        var source = new FakeSource("FrigateMqtt", new[] { context });
+
+        var stubPlugin = new StubBlueIrisPlugin();
+        var capturingDispatcher = new CapturingDispatcher();
+        var pump = new EventPump(
+            new IEventSource[] { source }, dedupe, monitor, capturingDispatcher,
+            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await pump.StartAsync(cts.Token);
+        await Task.Delay(100);
+        await cts.CancelAsync();
+        await pump.StopAsync(CancellationToken.None);
+
+        capturingDispatcher.Captured.Should().HaveCount(1);
+        var dispatched = capturingDispatcher.Captured[0];
+        dispatched.Camera.Should().Be("driveway",
+            "the matcher's Camera field is unchanged — only CameraShortName is augmented");
+        dispatched.CameraShortName.Should().Be("DriveWayHD",
+            "the host must with-clone EventContext per dispatch with the subscription's override");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SubscriptionWithoutCameraShortName_DispatchesNullOverride()
+    {
+        // Operators whose Frigate ↔ BI names match shouldn't need to set CameraShortName.
+        // When unset, the dispatched context's CameraShortName is null and {camera_shortname}
+        // falls through to {camera}.
+        var logger = new CapturingLogger();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var dedupe = new DedupeCache(cache);
+        var subs = new HostSubscriptionsOptions
+        {
+            Subscriptions = new[]
+            {
+                new SubscriptionOptions
+                {
+                    Name = "front_person",
+                    Camera = "driveway",
+                    Label = "person",
+                    CooldownSeconds = 30,
+                    Actions = new[] { new ActionEntry("BlueIris") },
+                    // CameraShortName intentionally unset.
+                },
+            },
+        };
+        var monitor = new StaticMonitor<HostSubscriptionsOptions>(subs);
+
+        var context = new EventContext
+        {
+            EventId = "e1",
+            Camera = "driveway",
+            Label = "person",
+            Zones = Array.Empty<string>(),
+            StartedAt = DateTimeOffset.UtcNow,
+            RawPayload = "{}",
+            SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
+        };
+        var source = new FakeSource("FrigateMqtt", new[] { context });
+
+        var stubPlugin = new StubBlueIrisPlugin();
+        var capturingDispatcher = new CapturingDispatcher();
+        var pump = new EventPump(
+            new IEventSource[] { source }, dedupe, monitor, capturingDispatcher,
+            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await pump.StartAsync(cts.Token);
+        await Task.Delay(100);
+        await cts.CancelAsync();
+        await pump.StopAsync(CancellationToken.None);
+
+        capturingDispatcher.Captured.Should().HaveCount(1);
+        capturingDispatcher.Captured[0].CameraShortName.Should().BeNull();
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DedupeSuppressesSecondMatch()
     {
         var logger = new CapturingLogger();
@@ -115,6 +229,27 @@ public sealed class EventPumpTests
     {
         public static readonly NoOpDispatcher Instance = new();
         public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct) => ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// Captures every <see cref="EventContext"/> handed to the dispatcher so #32-style tests
+    /// can assert that per-subscription augmentations (CameraShortName, etc.) reach the
+    /// downstream plugin via the dispatched context.
+    /// </summary>
+    private sealed class CapturingDispatcher : IActionDispatcher
+    {
+        public List<EventContext> Captured { get; } = new();
+        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct)
+        {
+            Captured.Add(ctx);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class StubBlueIrisPlugin : IActionPlugin
+    {
+        public string Name => "BlueIris";
+        public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider

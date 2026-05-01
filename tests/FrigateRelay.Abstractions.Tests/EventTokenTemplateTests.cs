@@ -11,7 +11,8 @@ public class EventTokenTemplateTests
         string camera = "front",
         string label = "person",
         string eventId = "ev-1",
-        IReadOnlyList<string>? zones = null) => new()
+        IReadOnlyList<string>? zones = null,
+        string? cameraShortName = null) => new()
     {
         EventId = eventId,
         Camera = camera,
@@ -20,6 +21,7 @@ public class EventTokenTemplateTests
         StartedAt = DateTimeOffset.UnixEpoch,
         RawPayload = "{}",
         SnapshotFetcher = static _ => ValueTask.FromResult<byte[]?>(null),
+        CameraShortName = cameraShortName,
     };
 
     [TestMethod]
@@ -96,5 +98,68 @@ public class EventTokenTemplateTests
         var result = tmpl.Resolve(ctx, urlEncode: false);
 
         result.Should().Be("driveway");
+    }
+
+    // ---------- {camera_shortname} (#32) ----------
+
+    [TestMethod]
+    public void Parse_CameraShortnameToken_AcceptedWithoutThrowing()
+    {
+        var act = () => EventTokenTemplate.Parse(
+            "http://bi/admin?camera={camera_shortname}", "Caller=BlueIris");
+        act.Should().NotThrow();
+    }
+
+    [TestMethod]
+    public void Resolve_CameraShortnameUnset_FallsThroughToCamera()
+    {
+        var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: null);
+
+        var result = tmpl.Resolve(ctx, urlEncode: false);
+
+        result.Should().Be("driveway",
+            "operators whose Frigate id and BI shortname already match should keep " +
+            "working without setting CameraShortName per subscription");
+    }
+
+    [TestMethod]
+    public void Resolve_CameraShortnameSet_UsesOverride()
+    {
+        var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: "DriveWayHD");
+
+        var result = tmpl.Resolve(ctx, urlEncode: false);
+
+        result.Should().Be("DriveWayHD",
+            "the override is the whole point of #32 — Blue Iris's HTTP API silently " +
+            "no-ops on unknown camera names, so the URL must carry the BI shortname");
+    }
+
+    [TestMethod]
+    public void Resolve_CameraTokenAndShortnameToken_AreIndependent()
+    {
+        // {camera} continues to render Frigate's id even when CameraShortName is set —
+        // important so operators who use {camera} in Pushover message templates don't
+        // suddenly get BI shortname text in their phone notifications.
+        var tmpl = EventTokenTemplate.Parse(
+            "frigate={camera} bi={camera_shortname}", "Caller=Test");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: "DriveWayHD");
+
+        var result = tmpl.Resolve(ctx, urlEncode: false);
+
+        result.Should().Be("frigate=driveway bi=DriveWayHD");
+    }
+
+    [TestMethod]
+    public void Resolve_CameraShortnameUrlEncoded()
+    {
+        var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: "Drive Way HD");
+
+        var result = tmpl.Resolve(ctx);
+
+        result.Should().Be("Drive%20Way%20HD",
+            "the override flows through the same Uri.EscapeDataString path as {camera}");
     }
 }

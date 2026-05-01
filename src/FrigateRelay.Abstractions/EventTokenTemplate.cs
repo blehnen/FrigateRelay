@@ -8,8 +8,8 @@ namespace FrigateRelay.Abstractions;
 /// fields into a string. Supports URL-encoding (default) or raw substitution.
 /// </summary>
 /// <remarks>
-/// Allowed tokens: {camera}, {label}, {event_id}, {zone}. The {score} placeholder is
-/// explicitly excluded (ID-7 hard rail) — EventContext carries no Score property.
+/// Allowed tokens: {camera}, {camera_shortname}, {label}, {event_id}, {zone}. The {score}
+/// placeholder is explicitly excluded (ID-7 hard rail) — EventContext carries no Score property.
 /// Use <see cref="Parse"/> to obtain an instance; the constructor is private.
 /// </remarks>
 public sealed partial class EventTokenTemplate
@@ -19,7 +19,8 @@ public sealed partial class EventTokenTemplate
 
     /// <summary>The set of token names accepted by <see cref="Parse"/>.</summary>
     public static readonly FrozenSet<string> AllowedTokens =
-        new[] { "camera", "label", "event_id", "zone" }.ToFrozenSet(StringComparer.Ordinal);
+        new[] { "camera", "camera_shortname", "label", "event_id", "zone" }
+            .ToFrozenSet(StringComparer.Ordinal);
 
     private readonly string _template;
 
@@ -48,7 +49,7 @@ public sealed partial class EventTokenTemplate
             if (!AllowedTokens.Contains(name))
                 throw new ArgumentException(
                     $"{callerName}: template contains unknown placeholder '{{{name}}}'. " +
-                    $"Allowed placeholders: {{camera}}, {{label}}, {{event_id}}, {{zone}}.",
+                    $"Allowed placeholders: {{camera}}, {{camera_shortname}}, {{label}}, {{event_id}}, {{zone}}.",
                     nameof(template));
         }
 
@@ -71,11 +72,12 @@ public sealed partial class EventTokenTemplate
         {
             var raw = m.Groups["name"].Value switch
             {
-                "camera"   => context.Camera,
-                "label"    => context.Label,
-                "event_id" => context.EventId,
-                "zone"     => context.Zones.Count > 0 ? context.Zones[0] : "",
-                _          => m.Value, // unreachable — Parse() guards
+                "camera"           => context.Camera,
+                "camera_shortname" => context.CameraShortName ?? context.Camera,
+                "label"            => context.Label,
+                "event_id"         => context.EventId,
+                "zone"             => context.Zones.Count > 0 ? context.Zones[0] : "",
+                _                  => m.Value, // unreachable — Parse() guards
             };
             return urlEncode ? Uri.EscapeDataString(raw) : raw;
         });

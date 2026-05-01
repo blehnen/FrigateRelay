@@ -28,7 +28,7 @@ internal static class AppsettingsWriter
             "{",
             $"  \"FrigateMqtt\": {{ \"Server\": \"{mqttServer}\" }},",
             "  \"BlueIris\": {",
-            "    \"TriggerUrlTemplate\": \"http://example.invalid/admin?trigger&camera={camera}\",",
+            "    \"TriggerUrlTemplate\": \"http://example.invalid/admin?trigger&camera={camera_shortname}\",",
             $"    \"SnapshotUrlTemplate\": \"{snapshotUrl}\"",
             "  },",
             "  \"Pushover\": { \"AppToken\": \"\", \"UserKey\": \"\" },",
@@ -70,6 +70,15 @@ internal static class AppsettingsWriter
         var zone = ValueOrEmpty(s, "Zone");
         if (!string.IsNullOrEmpty(zone))
             node["Zone"] = zone;
+        // Legacy `CameraShortName` carries the Blue Iris shortname (often distinct from the
+        // Frigate camera id). FrigateRelay v1.0.2+ honours this via SubscriptionOptions.CameraShortName
+        // and the {camera_shortname} URL-template token. Skip emit when the legacy field is empty
+        // OR identical to CameraName — operators whose Frigate id and BI shortname already match
+        // don't need the override (see issue #32).
+        var shortName = ValueOrEmpty(s, "CameraShortName");
+        var camera = ValueOrEmpty(s, "CameraName");
+        if (!string.IsNullOrEmpty(shortName) && !shortName.Equals(camera, StringComparison.Ordinal))
+            node["CameraShortName"] = shortName;
         node["Profile"] = "Standard";
         if (cooldown.HasValue)
             node["CooldownSeconds"] = cooldown.Value;

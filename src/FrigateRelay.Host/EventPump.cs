@@ -118,6 +118,15 @@ internal sealed class EventPump : BackgroundService
                         1,
                         new TagList { { "camera", context.Camera }, { "label", context.Label }, { "subscription", sub.Name } });
 
+                    // Apply per-subscription EventContext augmentations before dispatch (#32).
+                    // Today only CameraShortName; future host-managed per-subscription overrides
+                    // would plug in here. The source-agnostic invariant on EventContext stays
+                    // intact because the originating source never set this field — only the
+                    // host's matcher does, after the source has handed off the event.
+                    var dispatchContext = sub.CameraShortName is { } shortName
+                        ? context with { CameraShortName = shortName }
+                        : context;
+
                     // dispatch.enqueue span — wraps per-subscription action enqueue loop (PLAN-2.1 Task 1).
                     using (var enqueueActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
                         "dispatch.enqueue", ActivityKind.Producer))
@@ -142,9 +151,9 @@ internal sealed class EventPump : BackgroundService
                                 : Array.Empty<IValidationPlugin>();
 
                             await _dispatcher.EnqueueAsync(
-                                context, plugin, validators,
+                                dispatchContext, plugin, validators,
                                 sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider, ct).ConfigureAwait(false);
-                            LogDispatchEnqueued(_logger, plugin.Name, sub.Name, context.EventId, null);
+                            LogDispatchEnqueued(_logger, plugin.Name, sub.Name, dispatchContext.EventId, null);
                         }
                     }
                 }

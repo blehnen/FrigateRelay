@@ -57,8 +57,61 @@ public sealed class MigrateConfRoundTripTests
 
             // MigrateConf emits a complete appsettings (FrigateMqtt + BlueIris + Pushover +
             // Profiles + Subscriptions). The ≤60% gate applies only to the Profiles+Subscriptions
-            // example JSON (Phase 8). A full migration with connection settings achieves ≤70%.
-            ratio.Should().BeLessThanOrEqualTo(0.70d, "MigrateConf compact output must be well below the raw INI size");
+            // example JSON (Phase 8). A full migration with connection settings achieves ≤80%
+            // (was ≤70% pre-#32; per-subscription CameraShortName preservation adds ~one short
+            // field per row, pushing the ratio up slightly — still well below the raw INI size).
+            ratio.Should().BeLessThanOrEqualTo(0.80d, "MigrateConf compact output must be well below the raw INI size");
+        }
+        finally
+        {
+            if (File.Exists(output)) File.Delete(output);
+        }
+    }
+
+    [TestMethod]
+    public void RunMigrate_LegacyConf_PreservesCameraShortNamePerSubscription()
+    {
+        // #32: legacy CameraShortName carries the Blue Iris shortname, which Blue Iris
+        // requires verbatim in trigger URLs. The migration tool now preserves it on each
+        // subscription whenever it differs from CameraName (when they match, the override
+        // is redundant and is intentionally skipped).
+        var output = Path.Combine(Path.GetTempPath(), $"frigaterelay-migrate-{Guid.NewGuid():N}.json");
+        try
+        {
+            Program.RunMigrate(["--input", FixturePath, "--output", output]).Should().Be(0);
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(output));
+            var subscriptions = doc.RootElement.GetProperty("Subscriptions");
+
+            var driveway = subscriptions.EnumerateArray()
+                .First(s => s.GetProperty("Name").GetString() == "DriveWay Person");
+            driveway.GetProperty("Camera").GetString().Should().Be("driveway");
+            driveway.GetProperty("CameraShortName").GetString().Should().Be("DriveWayHD",
+                "the legacy CameraShortName must carry through so {camera_shortname} resolves " +
+                "to BI's shortname and the trigger URL actually fires");
+        }
+        finally
+        {
+            if (File.Exists(output)) File.Delete(output);
+        }
+    }
+
+    [TestMethod]
+    public void RunMigrate_LegacyConf_TriggerTemplateUsesCameraShortnameToken()
+    {
+        // #32 follow-on: with CameraShortName preserved per subscription, the migrated
+        // BlueIris.TriggerUrlTemplate should use {camera_shortname} so the URL substitution
+        // picks up the override automatically.
+        var output = Path.Combine(Path.GetTempPath(), $"frigaterelay-migrate-{Guid.NewGuid():N}.json");
+        try
+        {
+            Program.RunMigrate(["--input", FixturePath, "--output", output]).Should().Be(0);
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(output));
+            var trigger = doc.RootElement.GetProperty("BlueIris").GetProperty("TriggerUrlTemplate").GetString();
+            trigger.Should().Contain("{camera_shortname}",
+                "operators migrating from legacy almost certainly diverge between Frigate id " +
+                "and BI shortname, so the migrated template should opt into the override token");
         }
         finally
         {
