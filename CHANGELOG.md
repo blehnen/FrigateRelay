@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-05-01
+
+Maintenance release — operator-reported MQTT bugs from the v1.0.0 parity-window debugging session, plus docs accuracy fixes. No breaking config changes; one operator-action item (rename `PUSHOVER__APITOKEN` → `PUSHOVER__APPTOKEN` in `.env` and update Seq/Loki queries keyed on `EventId` → `FrigateEventId`).
+
 ### Added
 
 - `tests/FrigateRelay.IntegrationTests.RealBroker/` — opt-in integration-test project that runs against an operator-supplied MQTT broker rather than the in-process Testcontainers Mosquitto. Tests self-skip via `Assert.Inconclusive` unless `FRIGATERELAY_TEST_REAL_BROKER=1` is set; broker host/port and optional credentials come from `FRIGATERELAY_TEST_MQTT_HOST`/`_PORT`/`_USERNAME`/`_PASSWORD`. Topic prefix is `frigaterelay-test/<guid>/events` (never `frigate/events`) so a misconfigured test cannot trigger production action plugins. The project is not auto-discovered by `.github/scripts/run-tests.sh` — invoke it explicitly via `dotnet run --project tests/FrigateRelay.IntegrationTests.RealBroker`. See CONTRIBUTING.md for the operator run-book. Closes the harness portion of #17; the silent-SUBACK regression test (acceptance criterion 3) lands with the #16 fix in a follow-up PR.
@@ -22,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `README.md` + `CodeProjectAiOptions` XML doc — added a "Validator engine status" section noting that CodeProject.AI active development has stopped upstream. Existing CPAI installs and Blue Onyx-via-CPAI-API users are unaffected; the plugin is intentionally **not** marked `[Obsolete]` because it still works against current Blue Onyx (API-compatible) and older CPAI installs. Section points at the planned alternative validators on the v1.1 roadmap (#12 Blue Onyx, #13 Roboflow, #14 DOODS2). Closes #15.
 - Renamed the `{EventId}` log-template placeholder to `{FrigateEventId}` across every `LoggerMessage.Define[...]` and `[LoggerMessage]` call site in `src/` (17 sites across `EventPump`, `ChannelActionDispatcher`, `SnapshotResolver`, `BlueIrisActionPlugin`, `CodeProjectAiValidator`, `FrigateSnapshotProvider`, `PushoverActionPlugin`). The old name collided with Serilog's `Microsoft.Extensions.Logging` bridge, which enriches every entry with an `EventId` property derived from the `LoggerMessage.Define` `new EventId(N, "Name")` argument — that bridge-enriched property won over the call-site value, so structured logs printed e.g. `event_id={"Id":1,"Name":"MatchedEvent"}` instead of the actual Frigate event id (`1745558400.0-abc`). Operators see real event ids in console / file / Seq / OTLP output now. **Downstream observable change:** the structured-log property name shifts from `EventId` to `FrigateEventId` — operators who built Seq dashboards, Loki queries, or OTLP-trace lookups keyed on `EventId` need to update those queries (low risk, but worth a re-check). Closes #22.
 
-## [1.0.0] — 2026-05-03
+## [1.0.0] — 2026-05-01
 
 Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProcessingService` verified via a 24-hour live A/B window across all production cameras with zero missed alerts and zero spurious alerts — see `docs/parity-report.md`.
 
@@ -255,5 +259,6 @@ Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProces
 - `appsettings.json`, `appsettings.Local.json` (gitignored), `appsettings.Development.json` — base configuration layering.
 - `UserSecretsId` pinned to a stable GUID for consistent contributor experience.
 
-[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.1
 [1.0.0]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.0

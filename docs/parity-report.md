@@ -12,7 +12,7 @@ The `tools/FrigateRelay.MigrateConf reconcile` subcommand and the NDJSON file si
 
 ## Window summary
 
-- **Window:** 2026-05-02 → 2026-05-03 (~24 hours of continuous live A/B against real Frigate traffic)
+- **Window:** 2026-04-30 → 2026-05-01 (~24 hours of continuous live A/B against real Frigate traffic)
 - **RC under test:** `v1.0.0-rc3` (`ghcr.io/blehnen/frigaterelay:1.0.0-rc3`), deployed to the operator's Unraid host alongside the legacy `FrigateMQTTProcessingService`
 - **Cameras observed:** all production cameras (driveway, front door, garage, back yard, side yard, deck — 6+ cameras) exercised by real motion events plus deliberate walk-around traffic
 - **Pipeline shape:** Frigate MQTT → FrigateRelay → Blue Iris HTTP trigger + FrigateSnapshot → CodeProject.AI YOLOv5 6.2 validator → Pushover (gated on validator pass)
@@ -23,4 +23,4 @@ The `tools/FrigateRelay.MigrateConf reconcile` subcommand and the NDJSON file si
 
 ## Sign-off
 
-Operator confirms 1:1 parity across all cameras and zero unexplained divergence over the 24-hour live A/B window. Cleared for `v1.0.0` tag on 2026-05-03.
+Operator confirms 1:1 parity across all cameras and zero unexplained divergence over the 24-hour live A/B window. Cleared for `v1.0.0` tag on 2026-05-01.
