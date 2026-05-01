@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FrigateRelay.Sources.FrigateMqtt\FrigateRelay.Sources.FrigateMqtt.csproj" />
     <ProjectReference Include="..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <ProjectReference Include="..\FrigateRelay.TestHelpers\FrigateRelay.TestHelpers.csproj" />
   </ItemGroup>
 
 </Project>
