@@ -24,5 +24,15 @@ coverage:
         threshold: 1%
     patch:
       default:
+        # Patch coverage is INFORMATIONAL — the comment on each PR still
+        # reports the % so we can see it, but it does not fail the merge
+        # check. Rationale: this is a one-maintainer project and patch
+        # coverage hits noisy edge cases (cobertura path-casing mismatches
+        # across test runs, source-generator partial classes excluded from
+        # one assembly's instrumentation but tracked in another, whitespace
+        # re-alignment treated as "modified lines" — see PR #33 for a
+        # worked example). The project-status check above stays strict, so
+        # real regressions still surface.
         target: auto
         threshold: 1%
+        informational: true
