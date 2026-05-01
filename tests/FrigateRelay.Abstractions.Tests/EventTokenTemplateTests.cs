@@ -124,6 +124,26 @@ public class EventTokenTemplateTests
     }
 
     [TestMethod]
+    [DataRow("")]
+    [DataRow("   ")]
+    [DataRow("\t")]
+    public void Resolve_CameraShortnameBlankOrWhitespace_FallsThroughToCamera(string blankOverride)
+    {
+        // IConfiguration.Bind happily produces an empty string for "CameraShortName": "" or
+        // for an env var like CAMERASHORTNAME= with no value. Plain `??` would let that empty
+        // value through and we'd be back to the silent-no-op trap #32 was supposed to close.
+        // Treat any blank/whitespace as unset.
+        var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");
+        var ctx = NewCtx(camera: "driveway", cameraShortName: blankOverride);
+
+        var result = tmpl.Resolve(ctx, urlEncode: false);
+
+        result.Should().Be("driveway",
+            "blank/whitespace must fall through to Camera, otherwise BI gets " +
+            "camera= and silently no-ops just like the unconfigured case");
+    }
+
+    [TestMethod]
     public void Resolve_CameraShortnameSet_UsesOverride()
     {
         var tmpl = EventTokenTemplate.Parse("{camera_shortname}", "Caller=Test");

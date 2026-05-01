@@ -26,7 +26,7 @@ cp docker/.env.example .env
 Edit `.env` and fill in your secrets:
 
 ```
-BLUEIRIS__TRIGGERURLTEMPLATE=http://your-blueiris-host:81/admin?camera={camera}&trigger=1
+BLUEIRIS__TRIGGERURLTEMPLATE=http://your-blueiris-host:81/admin?camera={camera_shortname}&trigger=1
 PUSHOVER__APPTOKEN=your-app-token
 PUSHOVER__USERKEY=your-user-key
 ```

@@ -73,7 +73,9 @@ public sealed partial class EventTokenTemplate
             var raw = m.Groups["name"].Value switch
             {
                 "camera"           => context.Camera,
-                "camera_shortname" => context.CameraShortName ?? context.Camera,
+                "camera_shortname" => string.IsNullOrWhiteSpace(context.CameraShortName)
+                                          ? context.Camera
+                                          : context.CameraShortName,
                 "label"            => context.Label,
                 "event_id"         => context.EventId,
                 "zone"             => context.Zones.Count > 0 ? context.Zones[0] : "",
