@@ -4,11 +4,12 @@
 #     Validates docs artifacts: dotnet new template smoke + samples project build.
 #     Split-CI invariant: no metrics collection, no artifact upload (see CLAUDE.md D1).
 #
-# scaffold-smoke: installs PLAN-2.3 template, renders to scratch, copies into
+# scaffold-smoke: installs the plugin template, renders to scratch, copies into
 #   in-repo tree for relative ProjectReference resolution, builds + runs test,
-#   then restores tree. Skips gracefully until template lands (PLAN-2.3).
-# samples-build: builds PLAN-3.1 samples project. Conditional on directory
-#   existence — no-op until PLAN-3.1 lands.
+#   then restores tree.
+# samples-build: builds the samples project.
+# doc-samples-rot: byte-checks code fences in docs/plugin-author-guide.md
+#   against the corresponding sample files.
 
 name: Docs
 
@@ -44,7 +45,6 @@ jobs:
     name: Scaffold smoke (dotnet new frigaterelay-plugin)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: hashFiles('templates/**/template.json') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -129,7 +129,6 @@ jobs:
     name: Doc-sample byte-match check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: hashFiles('docs/plugin-author-guide.md') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v6
