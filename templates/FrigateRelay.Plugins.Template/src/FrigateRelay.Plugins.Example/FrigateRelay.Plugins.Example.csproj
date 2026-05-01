@@ -14,12 +14,13 @@
   </ItemGroup>
 
   <!--
-    ProjectReference path is relative to the template's location inside the FrigateRelay repo.
+    ProjectReference path is relative to where the rendered plugin lives in the in-repo tree:
+    <repo>/src/FrigateRelay.Plugins.<YourName>/, mirroring BlueIris / Pushover / etc.
     Out-of-repo authors: publish FrigateRelay.Abstractions to NuGet first, then replace this
     ProjectReference with a PackageReference to the published package.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

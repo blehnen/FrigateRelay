@@ -24,13 +24,14 @@
   </ItemGroup>
 
   <!--
-    ProjectReference paths are relative to the template's location inside the FrigateRelay repo.
+    ProjectReference paths are relative to where the rendered tests live in the in-repo tree:
+    <repo>/tests/FrigateRelay.Plugins.<YourName>.Tests/, mirroring the existing test projects.
     Out-of-repo authors: replace the Abstractions ProjectReference with a PackageReference once
     FrigateRelay.Abstractions is published to NuGet.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\FrigateRelay.Plugins.Example\FrigateRelay.Plugins.Example.csproj" />
-    <ProjectReference Include="..\..\..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
