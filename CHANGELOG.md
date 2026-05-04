@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Structured tags on all 10 `Meter "FrigateRelay"` counters via new `DispatcherDiagnostics.Increment*` helpers. Tag matrix documented in `docs/observability.md` (added in v1.1.0). Forbidden tag `event_id` is enforced by CI grep gate. `errors.unhandled` now carries a `component` tag (e.g., `EventPump`) so operators can triage unhandled errors by failing subsystem; replaces Phase 9's deliberately tagless behaviour. Issue #35.
+- `docs/observability.md` documenting the counter inventory, cardinality rules, and OTLP/Seq setup.
+- `docs/grafana/frigaterelay-dashboard.json` starter Grafana dashboard.
+- `docker/observability/` reference compose stacks (OTel + Prometheus + Grafana, plus standalone Seq).
+- `Makefile` with `make verify-observability` pre-release smoke target.
+- Reflection-based counter-inventory drift test (`CounterInventoryDriftTests`).
+- README "Observability" section. Issue #36.
 
 ## [1.0.3] — 2026-05-01
 
