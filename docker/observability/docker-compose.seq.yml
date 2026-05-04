@@ -1,0 +1,11 @@
+name: frigaterelay-seq
+
+services:
+  seq:
+    image: datalust/seq:2024.3
+    environment:
+      - ACCEPT_EULA=Y
+    ports:
+      - "5341:5341"   # Serilog HTTP sink ingestion + UI
+      - "8081:80"     # Alternate UI port (avoids conflicts with Prometheus/Grafana stack)
+    restart: unless-stopped
