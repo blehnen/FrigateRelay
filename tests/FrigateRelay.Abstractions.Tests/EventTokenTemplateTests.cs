@@ -212,8 +212,9 @@ public class EventTokenTemplateTests
     [TestMethod]
     public void EventTokenTemplate_AllowedTokens_Canonical()
     {
-        // Hardcoded expected set — NOT a self-comparison. Adding a future token (e.g. {score})
-        // requires updating BOTH EventTokenTemplate.AllowedTokens AND this test, by design.
+        // Hardcoded expected set — NOT a self-comparison. Adding OR removing a token
+        // (e.g. introducing {score} or dropping {zone}) requires updating BOTH
+        // EventTokenTemplate.AllowedTokens AND this test, by design.
         EventTokenTemplate.AllowedTokens.SetEquals(_canonicalTokens).Should().BeTrue(
             because: "AllowedTokens is the single source of truth for templated event-context placeholders. " +
                      "Adding a token requires updating both EventTokenTemplate.AllowedTokens and this canonical-set test.");
