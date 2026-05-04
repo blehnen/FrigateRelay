@@ -97,9 +97,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
 
             var channel = Channel.CreateBounded<DispatchItem>(channelOptions, evicted =>
             {
-                DispatcherDiagnostics.Drops.Add(
-                    1,
-                    new KeyValuePair<string, object?>("action", plugin.Name));
+                DispatcherDiagnostics.IncrementDrops(evicted, "channel_full");
                 LogDropped(_logger, evicted.Context.EventId, plugin.Name, capacity, null);
             });
 
@@ -147,14 +145,11 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 "Ensure startup validation prevents unknown plugin names from reaching EnqueueAsync.");
         }
 
-        DispatcherDiagnostics.ActionsDispatched.Add(
-            1,
-            new TagList { { "subscription", subscription }, { "action", action.Name } });
+        var item = new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
+            subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider);
+        DispatcherDiagnostics.IncrementActionsDispatched(item);
 
-        await channel.Writer.WriteAsync(
-            new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
-                subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider),
-            ct).ConfigureAwait(false);
+        await channel.Writer.WriteAsync(item, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -185,8 +180,6 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             actionActivity?.SetTag("event.id", item.Context.EventId);
             actionActivity?.SetTag("action", plugin.Name);
             actionActivity?.SetTag("subscription", item.Subscription);
-
-            var actionTags = new TagList { { "subscription", item.Subscription }, { "action", plugin.Name } };
 
             try
             {
@@ -229,20 +222,13 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                         if (!verdict.Passed)
                             vActivity?.SetTag("reason", verdict.Reason);
 
-                        var validatorTags = new TagList
-                        {
-                            { "subscription", item.Subscription },
-                            { "action", plugin.Name },
-                            { "validator", validator.Name }
-                        };
-
                         if (verdict.Passed)
                         {
-                            DispatcherDiagnostics.ValidatorsPassed.Add(1, validatorTags);
+                            DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
                         }
                         else
                         {
-                            DispatcherDiagnostics.ValidatorsRejected.Add(1, validatorTags);
+                            DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
                             LogValidatorRejected(
                                 _logger,
                                 item.Context.EventId,
@@ -268,7 +254,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
                 actionActivity?.SetTag("outcome", "success");
                 actionActivity?.SetStatus(ActivityStatusCode.Ok);
-                DispatcherDiagnostics.ActionsSucceeded.Add(1, actionTags);
+                DispatcherDiagnostics.IncrementActionsSucceeded(item);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -279,9 +265,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             }
             catch (Exception ex)
             {
-                DispatcherDiagnostics.Exhausted.Add(1,
-                    new KeyValuePair<string, object?>("action", plugin.Name));
-                DispatcherDiagnostics.ActionsFailed.Add(1, actionTags);
+                DispatcherDiagnostics.IncrementExhausted(item);
+                DispatcherDiagnostics.IncrementActionsFailed(item);
 
                 LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
                 actionActivity?.SetTag("outcome", "failure");
