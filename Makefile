@@ -5,7 +5,7 @@ SHELL := /bin/bash
 ## verify-observability: Start the OTel/Prometheus/Grafana stack, poll readiness, then tear down.
 verify-observability:
 	@set -euo pipefail; \
-	trap 'docker compose -p frigaterelay-observability -f docker/observability/docker-compose.yml down -v >/dev/null 2>&1 || true' EXIT; \
+	trap 'docker compose -p frigaterelay-observability -f docker/observability/docker-compose.yml down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
 	docker compose -p frigaterelay-observability -f docker/observability/docker-compose.yml up -d; \
 	echo "Waiting for Prometheus..."; \
 	for i in $$(seq 1 30); do \

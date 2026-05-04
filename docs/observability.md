@@ -157,9 +157,14 @@ To run a pre-release smoke validation of the full stack, use:
 make verify-observability
 ```
 
-The `Makefile` target (added by PLAN-2.2) starts the stack, polls the Prometheus scrape
-endpoint until the FrigateRelay metrics appear, then tears the stack down. See
-[RELEASING.md](../RELEASING.md) for when to run this in the release checklist.
+The `Makefile` target starts the OTel Collector / Prometheus / Grafana stack, waits for
+Prometheus and Grafana to report ready (`/-/ready` and `/api/health` respectively), then
+tears the stack down. The recipe verifies the *backend* stack is healthy — it does not
+launch a FrigateRelay process. To confirm a tagged counter sample reaches Prometheus end
+to end, run a FrigateRelay instance pointed at the collector before invoking the target
+and watch for any `frigaterelay_*_total` series at `http://localhost:9090/graph` while
+the stack is up. See [RELEASING.md](../RELEASING.md) for when to run this in the release
+checklist.
 
 ### Logs stack (Seq)
 
@@ -192,7 +197,7 @@ Then set the Seq server URL in your FrigateRelay config:
 SERILOG__SEQ__SERVERURL=http://seq:5341
 ```
 
-Seq is available at `http://localhost:5341` (or `http://localhost:80` for the UI) in the
+Seq is available at `http://localhost:5341` (or `http://localhost:8081` for the alternate-port UI mapping) in the
 reference stack. The Seq stack is independent of the OTel stack — you can run one, the other,
 or both.
 
