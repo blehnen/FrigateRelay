@@ -7,19 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-05-04
+
+Observability + structural cleanup. All counters on `Meter "FrigateRelay"` now emit structured tags so operators can pivot a Grafana dashboard by camera, subscription, action, validator, and component. Ships a complete reference observability stack (OTel Collector + Prometheus + Grafana, plus a standalone Seq stack for logs) and a full operator guide. Closes the v1.0.2 → v1.0.3 P0 root cause structurally by collapsing `BlueIrisUrlTemplate` to a thin wrapper around `EventTokenTemplate`.
+
 ### Added
 
-- Structured tags on all 10 `Meter "FrigateRelay"` counters via new `DispatcherDiagnostics.Increment*` helpers. Tag matrix documented in `docs/observability.md` (added in v1.1.0). Forbidden tag `event_id` is enforced by CI grep gate. `errors.unhandled` now carries a `component` tag (e.g., `EventPump`) so operators can triage unhandled errors by failing subsystem; replaces Phase 9's deliberately tagless behaviour. Issue #35.
-- `docs/observability.md` documenting the counter inventory, cardinality rules, and OTLP/Seq setup.
-- `docs/grafana/frigaterelay-dashboard.json` starter Grafana dashboard.
-- `docker/observability/` reference compose stacks (OTel + Prometheus + Grafana, plus standalone Seq).
-- `Makefile` with `make verify-observability` pre-release smoke target.
-- Reflection-based counter-inventory drift test (`CounterInventoryDriftTests`).
-- README "Observability" section. Issue #36.
+- Structured tags on all 10 `Meter "FrigateRelay"` counters via new `DispatcherDiagnostics.Increment*` helpers. Tag matrix documented in `docs/observability.md`. Forbidden tag `event_id` is enforced by a CI grep gate. `errors.unhandled` now carries a `component` tag (e.g., `EventPump`) so operators can triage unhandled errors by failing subsystem; replaces Phase 9's deliberately tagless behaviour. Issue #35.
+- `docs/observability.md` documenting the counter inventory, cardinality rules, OTLP and Seq setup, end-to-end recipes, and the `make verify-observability` ritual.
+- `docs/grafana/frigaterelay-dashboard.json` — starter Grafana dashboard (`schemaVersion: 39`, Grafana 11.x). Imports cleanly into vanilla Grafana with any Prometheus datasource. Panels cover events received/matched per camera, actions succeeded/failed per camera+action, validator rejection rate per validator, and dispatch drops + exhausted as alert candidates.
+- `docker/observability/` reference compose stacks: `docker-compose.yml` (OTel Collector + Prometheus + Grafana, all version-pinned, named volumes for state persistence) and `docker-compose.seq.yml` (Seq alone, separate Compose project name). Issue #36.
+- Root `Makefile` with `make verify-observability` — pre-release smoke target. Brings up the metrics stack, polls Prometheus `/-/ready` and Grafana `/api/health`, tears down via `trap` on `EXIT INT TERM`. Operators run FrigateRelay separately to confirm a tagged counter sample reaches Prometheus end-to-end.
+- Reflection-based counter-inventory drift test (`CounterInventoryDriftTests`) — parses `docs/observability.md`'s counter table and reflects `DispatcherDiagnostics`'s `Counter<long>` static fields, asserts `SetEquals`. Adding a counter to source without updating the doc (or vice versa) fails CI.
+- README "Observability" section linking to the new operator guide.
+- `EventTokenTemplate_AllowedTokens_Canonical` test in `EventTokenTemplateTests` — pins the canonical allowlist `{ camera, camera_shortname, label, event_id, zone }` to an explicit hardcoded set. Adding or removing a token without updating the test fails CI. Issue #34.
 
 ### Changed
 
-- Collapsed `BlueIrisUrlTemplate` to a thin wrapper around `EventTokenTemplate.Parse`/`Resolve`. Eliminates the duplicated `AllowedTokens` list that produced the v1.0.2 → v1.0.3 P0 — adding a future token (e.g., `{score}`) now requires editing exactly one allowlist instead of two. Public surface (`Parse(string)`, `Resolve(EventContext)`) and behavior unchanged. Canonical-set test in `EventTokenTemplateTests` ensures the allowlist cannot drift unnoticed. Issue #34.
+- Collapsed `BlueIrisUrlTemplate` to a thin wrapper around `EventTokenTemplate.Parse`/`Resolve`. Eliminates the duplicated `AllowedTokens` list that produced the v1.0.2 → v1.0.3 P0 — adding a future token (e.g., `{score}`) now requires editing exactly one allowlist instead of two. Existing `Parse(string)` / `Resolve(EventContext)` call shapes preserved. Issue #34.
+- `RELEASING.md` retitled `# Releasing FrigateRelay` (was `# Releasing FrigateRelay v1.0.0`) — the playbook applies to every release tag, not just v1.0.0.
+
+### Fixed
+
+- `BlueIris.SnapshotUrlTemplate` parse-error messages now name the correct config key. Pre-v1.1, `PluginRegistrar` validated the snapshot URL via the same `BlueIrisUrlTemplate.Parse` path as the trigger URL, and the resulting `ArgumentException` hard-coded the trigger config key — operators with a malformed snapshot URL were pointed at `BlueIris.TriggerUrlTemplate` instead of `BlueIris.SnapshotUrlTemplate`. Fixed via a new optional `BlueIrisUrlTemplate.Parse(template, callerName)` overload that the snapshot call site uses. Pre-existing surface gap surfaced and fixed during PR #40 review.
 
 ## [1.0.3] — 2026-05-01
 
@@ -316,7 +326,8 @@ Initial public release. 1:1 functional parity with the legacy `FrigateMQTTProces
 - `appsettings.json`, `appsettings.Local.json` (gitignored), `appsettings.Development.json` — base configuration layering.
 - `UserSecretsId` pinned to a stable GUID for consistent contributor experience.
 
-[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.0.3...HEAD
+[unreleased]: https://github.com/blehnen/FrigateRelay/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.1.0
 [1.0.3]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.3
 [1.0.2]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.2
 [1.0.1]: https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.1
