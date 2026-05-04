@@ -13,8 +13,14 @@ internal sealed class BlueIrisUrlTemplate
     /// Delegates to <see cref="EventTokenTemplate.Parse"/> — single source of truth for
     /// <see cref="EventTokenTemplate.AllowedTokens"/>, token regex, and error wording.
     /// </summary>
-    public static BlueIrisUrlTemplate Parse(string template) =>
-        new(EventTokenTemplate.Parse(template, "BlueIris.TriggerUrlTemplate"));
+    /// <param name="template">The URL template string with <c>{token}</c> placeholders.</param>
+    /// <param name="callerName">
+    /// The config-key name used in parse-error messages so operators see the correct key
+    /// (defaults to <c>BlueIris.TriggerUrlTemplate</c>; pass <c>BlueIris.SnapshotUrlTemplate</c>
+    /// when validating the snapshot URL).
+    /// </param>
+    public static BlueIrisUrlTemplate Parse(string template, string callerName = "BlueIris.TriggerUrlTemplate") =>
+        new(EventTokenTemplate.Parse(template, callerName));
 
     /// <summary>
     /// Substitutes <see cref="EventContext"/> fields into the template with URL encoding.
