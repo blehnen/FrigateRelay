@@ -1,5 +1,23 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 Wave 2 built + PR #39 opened
+
+- **Scope:** PR for issue #36 (`docs/observability.md` + Grafana dashboard JSON + `docker/observability/` reference compose stacks + root `Makefile` `verify-observability` target + `RELEASING.md` retitle + drift test + CHANGELOG).
+- **Branch:** `feat/36-observability-docs` off `b110bb3` (post-#38 main). Pushed; PR #39 opened.
+- **Plans built:** PLAN-2.1, PLAN-2.2, PLAN-2.3 — all reviewers PASS.
+- **Commits on `feat/36-observability-docs`** (12, ~1101 lines):
+  - PLAN-2.1: `b52aa3e` (`docs/observability.md`), `383f7c8` (Grafana dashboard), `4361cbe` (README section). Plus `8734a52` review fix (OTel env-var casing + native SDK form).
+  - PLAN-2.2: `1419491` (metrics compose + collector + prom configs), `2703a5c` (Seq compose), `67db72b` (Makefile). Plus `3152d48` review fix (trap signals + 2 doc nits).
+  - PLAN-2.3: `c5fb95b` (drift test), `e2323b0` (RELEASING retitle + verify-observability bullet), `7521a23` (CHANGELOG). Plus `0364e47` review fix (RELEASING body de-versioning + 2 doc/test nits).
+- **Verification:** `dotnet build` 0 warnings/errors; `run-tests.sh --skip-integration` **240/240** across 8 projects (was 239 from PR #38 baseline = +1 from `CounterInventoryDriftTests`); `make -n verify-observability` parses cleanly.
+- **Decisions to highlight (all per CONTEXT-13):**
+  - **D2** drift test uses reflection over `DispatcherDiagnostics`'s `Counter<long>` fields (excludes `Meter` and `ActivitySource` correctly via `FieldType` filter); doc parser locates `docs/observability.md` via marker-file walk from `AppContext.BaseDirectory` (resilient to SDK path-segment changes).
+  - **D7** two compose files preserved — metrics stack and Seq stack with distinct project names so they can run independently.
+  - **OQ-4** RELEASING.md retitled to version-agnostic; the body line that still hard-coded `v1.0.0` was de-versioned in the same PR.
+- **Reviewer findings landed this PR:** 1 Important + 7 Minor/Suggestion across 3 reviewers (PLAN-2.1: 1 Important + 1 Suggestion; PLAN-2.2: 3 Minor; PLAN-2.3: 1 Important + 2 Suggestions). All addressed inline before push — no deferred fixes.
+- **Drift-test guarantee:** adding a counter to `DispatcherDiagnostics` without updating `docs/observability.md` (or vice versa) now fails CI. The PR #38 `event_id`-grep gate is preserved; this test extends drift detection to the cumulative inventory.
+- **Next step:** await PR #39 merge, then branch `refactor/34-blueiris-template` off updated main for Wave 3 (PR for issue #34).
+
 ## 2026-05-04 — PR #38 merged + Wave 2 staged
 
 - **PR #38 merged** to origin/main as merge-commit `b110bb3`. CodeRabbit's two stale-text findings (ROADMAP "12 phases" and CounterIncrementTests Test 8 section header) were addressed in commit `4f2b874` before merge.

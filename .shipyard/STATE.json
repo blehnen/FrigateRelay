@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "Wave 1 (PR #38) merged 2026-05-04. Wave 2 worktree branched at .worktrees/feat-36-observability-docs (branch feat/36-observability-docs off b110bb3). Baseline clean — 239/239 tests, 0 warnings. Ready to dispatch builders for PLAN-2.1, 2.2, 2.3.",
-  "status": "wave_2_starting",
+  "position": "Wave 2 (PR #39 closes #36) pushed and opened. 12 commits on feat/36-observability-docs from b110bb3 base, +1101/-1 lines, 240/240 tests, drift test guards doc-vs-Meter parity. Both per-plan reviewers PASS (PLAN-2.1, 2.2, 2.3); all 8 review findings (1 important + 7 minor/suggestion) addressed inline. Awaiting merge before Wave 3.",
+  "status": "wave_2_in_review",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }
