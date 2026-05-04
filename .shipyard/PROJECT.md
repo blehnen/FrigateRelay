@@ -147,3 +147,52 @@ FrigateRelay/
 ├── README.md
 └── FrigateRelay.sln
 ```
+
+## Post-v1.0 Scope — v1.1 (observability + structural cleanup)
+
+v1.0.x is GA (v1.0.0 shipped 2026-05-03; v1.0.3 patched the `{camera_shortname}` allowlist drift). v1.1 closes the structural follow-up to that P0 and ships a complete observability story so operators can build dashboards out of the box.
+
+### Goals (v1.1)
+
+1. **Tag the meters.** Every counter on `Meter "FrigateRelay"` carries the structured tags an operator needs to pivot a dashboard by camera, subscription, action, validator, or component. Aggregate-only counters become per-camera-actionable.
+2. **Document and demonstrate observability end-to-end.** A new `docs/observability.md`, a working `docs/grafana/frigaterelay-dashboard.json`, and a `docker/observability/` reference stack so operators starting from nothing can stand up FrigateRelay → OTel Collector → Prometheus + Grafana with one `docker compose up`.
+3. **Eliminate the BlueIris template / EventTokenTemplate allowlist drift** that caused the v1.0.2→v1.0.3 P0, by collapsing `BlueIrisUrlTemplate` into a thin wrapper around `EventTokenTemplate`.
+
+### In scope (v1.1)
+
+- **#34** — refactor `BlueIrisUrlTemplate` to delegate to `EventTokenTemplate`. Single source of truth for `AllowedTokens`. New test asserts `BlueIrisUrlTemplate.AllowedTokens.SetEquals(EventTokenTemplate.AllowedTokens)` so future drift fails CI.
+- **#35** — add structured tags to all 10 counters in `DispatcherDiagnostics.cs` per the inventory in the issue (`subscription`, `camera`, `label`, `action`, `validator`, `reason`, `component` — never `event_id`). New `MeterListener`-based unit tests assert tag presence per counter. Per-counter XML doc-comments document the tag set + cardinality rule.
+- **#36** — `docs/observability.md` (counter inventory, OTLP export config, end-to-end recipes, cardinality rules for plugin authors), `docs/grafana/frigaterelay-dashboard.json`, `docker/observability/` compose files (OTel Collector → Prometheus + Grafana, plus a Seq stack), `make verify-observability` target, README "Observability" section linking to the new doc, one line in `RELEASING.md` for pre-release manual smoke.
+
+### Out of scope (deferred to v1.2)
+
+- **#13** — Roboflow Inference validator (RF-DETR).
+- **#14** — DOODS2 validator (TFLite / TF / YOLOv5 hub).
+- **#23** — optional parallel validator execution with all-pass aggregation.
+
+v1.2 narrative: more inference engines + the parallel-AND mode that uses them. #23 is structurally unblocked once #13/#14 ship the additional engines that make multi-engine smoke testing useful.
+
+### v1.1 PR sequencing
+
+Three sequential PRs against `main`:
+
+1. **#35 first.** Tags must land before the dashboard panels can pivot by them; otherwise the v1.1 dashboard would only work at system-aggregate and need an immediate follow-up.
+2. **#36 second.** Depends on #35's tags. Bundles the doc, the dashboard JSON, the compose files, and the README + RELEASING glue in one diff so reviewers see the full observability story together.
+3. **#34 in any slot** — independent of the other two; can land before, between, or after the observability pair. Pure refactor, no behavior change.
+
+CHANGELOG classifies #35 as additive (semver minor): metric names persist, only the series cardinality grows; aggregate Prometheus queries that don't filter on tags continue to return the same totals.
+
+### v1.1 verification gates
+
+- `dotnet build FrigateRelay.sln -c Release` zero warnings (warnings-as-errors, both Linux and Windows).
+- All existing tests pass; new `MeterListener` tests assert tag inventory per counter; new `BlueIrisUrlTemplate` allowlist-equality test passes.
+- `git grep '"event_id"' src/FrigateRelay.Host/Dispatch/` returns empty.
+- `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` still empty (architectural invariant unchanged).
+- `make verify-observability` succeeds on the maintainer's machine before tag push: `docker compose up` the reference stack, scrape FrigateRelay, assert at least one tagged counter sample lands in Prometheus, dashboard imports cleanly into vanilla Grafana.
+- `RELEASING.md` updated with the new pre-release smoke step.
+
+### v1.1 success criteria
+
+- A new operator can go from zero to a working Grafana dashboard in under fifteen minutes following `docs/observability.md` + the `docker/observability/` stack.
+- Adding a future token (e.g. `{score}`) requires editing `EventTokenTemplate.AllowedTokens` only — the BlueIris-side allowlist no longer exists.
+- A future contributor adding a new counter to `DispatcherDiagnostics` cannot ship without choosing a tag set, because the per-counter doc-comment template makes it the obvious next field to fill in.

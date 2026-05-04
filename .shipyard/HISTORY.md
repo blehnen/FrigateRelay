@@ -1,5 +1,22 @@
 # Shipyard History
 
+## 2026-05-04 — v1.1 scope captured (`/shipyard:brainstorm` — post-v1.0 issue triage)
+
+- **Trigger:** user invoked `/shipyard:brainstorm` to plan against the 6 open GitHub issues at https://github.com/blehnen/FrigateRelay/issues.
+- **Scope decisions (interactive Q&A):**
+  - **Q1 PROJECT.md handling** → Update existing (append "Post-v1.0 Scope — v1.1" section, preserve v1.0 history).
+  - **Q2 release split** → Option B: tight v1.1 = #34 + #35 + #36 (refactor + observability story); v1.2 picks up #13 + #14 + #23 (new validators + parallel mode).
+  - **Q3 PR sequencing within v1.1** → Option A: three sequential PRs (#35 first, #36 second, #34 any slot — independent).
+  - **Q4 docker-compose recipes (#36)** → Option C: compose files under `docker/observability/` + `make verify-observability` Makefile target + one line in `RELEASING.md` for pre-tag-push manual smoke. No new CI job.
+  - **Q5 roadmap handling** → Append Phase 13 to existing ROADMAP.md (preserve Phases 1–12 verbatim).
+- **Artifacts written:**
+  - `PROJECT.md` — appended "## Post-v1.0 Scope — v1.1 (observability + structural cleanup)" with Goals / In scope / Out of scope (v1.2 deferral) / PR sequencing / verification gates / success criteria.
+  - `ROADMAP.md` — appended "## Phase 13 — v1.1 Observability + Cleanup `[NOT STARTED]`" matching Phase 11/12 heading style. 60 lines added (374 → 433). New "Phase 13 open questions" subsection under existing Questions Appendix surfaces 4 deferred-decision items (per-counter tag selection, `make verify-observability` shell-vs-script, Grafana version pin, #34 error-message contract loosening).
+  - `STATE.json` — restored from HEAD (working tree had a stale Phase 4 snapshot from a prior corrupted write) and forward-rolled to Phase 13 / status ready. SHA256 recomputed.
+- **Architect dispatch:** `shipyard:architect` (opus per `model_routing.architecture`) appended Phase 13 in a single shot. No revision cycles required — user approved on first presentation.
+- **Out of scope (deferred to v1.2):** #13 (Roboflow Inference / RF-DETR), #14 (DOODS2), #23 (parallel validator execution). v1.2 narrative locked in: more inference engines + the parallel-AND mode that uses them.
+- **Next step:** `/shipyard:plan 13` to decompose Phase 13 into per-PR plans.
+
 ## 2026-04-28 — Phase 12 built (`/shipyard:build 12` — Parity Cutover, final phase before v1.0.0)
 
 - **Layout executed:** 3 waves / 8 plans / 18 tasks / ~14 implementation commits + 2 fix-ups + 1 closeout. Wave 1 (5 parallel team-mode `shipyard-build-phase-12-wave-1`) → Wave 2 (1 plan operator-checklist, agent mode) → Wave 3 (2 parallel team-mode `shipyard-build-phase-12-wave-3`). 48h passive-observation gate explicitly **continued in-session per user choice** — Wave 3 builds the reconcile tooling against synthetic NDJSON+CSV fixtures; the actual parity report is a TEMPLATE the operator fills before tagging v1.0.0.
