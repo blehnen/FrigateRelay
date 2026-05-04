@@ -40,7 +40,7 @@ public sealed class PluginRegistrar : IPluginRegistrar
         var snapshotUrlTemplate = context.Configuration.GetSection("BlueIris")["SnapshotUrlTemplate"];
         if (!string.IsNullOrWhiteSpace(snapshotUrlTemplate))
         {
-            var parsedSnapshot = BlueIrisUrlTemplate.Parse(snapshotUrlTemplate); // fail-fast at startup if invalid
+            var parsedSnapshot = BlueIrisUrlTemplate.Parse(snapshotUrlTemplate, "BlueIris.SnapshotUrlTemplate"); // fail-fast at startup if invalid
             context.Services.AddSingleton(new BlueIrisSnapshotUrlTemplate(parsedSnapshot));
             context.Services.AddSingleton<ISnapshotProvider, BlueIrisSnapshotProvider>();
         }

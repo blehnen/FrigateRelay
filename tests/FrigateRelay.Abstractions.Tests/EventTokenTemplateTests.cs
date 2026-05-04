@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -200,5 +201,22 @@ public class EventTokenTemplateTests
 
         result.Should().Be("Drive%20Way%20HD",
             "the override flows through the same Uri.EscapeDataString path as {camera}");
+    }
+
+    // ---------- Canonical-set drift guard (post-#34 single source of truth) ----------
+
+    private static readonly FrozenSet<string> _canonicalTokens =
+        new[] { "camera", "camera_shortname", "label", "event_id", "zone" }
+            .ToFrozenSet(StringComparer.Ordinal);
+
+    [TestMethod]
+    public void EventTokenTemplate_AllowedTokens_Canonical()
+    {
+        // Hardcoded expected set — NOT a self-comparison. Adding OR removing a token
+        // (e.g. introducing {score} or dropping {zone}) requires updating BOTH
+        // EventTokenTemplate.AllowedTokens AND this test, by design.
+        EventTokenTemplate.AllowedTokens.SetEquals(_canonicalTokens).Should().BeTrue(
+            because: "AllowedTokens is the single source of truth for templated event-context placeholders. " +
+                     "Adding a token requires updating both EventTokenTemplate.AllowedTokens and this canonical-set test.");
     }
 }

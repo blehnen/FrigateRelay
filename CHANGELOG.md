@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reflection-based counter-inventory drift test (`CounterInventoryDriftTests`).
 - README "Observability" section. Issue #36.
 
+### Changed
+
+- Collapsed `BlueIrisUrlTemplate` to a thin wrapper around `EventTokenTemplate.Parse`/`Resolve`. Eliminates the duplicated `AllowedTokens` list that produced the v1.0.2 → v1.0.3 P0 — adding a future token (e.g., `{score}`) now requires editing exactly one allowlist instead of two. Public surface (`Parse(string)`, `Resolve(EventContext)`) and behavior unchanged. Canonical-set test in `EventTokenTemplateTests` ensures the allowlist cannot drift unnoticed. Issue #34.
+
 ## [1.0.3] — 2026-05-01
 
 **P0 hotfix on v1.0.2.** The v1.0.2 release shipped the new `{camera_shortname}` token in `EventTokenTemplate.AllowedTokens` and updated the README + migration tool to recommend it, but missed updating `BlueIrisUrlTemplate`'s separate `AllowedTokens` list. Result: any operator who upgraded to v1.0.2 and used `{camera_shortname}` in their `BlueIris.TriggerUrlTemplate` (i.e. anyone following the v1.0.2 README) crashed at startup with:
