@@ -96,6 +96,17 @@ public class BlueIrisUrlTemplateTests
     }
 
     [TestMethod]
+    public void Parse_WithSnapshotCallerName_ErrorMessageReflectsSnapshotKey()
+    {
+        // PluginRegistrar parses the snapshot URL via Parse(template, "BlueIris.SnapshotUrlTemplate")
+        // so operators see the correct config key in the failure message rather than the
+        // default "BlueIris.TriggerUrlTemplate" leaking from the trigger-side default.
+        var act = () => BlueIrisUrlTemplate.Parse("https://x/{nope}", "BlueIris.SnapshotUrlTemplate");
+        act.Should().Throw<ArgumentException>()
+            .Which.Message.Should().Contain("BlueIris.SnapshotUrlTemplate");
+    }
+
+    [TestMethod]
     public void Parse_WithScorePlaceholder_ThrowsBecauseScoreIsNotInAllowlist()
     {
         // Encodes the Q1 architectural decision: {score} was deferred because EventContext
