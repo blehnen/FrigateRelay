@@ -1,5 +1,13 @@
 # Shipyard History
 
+## 2026-05-04 — PR #38 merged + Wave 2 staged
+
+- **PR #38 merged** to origin/main as merge-commit `b110bb3`. CodeRabbit's two stale-text findings (ROADMAP "12 phases" and CounterIncrementTests Test 8 section header) were addressed in commit `4f2b874` before merge.
+- **Local main rebased** onto origin/main — local shipyard wave-1-complete metadata commit replayed as `5dbd4a4` (was `decbaa5`). One unrelated upstream change picked up: Dependabot mstest bump (`085283b`/`e01701a`).
+- **Wave 1 worktree removed** (`.worktrees/feat-35-counter-tags`), local branch `feat/35-counter-tags` deleted.
+- **Wave 2 worktree branched:** `.worktrees/feat-36-observability-docs` on `feat/36-observability-docs` off `origin/main` (`b110bb3`). Baseline verified — `dotnet build FrigateRelay.sln -c Release` 0 warnings/errors, `run-tests.sh --skip-integration` 239/239 across 8 projects. Same as merged-main baseline.
+- **Next step:** dispatch Wave 2 builders — PLAN-2.1 (docs/observability.md + Grafana dashboard JSON + README), PLAN-2.2 (docker/observability/ compose stacks + Makefile), PLAN-2.3 (drift test + RELEASING.md + CHANGELOG). PLAN-2.3's drift test parses PLAN-2.1's markdown so 2.3 should land after 2.1 (or in the same diff with shared test fixtures).
+
 ## 2026-05-04 — Phase 13 Wave 1 built (`/shipyard:build 13` — PR #35 counter tags)
 
 - **Scope:** Wave 1 only on isolated worktree `.worktrees/feat-35-counter-tags` (branch `feat/35-counter-tags`), per the brainstorm decision to ship Phase 13 as 3 sequential PRs.

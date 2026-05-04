@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "Phase 13 Wave 1 build complete on feat/35-counter-tags. PLAN-1.1 + PLAN-1.2 PASS reviews. 6 commits, +201/-64 src/, +320 lines tests, 239/239 tests, 0 warnings. ID-29 filed (eviction-log staleness, deferred). Ready to push + open PR #35.",
-  "status": "wave_1_complete",
+  "position": "Wave 1 (PR #38) merged 2026-05-04. Wave 2 worktree branched at .worktrees/feat-36-observability-docs (branch feat/36-observability-docs off b110bb3). Baseline clean — 239/239 tests, 0 warnings. Ready to dispatch builders for PLAN-2.1, 2.2, 2.3.",
+  "status": "wave_2_starting",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }
