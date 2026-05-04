@@ -200,7 +200,8 @@ public sealed class CounterIncrementTests
     }
 
     // -----------------------------------------------------------------------
-    // Test 8: errors.unhandled increments ONCE with NO tags when IEventSource throws
+    // Test 8: errors.unhandled increments ONCE tagged component="EventPump" when
+    // IEventSource throws (Phase 13 #35 supersedes Phase 9's tagless behavior).
     // -----------------------------------------------------------------------
 
     [TestMethod]

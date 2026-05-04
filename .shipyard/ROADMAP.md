@@ -414,7 +414,7 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ## Phase Count
 
-**12 phases.** Within the 8–14 range requested. Phases 1–2 parallelizable after the `.sln` exists; Phases 3–12 sequential.
+**13 phases.** Phases 1–12 delivered v1.0; Phase 13 is the v1.1 Observability + Cleanup work. Phases 1–2 parallelizable after the `.sln` exists; Phases 3–13 sequential.
 
 ## Questions Appendix
 
