@@ -240,10 +240,13 @@ datasource name on import.
 
 ## `make verify-observability`
 
-The `Makefile` target `verify-observability` (added by PLAN-2.2) runs a pre-release smoke
-test of the full OTel/Prometheus/Grafana stack. It starts the compose stack, waits for
-Prometheus to scrape at least one FrigateRelay metric, then tears down. Run it once before
-tagging a release:
+The `Makefile` target `verify-observability` runs a pre-release smoke check of the
+OTel/Prometheus/Grafana stack. It starts the compose stack, waits for Prometheus and
+Grafana to report healthy (`/-/ready` and `/api/health` respectively), then tears down.
+The recipe verifies the *backend* stack — to confirm a tagged counter sample reaches
+Prometheus end to end, run a FrigateRelay instance against the collector beforehand and
+watch `:9090/graph` for any `frigaterelay_*_total` series. Run once before tagging a
+release:
 
 ```bash
 make verify-observability

@@ -75,7 +75,7 @@ public sealed class CounterInventoryDriftTests
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
-            if (line.Contains("Metric") && line.Contains("Tags") && line.StartsWith('|'))
+            if (line == "| Metric | Tags | Description |")
             {
                 headerIndex = i;
                 break;

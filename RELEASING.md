@@ -1,6 +1,6 @@
 # Releasing FrigateRelay
 
-This document is the operator's run book for cutting the `v1.0.0` release tag. The actual `git tag` command is a **manual operator step** — not an agent task. Phase 10's `release.yml` workflow fires automatically once the tag is pushed.
+This document is the operator's run book for cutting a release tag. The actual `git tag` command is a **manual operator step** — not an agent task. Phase 10's `release.yml` workflow fires automatically once the tag is pushed.
 
 ## Pre-release checklist
 
