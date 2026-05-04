@@ -1,5 +1,22 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 COMPLETE — all three v1.1 PRs merged
+
+- **PR #40 merged** to origin/main as merge-commit `06b4ba4`. CodeRabbit's one minor finding (snapshot caller-name leak) addressed in commit `7e13c04` before merge — `BlueIrisUrlTemplate.Parse` now accepts an optional `callerName` parameter; PluginRegistrar passes `"BlueIris.SnapshotUrlTemplate"` for snapshot validation; new regression test pins the contract.
+- **All three v1.1 PRs merged** (final summary):
+
+| PR | Issue | Merge commit | Scope |
+|---|---|---|---|
+| #38 | #35 | `b110bb3` | Structured counter tags + `MeterListener` tests |
+| #39 | #36 | `f4c9c73` | `docs/observability.md` + Grafana dashboard + reference compose stacks + `make verify-observability` + reflection drift test + RELEASING |
+| #40 | #34 | `06b4ba4` | `BlueIrisUrlTemplate` collapse + canonical-set drift test + caller-name parameter |
+
+- **Cumulative diff** (v1.0.3 → v1.1.0 candidate): all three PRs combined produced ~1100 lines of net additions (mostly the observability docs + reference stacks + drift tests), with the `BlueIrisUrlTemplate` collapse netting -34 lines on the source side.
+- **Test count** went 229 (pre-#38) → 239 (#38, +10 from `CounterTagMatrixTests`) → 240 (#39, +1 from `CounterInventoryDriftTests`) → 241 (#40, +1 from canonical-set test) → 242 (#40 review fix, +1 from snapshot caller-name regression guard).
+- **Worktrees cleaned up** (`feat-35-counter-tags`, `feat-36-observability-docs`, `refactor-34-blueiris-template` all removed; their branches deleted).
+- **Outstanding follow-ups (not v1.1 blockers):** ID-29 in `.shipyard/ISSUES.md` — eviction-callback log staleness (one-line fix, post-v1.1).
+- **Next step:** operator cuts `v1.1.0` per `RELEASING.md`. Promote CHANGELOG `[Unreleased]` → `[1.1.0] — 2026-05-04`, run pre-release checklist (`run-tests.sh`, `secret-scan.sh`, `make verify-observability` with FrigateRelay running), `git tag -a v1.1.0 -m "..."`, `git push origin v1.1.0`. The release.yml workflow auto-builds and pushes multi-arch GHCR images on tag push.
+
 ## 2026-05-04 — Phase 13 Wave 3 built + PR #40 opened (final v1.1 PR)
 
 - **Scope:** PR for issue #34 (`BlueIrisUrlTemplate` collapse + canonical-set drift test). Final PR in the v1.1 trio.

@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "Wave 3 (PR #40 closes #34) pushed and opened. 4 commits on refactor/34-blueiris-template from f4c9c73 base, +33/-46 lines, 241/241 tests, 11 BlueIris tests pass unchanged, +1 canonical-set drift guard. Reviewer PASS (0 critical / 0 important / 2 deferrable suggestions, 1 addressed inline). Awaiting merge before v1.1.0 cut.",
-  "status": "wave_3_in_review",
+  "position": "Phase 13 COMPLETE on main at 06b4ba4. PR #38 (issue #35), PR #39 (issue #36), PR #40 (issue #34) all merged. 242/242 tests, 0 warnings. CHANGELOG [Unreleased] aggregates all three PRs' bullets — ready for promotion to [1.1.0] and `git tag v1.1.0` per RELEASING.md.",
+  "status": "phase_complete",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }
