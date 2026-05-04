@@ -1,5 +1,25 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 Wave 3 built + PR #40 opened (final v1.1 PR)
+
+- **Scope:** PR for issue #34 (`BlueIrisUrlTemplate` collapse + canonical-set drift test). Final PR in the v1.1 trio.
+- **Branch:** `refactor/34-blueiris-template` off `f4c9c73` (post-#39 main). Pushed; PR #40 opened.
+- **Plan built:** PLAN-3.1 (4 tasks, one over the 3-task limit; architect justified Task 4 as one-line CHANGELOG bookkeeping). Reviewer verdict PASS.
+- **Commits on `refactor/34-blueiris-template`** (4):
+  - `004dfb3` — `refactor(blueiris): collapse BlueIrisUrlTemplate to thin wrapper around EventTokenTemplate`. 58 → 24 lines. Single source of truth for `AllowedTokens`, regex, and unknown-placeholder error wording.
+  - `f7c32ba` — `test(abstractions): add EventTokenTemplate_AllowedTokens_Canonical drift guard`. Hardcoded canonical set; catches both additions and removals.
+  - `940b24a` — `docs(changelog): add [Unreleased] entry for BlueIrisUrlTemplate collapse (Issue #34)`.
+  - `f824bd2` — `review: clarify drift-test comment to cover removals as well as additions` (PLAN-3.1 review suggestion).
+- **Cumulative diff:** 3 src/test files, +33/-46 net (collapse shrank `BlueIrisUrlTemplate` more than the new test added).
+- **Verification:** `dotnet build` 0 warnings/errors; full suite 241/241 across 8 projects (was 240 from PR #39 = +1 from canonical-set test); the 11 existing `BlueIrisUrlTemplateTests` pass unchanged (RESEARCH.md prediction confirmed: wildcard error-message assertions survive the new caller-name format).
+- **Decisions confirmed:**
+  - **D6** drift test uses an explicit hardcoded `private static readonly FrozenSet<string> _canonicalTokens` field (`{ camera, camera_shortname, label, event_id, zone }`). NOT a self-comparison.
+  - **`BlueIrisSnapshotUrlTemplate` untouched** per the issue's explicit guidance — DI marker only.
+  - **`BlueIrisActionPlugin.cs` call sites unaffected** — `Parse(string)` signature preserved.
+- **Reviewer findings landed this PR:** 0 Critical / 0 Important / 2 Suggestions. 1 addressed inline (test-comment scope tightened to mention removals); 1 deferred (SUMMARY-3.1 prose says `record` while implementation is `class` — historical artifact, no source impact).
+- **Closes the v1.0.2→v1.0.3 P0 root cause structurally.** Adding a future token (e.g., `{score}`) now requires editing exactly one allowlist; the canonical-set test fails CI on drift.
+- **Next step:** merge PR #40, then cut `v1.1.0` per `RELEASING.md`. CHANGELOG `[Unreleased]` already aggregates all three PRs' bullets.
+
 ## 2026-05-04 — Phase 13 Wave 2 built + PR #39 opened
 
 - **Scope:** PR for issue #36 (`docs/observability.md` + Grafana dashboard JSON + `docker/observability/` reference compose stacks + root `Makefile` `verify-observability` target + `RELEASING.md` retitle + drift test + CHANGELOG).

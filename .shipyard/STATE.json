@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "Wave 2 (PR #39 closes #36) pushed and opened. 12 commits on feat/36-observability-docs from b110bb3 base, +1101/-1 lines, 240/240 tests, drift test guards doc-vs-Meter parity. Both per-plan reviewers PASS (PLAN-2.1, 2.2, 2.3); all 8 review findings (1 important + 7 minor/suggestion) addressed inline. Awaiting merge before Wave 3.",
-  "status": "wave_2_in_review",
+  "position": "Wave 3 (PR #40 closes #34) pushed and opened. 4 commits on refactor/34-blueiris-template from f4c9c73 base, +33/-46 lines, 241/241 tests, 11 BlueIris tests pass unchanged, +1 canonical-set drift guard. Reviewer PASS (0 critical / 0 important / 2 deferrable suggestions, 1 addressed inline). Awaiting merge before v1.1.0 cut.",
+  "status": "wave_3_in_review",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }
