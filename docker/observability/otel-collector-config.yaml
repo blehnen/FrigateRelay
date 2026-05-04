@@ -1,0 +1,31 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # No namespace — counters are already named `frigaterelay.*` in the Meter, so
+    # the Prometheus exporter normalizes them to `frigaterelay_*_total` directly.
+    # Setting `namespace: frigaterelay` here would double-prefix to
+    # `frigaterelay_frigaterelay_*_total` and break every dashboard panel.
+  debug:
+    verbosity: detailed
+
+processors:
+  batch:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

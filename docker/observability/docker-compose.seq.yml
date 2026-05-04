@@ -1,0 +1,19 @@
+name: frigaterelay-seq
+
+services:
+  seq:
+    image: datalust/seq:2024.3
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - seq-data:/data
+    ports:
+      - "5341:5341"   # Serilog HTTP sink ingestion + UI
+      - "8081:80"     # Alternate UI port (avoids conflicts with Prometheus/Grafana stack)
+    restart: unless-stopped
+
+# Named volume preserves ingested logs across `docker compose up/down` cycles.
+# The Makefile `verify-observability` recipe uses `down -v` so smoke teardown
+# still wipes state — the volume only matters for ongoing operator use.
+volumes:
+  seq-data:

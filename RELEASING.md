@@ -1,6 +1,6 @@
-# Releasing FrigateRelay v1.0.0
+# Releasing FrigateRelay
 
-This document is the operator's run book for cutting the `v1.0.0` release tag. The actual `git tag` command is a **manual operator step** — not an agent task. Phase 10's `release.yml` workflow fires automatically once the tag is pushed.
+This document is the operator's run book for cutting a release tag. The actual `git tag` command is a **manual operator step** — not an agent task. Phase 10's `release.yml` workflow fires automatically once the tag is pushed.
 
 ## Pre-release checklist
 
@@ -9,6 +9,7 @@ Every item must be checked before running the tag command.
 - [ ] All Phase 12 plans complete (`/shipyard:status` shows phase-12 closed)
 - [ ] `dotnet build FrigateRelay.sln -c Release` exits 0 (warnings-as-errors; must be clean on both Ubuntu and Windows)
 - [ ] `.github/scripts/run-tests.sh` exits 0 (all test projects green)
+- [ ] `make verify-observability` exits 0 (reference compose stack boots and Prometheus + Grafana respond healthy). Operator should additionally have a FrigateRelay instance running and emitting to the OTel Collector beforehand to manually confirm a tagged counter sample reaches Prometheus (browse `:9090/graph` for any `frigaterelay_*_total` series).
 - [ ] `.github/scripts/secret-scan.sh` exits 0 (no secret-shaped strings in the tree)
 - [ ] `docs/parity-report.md` is populated (not the template placeholder) AND shows zero missed alerts AND zero spurious alerts; or every discrepancy is explicitly documented as an intentional behavioral improvement
 - [ ] The ≥48-hour parity window has closed and the [`docs/parity-window-checklist.md`](docs/parity-window-checklist.md) close-out steps are complete

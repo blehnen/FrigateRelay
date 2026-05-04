@@ -96,6 +96,12 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 - **SnapshotProvider override:** `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
 - **Validators** attach to specific action entries and gate that action independently.
 
+## Observability
+
+FrigateRelay emits OpenTelemetry metrics and traces under `Meter "FrigateRelay"` and `ActivitySource "FrigateRelay"`, plus Serilog logs to console and (optionally) Seq. The 10 counters carry structured tags (camera, subscription, action, etc.) bounded by your Frigate + subscription config.
+
+See [docs/observability.md](docs/observability.md) for the full counter inventory, cardinality guidance, OTLP collector setup, and Grafana dashboard import. A reference compose stack lives in [docker/observability/](docker/observability/).
+
 ## Validator engine status
 
 FrigateRelay ships with one validator plugin today — **CodeProject.AI** — but **active CodeProject.AI development has stopped upstream**. The plugin's request shape (`POST /v1/vision/detection`) is also the API exposed by **[Blue Onyx](https://github.com/xnorpx/blue-onyx)**, so the existing plugin is the supported path to either backend.
