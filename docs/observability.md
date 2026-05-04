@@ -101,18 +101,25 @@ To activate OTLP export, set the collector endpoint:
 **Option B — environment variable:**
 
 ```
-OTEL__OTLPENDPOINT=http://otel-collector:4317
+Otel__OtlpEndpoint=http://otel-collector:4317
 ```
 
 The double-underscore convention maps to the nested `Otel:OtlpEndpoint` key per standard
-.NET `IConfiguration` binding rules.
+.NET `IConfiguration` binding rules. The casing matches the JSON section/key on purpose —
+copy-paste between the two forms is mechanical.
+
+The OTel SDK also recognises the native `OTEL_EXPORTER_OTLP_ENDPOINT` env var directly. In
+FrigateRelay, `HostBootstrap.cs` configures the exporter from `IConfiguration`, so
+`Otel__OtlpEndpoint` (or its JSON-form equivalent) takes precedence. Use the .NET form for
+FrigateRelay-managed config; reach for the SDK form only if you have a sidecar-injected
+OTel config that bypasses `IConfiguration` entirely.
 
 **Protocol:** The exporter defaults to OTLP/gRPC. Port `4317` is the standard gRPC receiver
 port. If your collector only exposes the HTTP/protobuf endpoint, set the protocol explicitly:
 
 ```
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL__OTLPENDPOINT=http://otel-collector:4318/v1/metrics
+Otel__OtlpEndpoint=http://otel-collector:4318/v1/metrics
 ```
 
 **What is exported:** When `OtlpEndpoint` is set, both metrics and traces are exported to the
@@ -136,7 +143,7 @@ alongside your FrigateRelay container:
 docker compose -f docker/observability/docker-compose.yml up -d
 ```
 
-Then set `OTEL__OTLPENDPOINT=http://otel-collector:4317` in your FrigateRelay environment
+Then set `Otel__OtlpEndpoint=http://otel-collector:4317` in your FrigateRelay environment
 (or in the `Otel:OtlpEndpoint` config key). The OTel Collector exposes the standard gRPC
 receiver on port `4317` and forwards scraped metrics to Prometheus. Grafana is available at
 `http://localhost:3000` with no authentication in the reference stack — restrict access
