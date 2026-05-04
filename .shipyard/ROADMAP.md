@@ -362,9 +362,59 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
+## Phase 13 — v1.1 Observability + Cleanup  *[NOT STARTED]*
+
+**Status:** Not started. v1.0.x is GA (v1.0.0 shipped 2026-05-03; v1.0.3 patched the `{camera_shortname}` allowlist drift). This phase ships the v1.1 minor: complete the observability story so operators can stand up dashboards out of the box, and collapse the `BlueIrisUrlTemplate`/`EventTokenTemplate` allowlist drift that caused the v1.0.2→v1.0.3 P0. Source of truth for scope: `PROJECT.md` "Post-v1.0 Scope — v1.1" section. Issues in scope: **#34** (refactor), **#35** (counter tags), **#36** (docs + reference compose stack). Issues #13, #14, #23 are explicitly v1.2 and out of scope here.
+
+**Goal.** Ship v1.1.0 with (a) every counter on `Meter "FrigateRelay"` carrying the structured tags an operator needs to pivot a dashboard by camera/subscription/action/validator/component; (b) end-to-end observability docs + a reference Grafana dashboard + a `docker/observability/` stack; (c) `BlueIrisUrlTemplate` reduced to a thin wrapper around `EventTokenTemplate` so a future allowed-token additive (e.g. `{score}`) requires editing exactly one allowlist.
+
+**Dependencies.** Phase 12 (v1.0.0 GA on `main`; release.yml + RELEASING.md tag-cut policy in place).
+
+**Risk.** **Low–Medium**. Composite breakdown:
+- **#34 — Low.** Pure refactor with strong existing test coverage (23 `BlueIrisUrlTemplateTests`). Failure modes are caught at compile or test time.
+- **#35 — Low–Medium.** Touches every counter increment site in `DispatcherDiagnostics.cs` (10 counters). Mistakes are observable (missing tags show up immediately in any consumer) and recoverable (additive change; fix-forward in a patch). The CHANGELOG-additive semver-minor classification is correct because metric *names* persist — only series cardinality grows.
+- **#36 — Low.** Docs + reference compose stack, no production-path changes. Worst case: dashboard imports cleanly but a panel pivots wrong, fixed in a follow-up patch.
+
+**Estimate.** 4–6 hours of active work + the operator's manual `make verify-observability` smoke time (one-shot `docker compose up` + scrape + dashboard import + tear down).
+
+**PR sequencing (decided).** Three sequential PRs against `main`:
+1. **#35 first.** Tags must land before #36's dashboard panels can pivot by them; otherwise the v1.1 dashboard would only work at system-aggregate and need an immediate follow-up.
+2. **#36 second.** Depends on #35's tags. Bundles `docs/observability.md`, `docs/grafana/frigaterelay-dashboard.json`, `docker/observability/`, the `Makefile` target, the `RELEASING.md` line, and the README link in one diff so reviewers see the full observability story together.
+3. **#34 in any slot.** Independent of the other two — pure refactor, zero behavior change. Can land before, between, or after the observability pair.
+
+**Deliverables.**
+
+- **#35 — Tag every counter (`src/FrigateRelay.Host/Dispatch/DispatcherDiagnostics.cs`).** Add structured tags to all 10 counters per the issue inventory: `subscription`, `camera`, `label`, `action`, `validator`, `reason`, `component`. **Hard rule: no `event_id` tag** (cardinality-bomb forbidden; CI grep gate enforces). Per-counter XML doc-comment lists the tag set + cardinality rule so a future contributor adding a counter cannot ship without filling in the tag-set field. New `MeterListener`-based unit tests in `tests/FrigateRelay.Host.Tests/` assert tag presence — one test per counter is sufficient. CHANGELOG entry classifies as additive (semver minor): aggregate Prometheus queries that don't filter on tags continue to return the same totals.
+- **#36 — Observability docs + reference stack.** Depends on #35 landing first. Ships:
+  - `docs/observability.md` — counter inventory matching `DispatcherDiagnostics.cs` exactly (drift would fail the doc-vs-code parity test if added; at minimum, the comment in `DispatcherDiagnostics.cs` reads "if you add a counter here, update `docs/observability.md`"), OTLP export config, end-to-end docker-compose recipes, cardinality rules for plugin authors.
+  - `docs/grafana/frigaterelay-dashboard.json` — panels covering: events received/matched per camera, actions succeeded/failed per camera+action, validator rejection rate per validator, dispatch drops + exhaustion.
+  - `docker/observability/` directory with two compose stacks: (a) FrigateRelay → OTel Collector → Prometheus + Grafana, (b) FrigateRelay → Seq for logs.
+  - `make verify-observability` Makefile target — hosts the operator's manual smoke-test ritual: `docker compose up`, scrape FrigateRelay, assert at least one tagged counter sample lands in Prometheus, assert the dashboard imports cleanly into vanilla Grafana, tear down.
+  - One line in `RELEASING.md` invoking `make verify-observability` as a pre-tag-push step.
+  - README.md gains a new "Observability" section linking to `docs/observability.md`.
+- **#34 — Collapse the BlueIris template allowlist (`src/FrigateRelay.Plugins.BlueIris/BlueIrisUrlTemplate.cs` + `src/FrigateRelay.Abstractions/EventTokenTemplate.cs`).** Reduce `BlueIrisUrlTemplate` to a thin wrapper that delegates to `EventTokenTemplate`. Single source of truth for `AllowedTokens`. Add a test that asserts `BlueIrisUrlTemplate.AllowedTokens.SetEquals(EventTokenTemplate.AllowedTokens)` so a future divergence fails CI loudly. All 23 existing `BlueIrisUrlTemplateTests` must pass unchanged — or with only the unknown-placeholder error-message contract loosened to match `EventTokenTemplate`'s caller-name pattern (test assertions updated minimally; no behavioral regression).
+
+**Success criteria (verifiable).**
+- `dotnet build FrigateRelay.sln -c Release` zero warnings on both Linux and Windows (warnings-as-errors invariant unchanged).
+- All existing tests pass; new `MeterListener` tests assert tag inventory per counter (one per counter); new `BlueIrisUrlTemplate.AllowedTokens.SetEquals(EventTokenTemplate.AllowedTokens)` test passes.
+- `git grep '"event_id"' src/FrigateRelay.Host/Dispatch/` returns empty (cardinality-bomb tripwire).
+- `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` still empty (architectural invariant unchanged).
+- `make verify-observability` succeeds locally before tag push: reference stack scrapes a tagged counter sample into Prometheus and imports the dashboard cleanly into vanilla Grafana, then tears down without leaking containers.
+- `RELEASING.md` updated with the new pre-release smoke step.
+- A new operator can go from zero to a working Grafana dashboard in under fifteen minutes following `docs/observability.md` + the `docker/observability/` stack.
+- Three merged PRs on `main` (one per issue), then `v1.1.0` tag — operator-cut per the CONTEXT-12 D7 manual tag-cut policy from v1.0; release.yml auto-builds + pushes multi-arch GHCR images on the tag push.
+
+**Risk reductions.**
+- **Closes the v1.0.2→v1.0.3 P0 root cause.** The `{camera_shortname}` allowlist drift was a duplicated `AllowedTokens` set across `BlueIrisUrlTemplate` and `EventTokenTemplate`. After #34, adding a future token (e.g. `{score}`) requires editing `EventTokenTemplate.AllowedTokens` only — the BlueIris-side allowlist no longer exists as a parallel surface that can drift.
+- **Eliminates aggregate-only-counter blindness.** Pre-#35, dashboards can only show system totals; a single misbehaving camera or a single failing action is invisible to the operator without code-level log inspection. After #35, every counter is pivotable by camera, subscription, action, validator, and component — the v1.1 dashboard makes per-camera action-failure rates visible at a glance.
+- **Forces the per-counter discipline forward.** The XML doc-comment template + the "if you add a counter here, update `docs/observability.md`" comment means a future contributor adding a new counter must choose a tag set deliberately, not by omission — the docs and the code stay in lockstep by construction.
+- **No production-path code change for #36.** The reference stack and docs land without touching any dispatch, plugin, or host runtime code, isolating risk to the observability surface only.
+
+---
+
 ## Phase Count
 
-**12 phases.** Within the 8–14 range requested. Phases 1–2 parallelizable after the `.sln` exists; Phases 3–12 sequential.
+**13 phases.** Phases 1–12 delivered v1.0; Phase 13 is the v1.1 Observability + Cleanup work. Phases 1–2 parallelizable after the `.sln` exists; Phases 3–13 sequential.
 
 ## Questions Appendix
 
@@ -372,3 +422,12 @@ No speculative technology substitutions or scope changes. One intentionally defe
 
 - **Alpine vs Debian-slim base image (Phase 10):** PROJECT.md says "locked in during the plan phase"; this roadmap defers the lock-in to the start of Phase 10 because it depends on empirical image-size and MQTTnet/OTel-gRPC compatibility on musl, which cannot be usefully decided earlier. Current lean: **Alpine**, with a documented fallback to Debian-slim. Flagging here rather than pre-deciding.
 - **`/healthz` transport (Phase 10):** Minimal API pulls in ASP.NET Core; a raw TCP listener is heavier to maintain. Lean: minimal API, but this is worth a five-minute decision at the top of Phase 10 before committing.
+
+### Phase 13 open questions (surface, do not decide silently)
+
+The v1.1 scope in `PROJECT.md` is closed; these are clarifications a planner will need at the start of Phase 13 PR-1 (#35) and PR-2 (#36) but that the roadmap does not pre-decide:
+
+- **Tag-vs-counter matrix.** `PROJECT.md` lists the tag inventory (`subscription`, `camera`, `label`, `action`, `validator`, `reason`, `component`) and the rule "never `event_id`", but does not pin which counters carry which tags. The issue (#35) is the source of truth; PR-1's planning brief should resolve the per-counter tag selection before implementation begins.
+- **`make verify-observability` host requirements.** The Makefile target encodes the operator's manual ritual; whether it shells out to `docker compose` directly or wraps a small Python/bash helper script is a planning-phase choice. Either is acceptable provided the target is idempotent and tears down cleanly on failure.
+- **Dashboard JSON Grafana version target.** The dashboard must "import cleanly into vanilla Grafana", but the specific Grafana version pinned in `docker/observability/` (and therefore the dashboard's `schemaVersion`) is a five-minute decision at the start of PR-2. Lean: latest stable Grafana OSS at the time of PR-2.
+- **`#34` error-message contract loosening.** The 23 existing `BlueIrisUrlTemplateTests` may need their unknown-placeholder error-message assertions loosened to match `EventTokenTemplate`'s caller-name pattern. Whether to update the tests vs. preserve the exact prior message via wrapper-side formatting is a small planning call — preference is updating the tests (single source of truth wins) but worth flagging at PR-3 time so the reviewer is not surprised.

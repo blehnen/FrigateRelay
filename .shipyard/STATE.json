@@ -1,8 +1,8 @@
 {
   "schema": 3,
-  "phase": 12,
-  "position": "Phase 12 (Parity Cutover) build complete. 8 plans / 18 tasks / 208/208 tests / verifier COMPLETE / auditor PASS_WITH_NOTES (ID-28 closed inline) / simplifier clean / documenter blocker fixed inline. ROADMAP complete through Phase 12. Ready for /shipyard:ship → manual v1.0.0 tag per RELEASING.md.",
-  "status": "complete",
-  "updated_at": "2026-04-28T20:30:00Z",
+  "phase": 13,
+  "position": "Phase 13 planned: 6 plans across 3 waves (1.1+1.2 / 2.1+2.2+2.3 / 3.1), 18 tasks. CRITIQUE READY, VERIFICATION PASS_WITH_NOTES (3 caveats addressed inline). Ready for /shipyard:build 13.",
+  "status": "planned",
+  "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }

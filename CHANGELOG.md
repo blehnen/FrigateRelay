@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Structured tags on all 10 `Meter "FrigateRelay"` counters via new `DispatcherDiagnostics.Increment*` helpers. Tag matrix documented in `docs/observability.md` (added in v1.1.0). Forbidden tag `event_id` is enforced by CI grep gate. `errors.unhandled` now carries a `component` tag (e.g., `EventPump`) so operators can triage unhandled errors by failing subsystem; replaces Phase 9's deliberately tagless behaviour. Issue #35.
+
 ## [1.0.3] — 2026-05-01
 
 **P0 hotfix on v1.0.2.** The v1.0.2 release shipped the new `{camera_shortname}` token in `EventTokenTemplate.AllowedTokens` and updated the README + migration tool to recommend it, but missed updating `BlueIrisUrlTemplate`'s separate `AllowedTokens` list. Result: any operator who upgraded to v1.0.2 and used `{camera_shortname}` in their `BlueIris.TriggerUrlTemplate` (i.e. anyone following the v1.0.2 README) crashed at startup with:

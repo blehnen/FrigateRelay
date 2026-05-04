@@ -1,5 +1,34 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 planned (`/shipyard:plan 13` — v1.1 Observability + Cleanup)
+
+- **Discussion capture (CONTEXT-13.md):** 4 design decisions resolved interactively (D1 helper-method API for tags, D2 reflection-based drift test, D3 direct-shell Makefile, D4 update tests for #34 error-message contract). Then 5 OQs surfaced by RESEARCH.md addendum (D5 events.received tag matrix amended — drop `subscription`, D6 explicit canonical-set drift test post-collapse, D7 two compose files in docker/observability/, OQ-2 auto-resolved, OQ-4 RELEASING.md retitle, D8 actual test count is 11 not 23).
+- **Researcher (sonnet):** required one continuation SendMessage to write the file. RESEARCH.md = 336 lines. Documented every counter call site with file:line refs, OTLP wiring (gRPC port 4317), DispatcherDiagnostics shape (static class, no DI), DispatchItem/EventContext field inventory, existing MeterListener test patterns at `tests/FrigateRelay.Host.Tests/Observability/CounterIncrementTests.cs`, full template-class shapes for #34, all call sites of BlueIrisUrlTemplate.
+- **Architect (opus):** generated 6 plan files / 18 tasks across 3 waves on the first dispatch. PLAN-3.1 has 4 tasks (justified inline — Task 4 is one-line CHANGELOG). All 8 CONTEXT-13 decisions honored. Wave 1 plans 1.1+1.2 file-disjoint (parallel-safe within PR working branch); Wave 2 plans 2.1+2.2+2.3 file-disjoint.
+- **Verifier — completeness (sonnet):** verdict **PASS_WITH_NOTES**. All 10 ROADMAP success criteria + all 9 CONTEXT-13 decisions covered. 3 caveats: Gap-1 (Makefile scope vs SC-7 wording — operator pre-condition) and Gap-2 (PLAN-2.2 must_haves missing config files) addressed inline by orchestrator with surgical edits to PLAN-2.2 and PLAN-2.3. Gap-3 (PLAN-3.1 4 tasks) accepted with architect's inline justification.
+- **Verifier — critique (sonnet):** required one continuation SendMessage to write the file. CRITIQUE.md = 9.1KB. Verdict **READY** — all 6 plans feasible as written, file paths verified, API surface match, verification commands runnable, cross-plan dependencies acyclic.
+- **Inline edits this session:** PLAN-2.2 must_haves now lists otel-collector-config.yaml + prometheus.yml; PLAN-2.3 RELEASING.md task wording amended to include operator pre-condition for SC-7 counter-sample confirmation (Makefile per D3 verifies stack health only — operator manually confirms `frigaterelay_*_total` series in `:9090/graph` to honor SC-7 intent without expanding Makefile scope).
+- **Native tasks:** 6 created via TaskCreate (one per plan). Status: pending.
+- **State:** phase=13, status=planned, position="Ready for /shipyard:build 13".
+- **Next step:** `/shipyard:build 13` (or optionally `/shipyard:worktree create phase-13-v1.1` for isolation first).
+
+## 2026-05-04 — v1.1 scope captured (`/shipyard:brainstorm` — post-v1.0 issue triage)
+
+- **Trigger:** user invoked `/shipyard:brainstorm` to plan against the 6 open GitHub issues at https://github.com/blehnen/FrigateRelay/issues.
+- **Scope decisions (interactive Q&A):**
+  - **Q1 PROJECT.md handling** → Update existing (append "Post-v1.0 Scope — v1.1" section, preserve v1.0 history).
+  - **Q2 release split** → Option B: tight v1.1 = #34 + #35 + #36 (refactor + observability story); v1.2 picks up #13 + #14 + #23 (new validators + parallel mode).
+  - **Q3 PR sequencing within v1.1** → Option A: three sequential PRs (#35 first, #36 second, #34 any slot — independent).
+  - **Q4 docker-compose recipes (#36)** → Option C: compose files under `docker/observability/` + `make verify-observability` Makefile target + one line in `RELEASING.md` for pre-tag-push manual smoke. No new CI job.
+  - **Q5 roadmap handling** → Append Phase 13 to existing ROADMAP.md (preserve Phases 1–12 verbatim).
+- **Artifacts written:**
+  - `PROJECT.md` — appended "## Post-v1.0 Scope — v1.1 (observability + structural cleanup)" with Goals / In scope / Out of scope (v1.2 deferral) / PR sequencing / verification gates / success criteria.
+  - `ROADMAP.md` — appended "## Phase 13 — v1.1 Observability + Cleanup `[NOT STARTED]`" matching Phase 11/12 heading style. 60 lines added (374 → 433). New "Phase 13 open questions" subsection under existing Questions Appendix surfaces 4 deferred-decision items (per-counter tag selection, `make verify-observability` shell-vs-script, Grafana version pin, #34 error-message contract loosening).
+  - `STATE.json` — restored from HEAD (working tree had a stale Phase 4 snapshot from a prior corrupted write) and forward-rolled to Phase 13 / status ready. SHA256 recomputed.
+- **Architect dispatch:** `shipyard:architect` (opus per `model_routing.architecture`) appended Phase 13 in a single shot. No revision cycles required — user approved on first presentation.
+- **Out of scope (deferred to v1.2):** #13 (Roboflow Inference / RF-DETR), #14 (DOODS2), #23 (parallel validator execution). v1.2 narrative locked in: more inference engines + the parallel-AND mode that uses them.
+- **Next step:** `/shipyard:plan 13` to decompose Phase 13 into per-PR plans.
+
 ## 2026-04-28 — Phase 12 built (`/shipyard:build 12` — Parity Cutover, final phase before v1.0.0)
 
 - **Layout executed:** 3 waves / 8 plans / 18 tasks / ~14 implementation commits + 2 fix-ups + 1 closeout. Wave 1 (5 parallel team-mode `shipyard-build-phase-12-wave-1`) → Wave 2 (1 plan operator-checklist, agent mode) → Wave 3 (2 parallel team-mode `shipyard-build-phase-12-wave-3`). 48h passive-observation gate explicitly **continued in-session per user choice** — Wave 3 builds the reconcile tooling against synthetic NDJSON+CSV fixtures; the actual parity report is a TEMPLATE the operator fills before tagging v1.0.0.

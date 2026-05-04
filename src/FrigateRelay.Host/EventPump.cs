@@ -90,9 +90,7 @@ internal sealed class EventPump : BackgroundService
                 receiveActivity?.SetTag("event.id", context.EventId);
                 receiveActivity?.SetTag("event.source", source.Name);
 
-                DispatcherDiagnostics.EventsReceived.Add(
-                    1,
-                    new TagList { { "camera", context.Camera }, { "label", context.Label } });
+                DispatcherDiagnostics.IncrementEventsReceived(context);
 
                 var subs = _subsMonitor.CurrentValue.Subscriptions;
 
@@ -114,9 +112,7 @@ internal sealed class EventPump : BackgroundService
                     if (!_dedupe.TryEnter(sub, context)) continue;
                     LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
 
-                    DispatcherDiagnostics.EventsMatched.Add(
-                        1,
-                        new TagList { { "camera", context.Camera }, { "label", context.Label }, { "subscription", sub.Name } });
+                    DispatcherDiagnostics.IncrementEventsMatched(context, sub.Name);
 
                     // Apply per-subscription EventContext augmentations before dispatch (#32).
                     // Today only CameraShortName; future host-managed per-subscription overrides
@@ -165,7 +161,7 @@ internal sealed class EventPump : BackgroundService
         }
         catch (Exception ex)
         {
-            DispatcherDiagnostics.ErrorsUnhandled.Add(1);
+            DispatcherDiagnostics.IncrementErrorsUnhandled("EventPump");
             LogPumpFaulted(_logger, source.Name, ex, null);
         }
         finally

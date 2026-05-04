@@ -200,11 +200,12 @@ public sealed class CounterIncrementTests
     }
 
     // -----------------------------------------------------------------------
-    // Test 8: errors.unhandled increments ONCE with NO tags when IEventSource throws
+    // Test 8: errors.unhandled increments ONCE tagged component="EventPump" when
+    // IEventSource throws (Phase 13 #35 supersedes Phase 9's tagless behavior).
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public async Task ErrorsUnhandled_Increments_OnPumpFault_Once_Untagged()
+    public async Task ErrorsUnhandled_Increments_OnPumpFault_Once_TaggedWithComponent()
     {
         var measurements = new List<(string name, long value, IReadOnlyList<KeyValuePair<string, object?>> tags)>();
         using var listener = BuildListener(measurements, "frigaterelay.errors.unhandled");
@@ -218,7 +219,9 @@ public sealed class CounterIncrementTests
         var hits = measurements.Where(m => m.name == "frigaterelay.errors.unhandled").ToList();
         hits.Should().HaveCount(1, "single unhandled error = one increment");
         hits[0].value.Should().Be(1);
-        hits[0].tags.Should().BeEmpty("errors.unhandled is intentionally tagless (D3/D9)");
+        hits[0].tags.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new KeyValuePair<string, object?>("component", "EventPump"),
+                "Phase 13 issue #35 / CONTEXT-13 D-section adds the `component` tag so operators can triage unhandled errors by failing subsystem");
     }
 
     // -----------------------------------------------------------------------
