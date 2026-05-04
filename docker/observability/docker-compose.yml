@@ -15,6 +15,7 @@ services:
     image: prom/prometheus:v2.55.0
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
@@ -27,8 +28,18 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
     ports:
       - "3000:3000"
     depends_on:
       - prometheus
     restart: unless-stopped
+
+# Named volumes preserve Prometheus scrape history and Grafana state across
+# `docker compose up/down` cycles. The Makefile `verify-observability` recipe
+# uses `down -v` so smoke teardown still wipes everything — these volumes
+# only matter for ongoing operator use.
+volumes:
+  prometheus-data:
+  grafana-data:

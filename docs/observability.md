@@ -100,7 +100,7 @@ To activate OTLP export, set the collector endpoint:
 
 **Option B — environment variable:**
 
-```
+```env
 Otel__OtlpEndpoint=http://otel-collector:4317
 ```
 
@@ -117,7 +117,7 @@ OTel config that bypasses `IConfiguration` entirely.
 **Protocol:** The exporter defaults to OTLP/gRPC. Port `4317` is the standard gRPC receiver
 port. If your collector only exposes the HTTP/protobuf endpoint, set the protocol explicitly:
 
-```
+```env
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 Otel__OtlpEndpoint=http://otel-collector:4318/v1/metrics
 ```
@@ -185,7 +185,7 @@ Then set the Seq server URL in your FrigateRelay config:
 {
   "Serilog": {
     "Seq": {
-      "ServerUrl": "http://seq:5341"
+      "ServerUrl": "http://localhost:5341"
     }
   }
 }
@@ -193,13 +193,18 @@ Then set the Seq server URL in your FrigateRelay config:
 
 **Option B — environment variable:**
 
-```
-SERILOG__SEQ__SERVERURL=http://seq:5341
+```env
+SERILOG__SEQ__SERVERURL=http://localhost:5341
 ```
 
 Seq is available at `http://localhost:5341` (or `http://localhost:8081` for the alternate-port UI mapping) in the
 reference stack. The Seq stack is independent of the OTel stack — you can run one, the other,
 or both.
+
+**Docker networking note:** The default `http://localhost:5341` works when FrigateRelay
+runs natively on the host (or in any container with `network_mode: host`). If FrigateRelay
+runs as a container on the same Compose network as the `seq` service, swap `localhost` for
+the service name `seq` (e.g., `http://seq:5341`).
 
 ---
 

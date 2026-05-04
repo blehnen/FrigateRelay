@@ -9,7 +9,10 @@ receivers:
 exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
-    namespace: frigaterelay
+    # No namespace — counters are already named `frigaterelay.*` in the Meter, so
+    # the Prometheus exporter normalizes them to `frigaterelay_*_total` directly.
+    # Setting `namespace: frigaterelay` here would double-prefix to
+    # `frigaterelay_frigaterelay_*_total` and break every dashboard panel.
   debug:
     verbosity: detailed
 
