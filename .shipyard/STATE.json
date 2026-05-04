@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "v1.1 scope captured in PROJECT.md (Post-v1.0 section). Phase 13 (#34 BlueIris template refactor, #35 counter tags, #36 observability docs + dashboard) appended to ROADMAP.md. Ready for /shipyard:plan 13.",
-  "status": "ready",
+  "position": "Phase 13 planned: 6 plans across 3 waves (1.1+1.2 / 2.1+2.2+2.3 / 3.1), 18 tasks. CRITIQUE READY, VERIFICATION PASS_WITH_NOTES (3 caveats addressed inline). Ready for /shipyard:build 13.",
+  "status": "planned",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }

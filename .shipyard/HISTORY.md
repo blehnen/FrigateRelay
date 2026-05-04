@@ -1,5 +1,17 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 planned (`/shipyard:plan 13` — v1.1 Observability + Cleanup)
+
+- **Discussion capture (CONTEXT-13.md):** 4 design decisions resolved interactively (D1 helper-method API for tags, D2 reflection-based drift test, D3 direct-shell Makefile, D4 update tests for #34 error-message contract). Then 5 OQs surfaced by RESEARCH.md addendum (D5 events.received tag matrix amended — drop `subscription`, D6 explicit canonical-set drift test post-collapse, D7 two compose files in docker/observability/, OQ-2 auto-resolved, OQ-4 RELEASING.md retitle, D8 actual test count is 11 not 23).
+- **Researcher (sonnet):** required one continuation SendMessage to write the file. RESEARCH.md = 336 lines. Documented every counter call site with file:line refs, OTLP wiring (gRPC port 4317), DispatcherDiagnostics shape (static class, no DI), DispatchItem/EventContext field inventory, existing MeterListener test patterns at `tests/FrigateRelay.Host.Tests/Observability/CounterIncrementTests.cs`, full template-class shapes for #34, all call sites of BlueIrisUrlTemplate.
+- **Architect (opus):** generated 6 plan files / 18 tasks across 3 waves on the first dispatch. PLAN-3.1 has 4 tasks (justified inline — Task 4 is one-line CHANGELOG). All 8 CONTEXT-13 decisions honored. Wave 1 plans 1.1+1.2 file-disjoint (parallel-safe within PR working branch); Wave 2 plans 2.1+2.2+2.3 file-disjoint.
+- **Verifier — completeness (sonnet):** verdict **PASS_WITH_NOTES**. All 10 ROADMAP success criteria + all 9 CONTEXT-13 decisions covered. 3 caveats: Gap-1 (Makefile scope vs SC-7 wording — operator pre-condition) and Gap-2 (PLAN-2.2 must_haves missing config files) addressed inline by orchestrator with surgical edits to PLAN-2.2 and PLAN-2.3. Gap-3 (PLAN-3.1 4 tasks) accepted with architect's inline justification.
+- **Verifier — critique (sonnet):** required one continuation SendMessage to write the file. CRITIQUE.md = 9.1KB. Verdict **READY** — all 6 plans feasible as written, file paths verified, API surface match, verification commands runnable, cross-plan dependencies acyclic.
+- **Inline edits this session:** PLAN-2.2 must_haves now lists otel-collector-config.yaml + prometheus.yml; PLAN-2.3 RELEASING.md task wording amended to include operator pre-condition for SC-7 counter-sample confirmation (Makefile per D3 verifies stack health only — operator manually confirms `frigaterelay_*_total` series in `:9090/graph` to honor SC-7 intent without expanding Makefile scope).
+- **Native tasks:** 6 created via TaskCreate (one per plan). Status: pending.
+- **State:** phase=13, status=planned, position="Ready for /shipyard:build 13".
+- **Next step:** `/shipyard:build 13` (or optionally `/shipyard:worktree create phase-13-v1.1` for isolation first).
+
 ## 2026-05-04 — v1.1 scope captured (`/shipyard:brainstorm` — post-v1.0 issue triage)
 
 - **Trigger:** user invoked `/shipyard:brainstorm` to plan against the 6 open GitHub issues at https://github.com/blehnen/FrigateRelay/issues.
