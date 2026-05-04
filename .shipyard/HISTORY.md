@@ -1,5 +1,24 @@
 # Shipyard History
 
+## 2026-05-04 — Phase 13 Wave 1 built (`/shipyard:build 13` — PR #35 counter tags)
+
+- **Scope:** Wave 1 only on isolated worktree `.worktrees/feat-35-counter-tags` (branch `feat/35-counter-tags`), per the brainstorm decision to ship Phase 13 as 3 sequential PRs.
+- **Plans built:** PLAN-1.1 (helper-method refactor on `DispatcherDiagnostics`), PLAN-1.2 (10 `MeterListener` tag-presence tests + CHANGELOG). Both PASS reviews.
+- **Commits on `feat/35-counter-tags`:** 6 atomic commits from `b0fc774`:
+  - `14ec2f5` add 10 helper methods + per-counter XML doc-comments
+  - `d53c4a1` migrate EventPump increment sites
+  - `07479ba` migrate ChannelActionDispatcher increment sites
+  - `07832b2` cross-phase fix: `ErrorsUnhandled_*_Untagged` → `_TaggedWithComponent` (Phase 9 D9 → Phase 13 #35)
+  - `cafaee0` `CounterTagMatrixTests.cs` (10 tests, one per counter, with `event_id` absence tripwire)
+  - `6928164` CHANGELOG `[Unreleased]` entry
+- **Cumulative diff:** 4 src/test files, +201/-64 lines + new 320-line test file.
+- **Verification:** `dotnet build` 0 warnings/errors, `run-tests.sh --skip-integration` 239/239 across 8 projects (up from 229 baseline = +10 from new tests). `git grep '"event_id"' src/FrigateRelay.Host/Dispatch/` empty (CONTEXT-13 hard rule).
+- **Cross-phase decision logged:** Phase 9's deliberate "intentionally tagless `errors.unhandled`" intent is intentionally overruled by Phase 13 issue #35's `component` tag. Operator confirmed at build time.
+- **Builder ergonomics:** Both PLAN-1.1 and PLAN-1.2 builder agents stalled before completing the closeout (build verification + commit + SUMMARY) — orchestrator finished inline. Commits are clean. Pattern noted for future-Phase builder dispatch.
+- **Issue filed (deferred):** `ID-29` — eviction-callback log captures stale `plugin.Name` from loop variable. Pre-existing closure-capture pattern surfaced by PLAN-1.1's refactor; one-line follow-up fix. Counter tags themselves are correct.
+- **Post-phase gates intentionally deferred to end-of-Phase 13.** Wave-level reviewers PASSed both plans; the auditor/simplifier/documenter make more sense once all three PRs (Wave 1+2+3) have landed and the cumulative diff is reviewable as a unit.
+- **Next step:** push `feat/35-counter-tags` and open PR #35; after merge, branch `feat/36-observability-docs` for Wave 2.
+
 ## 2026-05-04 — Phase 13 planned (`/shipyard:plan 13` — v1.1 Observability + Cleanup)
 
 - **Discussion capture (CONTEXT-13.md):** 4 design decisions resolved interactively (D1 helper-method API for tags, D2 reflection-based drift test, D3 direct-shell Makefile, D4 update tests for #34 error-message contract). Then 5 OQs surfaced by RESEARCH.md addendum (D5 events.received tag matrix amended — drop `subscription`, D6 explicit canonical-set drift test post-collapse, D7 two compose files in docker/observability/, OQ-2 auto-resolved, OQ-4 RELEASING.md retitle, D8 actual test count is 11 not 23).

@@ -480,3 +480,32 @@ Phase 8 PLAN-1.1 internalized `ActionEntryJsonConverter` and `SnapshotResolverOp
 
 **Resolution:**
 Implemented Option 1: `ActionEntryTypeConverter : TypeConverter` decorating `ActionEntry` via `[TypeConverter(typeof(ActionEntryTypeConverter))]`. `CanConvertFrom(string) => true`, `ConvertFrom(string s) => new ActionEntry(s)`. Coexists with the existing `[JsonConverter]` on disjoint code paths (binder uses TypeConverter; `JsonSerializer.Deserialize` uses JsonConverter). 3 TDD tests in `ActionEntryTypeConverterTests` exercise string-only / object-only / mixed array binding via `IConfiguration.Bind` — all green. Operators with Phase 4 `appsettings.json` files using the string-array shape `["BlueIris"]` will now bind correctly; the silent-drop regression is fixed.
+
+---
+
+### ID-29: Eviction-callback log captures stale `plugin.Name` from loop variable
+
+**Source:** reviewer (Phase 13 REVIEW-1.1, 2026-05-04)
+**Severity:** Low (log-only; counter tags unaffected)
+**Status:** Open
+
+**Description:**
+At `src/FrigateRelay.Host/Dispatch/ChannelActionDispatcher.cs:100–101`, the `Channel.CreateBounded` eviction callback captures `plugin` from the surrounding `foreach (var plugin in plugins)` loop. The post-PLAN-1.1 code is:
+
+```csharp
+var channel = Channel.CreateBounded<DispatchItem>(channelOptions, evicted =>
+{
+    DispatcherDiagnostics.IncrementDrops(evicted, "channel_full");
+    LogDropped(_logger, evicted.Context.EventId, plugin.Name, capacity, null);
+});
+```
+
+Counter tags are correct because `IncrementDrops` reads from the captured `evicted` parameter (per CONTEXT-13 OQ-2). But `LogDropped` uses `plugin.Name` from the closure, not `evicted.Plugin.Name`. If eviction fires after the outer `foreach` loop has advanced (theoretical but possible in queued-eviction edge cases), the log message's `Action` field could refer to a different plugin than the one whose item was actually dropped.
+
+**Pre-existing.** The closure-capture pattern existed before Phase 13; PLAN-1.1's helper-method refactor surfaced it during REVIEW-1.1. PLAN-1.1's commit scope was tight to the helper migration so the fix was deliberately deferred.
+
+**Remediation:**
+One-line swap — replace `plugin.Name` with `evicted.Plugin.Name` in the `LogDropped` call so the log message and the counter tags share a single source of truth (the evicted item itself).
+
+**Impact:**
+Operator-facing log accuracy under high-throughput drop scenarios. No counter-data correctness impact, no security impact.

@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 13,
-  "position": "Phase 13 planned: 6 plans across 3 waves (1.1+1.2 / 2.1+2.2+2.3 / 3.1), 18 tasks. CRITIQUE READY, VERIFICATION PASS_WITH_NOTES (3 caveats addressed inline). Ready for /shipyard:build 13.",
-  "status": "planned",
+  "position": "Phase 13 Wave 1 build complete on feat/35-counter-tags. PLAN-1.1 + PLAN-1.2 PASS reviews. 6 commits, +201/-64 src/, +320 lines tests, 239/239 tests, 0 warnings. ID-29 filed (eviction-log staleness, deferred). Ready to push + open PR #35.",
+  "status": "wave_1_complete",
   "updated_at": "2026-05-04T00:00:00Z",
   "blocker": null
 }
