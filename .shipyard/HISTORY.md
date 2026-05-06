@@ -850,3 +850,5 @@
 - [2026-04-28T20:49:51Z] Session ended during build (may need /shipyard:resume)
 - [2026-05-06T00:00:00Z] Phase 14 scoped (v1.2 — issues #13/#14/#23). PROJECT.md and ROADMAP.md updated; ready for /shipyard:plan 14.
 - [2026-05-06T00:00:00Z] Phase 14 planned (v1.2). 8 plans, 21 tasks across 3 waves. VERIFICATION=PASS, CRITIQUE=READY.
+- [2026-05-06T19:49:32Z] Session ended during build (may need /shipyard:resume)
+- [2026-05-06T19:51:46Z] Session ended during build (may need /shipyard:resume)

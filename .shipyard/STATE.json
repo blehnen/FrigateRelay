@@ -1,7 +1,7 @@
 {
   "schema": 3,
   "phase": 14,
-  "position": "Wave 1 (PR #42 / issue #13 Roboflow) merged to main at 28d760b. Wave 2 (PR for #14 DOODS2 HTTP+gRPC) next: PLAN-2.1 scaffold + .proto vendor + DI; PLAN-2.2 HTTP tests; PLAN-2.3 gRPC tests + dep-containment.",
+  "position": "Wave 1 (PR #42 / #13 Roboflow) and Wave 2 (PR #43 / #14 DOODS2) merged. Wave 3 next: per-action ParallelValidators (#23). Worktree at .worktrees/phase-14-wave-3-parallel on branch feature/23-parallel-validators. PLAN-3.1 (field plumbing) → PLAN-3.2 (dispatcher branch + tests) → PLAN-3.3 (integration test + CHANGELOG).",
   "status": "building",
   "updated_at": "2026-05-06T00:00:00Z",
   "blocker": null
