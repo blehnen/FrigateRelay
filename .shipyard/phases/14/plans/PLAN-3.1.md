@@ -59,7 +59,7 @@ Add an XML doc-comment block on the new parameter:
 /// <param name="ParallelValidators">
 /// When <see langword="true"/>, the action's validators run concurrently via
 /// <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>
-/// with strict-AND aggregation: ALL validators must <c>Verdict.Allow</c> for the action to fire.
+/// with strict-AND aggregation: ALL validators must return <c>Verdict.Pass()</c> for the action to fire.
 /// First-reject does NOT short-circuit other in-flight validators (CONTEXT-14 D6) — operators
 /// get full per-validator visibility on every dispatch via the existing
 /// <c>validators.rejected</c> per-validator counter.

@@ -51,7 +51,7 @@ Mirror `tests/FrigateRelay.Plugins.Roboflow.Tests/FrigateRelay.Plugins.Roboflow.
 
 The csproj must NOT add `Grpc.AspNetCore.Server` here — that is PLAN-2.3's responsibility (the in-process gRPC test host pattern). PLAN-2.2 only needs WireMock + the existing test stack. PLAN-2.3 will edit this same csproj to add the gRPC server packages.
 
-`Usings.cs` matches the Roboflow tests' shape: `global using FrigateRelay.TestHelpers;` and `global using Microsoft.VisualStudio.TestTools.UnitTesting;`.
+`Usings.cs` matches the Roboflow tests' shape: `global using FluentAssertions;`, `global using FrigateRelay.TestHelpers;`, and `global using Microsoft.VisualStudio.TestTools.UnitTesting;`. (PR #42's REVIEW-1.2 caught the FluentAssertions omission — needed so `.Should()` chains compile without per-file usings.)
 
 Add to solution: `dotnet sln FrigateRelay.sln add tests/FrigateRelay.Plugins.Doods2.Tests/FrigateRelay.Plugins.Doods2.Tests.csproj`.
 

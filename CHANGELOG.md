@@ -18,11 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   integration test (the upstream `roboflow/roboflow-inference-server-cpu` image is
   ~16 GB, exceeding GitHub Actions disk budget).
 
-  **Manual smoke recipe** (operator runs locally):
+  **Manual smoke recipe** (operator runs locally — image tag pinned to the version
+  the validator was verified against):
   ```bash
   docker run --rm -p 9001:9001 \
       -e ROBOFLOW_API_KEY=... \
-      roboflow/roboflow-inference-server-cpu:latest
+      roboflow/roboflow-inference-server-cpu:1.2.7
   curl -X POST http://localhost:9001/infer/object_detection \
       -H 'Content-Type: application/json' \
       -d '{"model_id":"rfdetr-base/1","image":{"type":"base64","value":"<b64>"},"confidence":0.5}'

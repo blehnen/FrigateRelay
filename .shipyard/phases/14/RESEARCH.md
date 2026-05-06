@@ -84,7 +84,7 @@ The architect should clone this shape verbatim — CPAI is the canonical `IValid
 ### 1.6 Test shape (clone for Roboflow + DOODS2 unit tests)
 
 `tests/FrigateRelay.Plugins.CodeProjectAi.Tests/`:
-- `CodeProjectAiValidatorTests.cs` — single test file with WireMock stubs for the upstream HTTP, NSubstitute for `ILogger`, the shared `FrigateRelay.TestHelpers` `CapturingLogger<T>` if log assertions are needed.
+- `CodeProjectAiValidatorTests.cs` — single test file with WireMock stubs for the upstream HTTP. Log assertions use the shared `FrigateRelay.TestHelpers.CapturingLogger<T>` per CLAUDE.md "Conventions" — NOT NSubstitute on `ILogger<T>`, which is fragile around generic-`TState` matching for the `Log<TState>` method.
 - Tests assertions follow the contract: allow / reject (low confidence) / reject (label not allowed) / no snapshot / timeout (Fail-Closed default) / timeout (Fail-Open) / network unavailable (Fail-Closed) / network unavailable (Fail-Open) / cancellation (host shutdown propagates `OperationCanceledException`).
 - **Test count baseline:** the existing CPAI test project ships 24 tests (per the CI run output of v1.1.0). Roboflow + DOODS2 should each ship at minimum 6 tests for the same paths; suggest 8-10 each.
 
