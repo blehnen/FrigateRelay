@@ -68,11 +68,21 @@ public sealed partial class Doods2Validator : IValidationPlugin
 
         try
         {
+            // Guard before any work: a pre-cancelled token must short-circuit before reaching
+            // the HTTP layer (also prevents downstream `HttpClient` from sending bytes if
+            // SendAsync's pre-cancel check is bypassed by a future framework regression).
+            ct.ThrowIfCancellationRequested();
+
             var base64 = Convert.ToBase64String(snap.Bytes);
             var request = new Doods2HttpRequest(
                 DetectorName: _opts.DetectorName,
                 Data: base64,
-                Detect: new Dictionary<string, double> { ["*"] = _opts.MinConfidence });
+                // DOODS2's `detect` map expects 0-100 thresholds (matches its on-wire confidence
+                // scale). MinConfidence is operator-facing 0-1; multiply by 100.0 to send the
+                // server-side filter the right value. The plugin's post-filter
+                // (`EvaluateDetections`) is the authoritative gate; this just keeps DOODS2 from
+                // returning every detection above 0.5% confidence when the operator wanted 50%.
+                Detect: new Dictionary<string, double> { ["*"] = _opts.MinConfidence * 100.0 });
 
             using var response = await _http.PostAsJsonAsync("/detect", request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();

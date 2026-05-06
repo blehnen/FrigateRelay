@@ -30,6 +30,15 @@ public sealed class Doods2ValidatorTests
 
         verdict.Passed.Should().BeTrue();
         verdict.Score.Should().BeApproximately(0.80, 0.001, "80.0 raw / 100.0 = 0.80 normalized");
+
+        // Lock in the request-body scale invariant: MinConfidence=0.5 (0-1 operator scale) must
+        // be sent to DOODS2 as 50.0 in the `detect` dict (0-100 server scale). A regression that
+        // sends 0.5 unscaled would cause DOODS2 to filter at 0.5% confidence — masked by the
+        // post-filter today, but operator intent would be silently mis-encoded.
+        stub.LogEntries.Should().HaveCount(1);
+        var body = stub.LogEntries[0].RequestMessage?.Body;
+        body.Should().NotBeNull();
+        body!.Should().Contain("\"*\":50");
     }
 
     // -------------------------------------------------------------------------
@@ -105,6 +114,8 @@ public sealed class Doods2ValidatorTests
     public async Task ValidateAsync_HttpTimeout_FailClosed_ReturnsReject()
     {
         using var stub = WireMockServer.Start();
+        // No body matchers here — error-path tests focus on validator behavior, not the
+        // request-body contract (covered by Test 1's body assertion). Same pattern in tests 6-8.
         stub.Given(Request.Create().WithPath("/detect").UsingPost())
             .RespondWith(Response.Create().WithDelay(TimeSpan.FromSeconds(10)).WithStatusCode(200).WithBody("{}"));
 
