@@ -1,6 +1,7 @@
 using FrigateRelay.Abstractions;
 using FrigateRelay.Plugins.Roboflow;
 using Microsoft.Extensions.Logging;
+using WireMock.Matchers;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
@@ -220,6 +221,63 @@ public sealed class RoboflowValidatorTests
     }
 
     // -------------------------------------------------------------------------
+    // Test 10: HTTP 200 + non-JSON body → JsonException routed through OnError (FailClosed)
+    // -------------------------------------------------------------------------
+    /// <summary>Server returns 200 with an HTML body — JsonException must NOT escape; FailClosed → Fail.</summary>
+    [TestMethod]
+    public async Task ValidateAsync_NonJsonResponse_FailClosed_ReturnsReject()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create().WithPath("/infer/object_detection").UsingPost())
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithHeader("Content-Type", "application/json")
+                .WithBody("<html>upstream proxy returned an error page</html>"));
+
+        var logger = new CapturingLogger<RoboflowValidator>();
+        var validator = MakeValidator(stub.Url!, minConf: 0.5, labels: ["person"], logger: logger);
+
+        var verdict = await validator.ValidateAsync(MakeContext(), MakeSnapshotContext(), CancellationToken.None);
+
+        verdict.Passed.Should().BeFalse();
+        verdict.Reason.Should().StartWith("validator_unavailable: ");
+        logger.Entries.Should().Contain(e => e.Id.Id == 7102 && e.Level == LogLevel.Warning);
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 11: ApiKey configured → forwarded as `api_key` field in request body
+    // -------------------------------------------------------------------------
+    /// <summary>Configured ApiKey is sent as the `api_key` field; absence omits it (OQ #6 — auth path).</summary>
+    [TestMethod]
+    public async Task ValidateAsync_ApiKeyConfigured_SendsApiKeyInRequestBody()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create()
+                .WithPath("/infer/object_detection")
+                .UsingPost()
+                .WithBody(new JsonPathMatcher("$.api_key")))
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithBodyAsJson(new
+                {
+                    predictions = new[] { new { x = 0, y = 0, width = 10, height = 10, @class = "person", confidence = 0.95, class_id = 0 } },
+                    image = new { width = 640, height = 480 },
+                    time = 0.01,
+                }));
+
+        var validator = MakeValidator(stub.Url!, minConf: 0.5, labels: ["person"], apiKey: "rf_secret_key_xyz");
+        var verdict = await validator.ValidateAsync(MakeContext(), MakeSnapshotContext(), CancellationToken.None);
+
+        verdict.Passed.Should().BeTrue();
+
+        // Check the actual request body included api_key=rf_secret_key_xyz.
+        stub.LogEntries.Should().HaveCount(1);
+        var body = stub.LogEntries[0].RequestMessage?.Body;
+        body.Should().NotBeNull("WireMock should capture the JSON body of the validator's POST");
+        body!.Should().Contain("\"api_key\":\"rf_secret_key_xyz\"");
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
@@ -248,7 +306,15 @@ public sealed class RoboflowValidatorTests
     }
 
     private static void StubInferEndpoint(WireMockServer ws, object response) =>
-        ws.Given(Request.Create().WithPath("/infer/object_detection").UsingPost())
+        ws.Given(Request.Create()
+                .WithPath("/infer/object_detection")
+                .UsingPost()
+                // Body matchers protect the live Roboflow contract: if a future serializer
+                // change drops or renames any of these fields, every test using this stub fails.
+                .WithBody(new JsonPathMatcher("$.model_id"))
+                .WithBody(new JsonPathMatcher("$.image.type"))
+                .WithBody(new JsonPathMatcher("$.image.value"))
+                .WithBody(new JsonPathMatcher("$.confidence")))
           .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(response));
 
     private static RoboflowValidator MakeValidator(
@@ -257,7 +323,8 @@ public sealed class RoboflowValidatorTests
         string[]? labels = null,
         RoboflowValidatorErrorMode onError = RoboflowValidatorErrorMode.FailClosed,
         TimeSpan? timeout = null,
-        CapturingLogger<RoboflowValidator>? logger = null)
+        CapturingLogger<RoboflowValidator>? logger = null,
+        string apiKey = "")
     {
         var opts = new RoboflowOptions
         {
@@ -267,6 +334,7 @@ public sealed class RoboflowValidatorTests
             AllowedLabels = labels ?? [],
             OnError = onError,
             Timeout = timeout ?? TimeSpan.FromSeconds(5),
+            ApiKey = apiKey,
         };
         var http = new HttpClient
         {

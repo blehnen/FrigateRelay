@@ -35,6 +35,18 @@ public sealed class RoboflowOptions
     public string BaseUrl { get; set; } = "";
 
     /// <summary>
+    /// Optional API key for authenticated self-hosted Roboflow Inference deployments. Sent as
+    /// the <c>api_key</c> field in the <c>POST /infer/object_detection</c> request body when
+    /// non-empty (per the Roboflow Inference v1.x <c>ObjectDetectionInferenceRequest</c> schema).
+    /// Empty by default — omit from the request body for unauthenticated deployments.
+    /// </summary>
+    /// <remarks>
+    /// Should be supplied via env var or user-secrets, never committed to <c>appsettings.json</c>
+    /// (PROJECT.md / CLAUDE.md secret-handling invariant).
+    /// </remarks>
+    public string ApiKey { get; set; } = "";
+
+    /// <summary>
     /// Model identifier including version suffix, e.g. <c>rfdetr-base/1</c>. Sent as
     /// <c>model_id</c> in the request body. Operators declare one validator instance per model
     /// (CONTEXT-14 D3).

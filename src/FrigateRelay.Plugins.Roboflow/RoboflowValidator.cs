@@ -67,7 +67,8 @@ public sealed partial class RoboflowValidator : IValidationPlugin
             var request = new RoboflowRequest(
                 ModelId: _opts.ModelId,
                 Image: new RoboflowRequestImage(Type: "base64", Value: base64),
-                Confidence: _opts.MinConfidence);
+                Confidence: _opts.MinConfidence,
+                ApiKey: string.IsNullOrEmpty(_opts.ApiKey) ? null : _opts.ApiKey);
 
             using var response = await _http.PostAsJsonAsync("/infer/object_detection", request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
@@ -93,6 +94,16 @@ public sealed partial class RoboflowValidator : IValidationPlugin
                 ? Verdict.Pass()
                 : Verdict.Fail($"validator_unavailable: {ex.Message}");
         }
+        catch (System.Text.Json.JsonException ex)
+        {
+            // Roboflow returned non-JSON (HTML error page, truncated body) or a shape we don't
+            // recognize. Route through OnError so a misbehaving server can't escape the
+            // FailOpen/FailClosed contract via an unhandled deserialization exception.
+            Log.ValidatorUnavailable(_logger, _name, ctx.EventId, ex);
+            return _opts.OnError == RoboflowValidatorErrorMode.FailOpen
+                ? Verdict.Pass()
+                : Verdict.Fail($"validator_unavailable: {ex.Message}");
+        }
     }
 
     private Verdict EvaluatePredictions(RoboflowResponse? body)
@@ -103,6 +114,10 @@ public sealed partial class RoboflowValidator : IValidationPlugin
         foreach (var p in body.Predictions)
         {
             if (p.Confidence < _opts.MinConfidence) continue;
+            // STJ does not enforce non-nullable record params on deserialization (RespectNullableAnnotations
+            // is false by default); a missing/null `class` field deserializes as null. Skip such predictions
+            // rather than risk an NRE in the AllowedLabels comparison.
+            if (string.IsNullOrEmpty(p.Label)) continue;
             if (_opts.AllowedLabels.Length > 0 &&
                 !_opts.AllowedLabels.Any(l => string.Equals(l, p.Label, StringComparison.OrdinalIgnoreCase)))
                 continue;
