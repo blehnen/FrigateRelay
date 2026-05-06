@@ -118,6 +118,15 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     /// <inheritdoc />
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Cancel the internal stopping CTS first so any in-flight ValidateAsync /
+        // ExecuteAsync that respects cancellation (HttpClient calls, Task.Delay) is
+        // interrupted promptly. This is the signal the consumer-loop's outer
+        // `catch (OperationCanceledException) when (ct.IsCancellationRequested)`
+        // handler relies on for graceful unwinding (CONTEXT-9 D4 / ID-6 fix).
+        // IHostedService.StopAsync receives the host's drain-window token, NOT a
+        // signal to cancel internal work, so we must trigger _stoppingCts manually.
+        await _stoppingCts.CancelAsync().ConfigureAwait(false);
+
         // Complete all writers so ReadAllAsync exits when the queue drains.
         foreach (var channel in _channels.Values)
             channel.Writer.Complete();
@@ -169,8 +178,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         ChannelReader<DispatchItem> reader,
         CancellationToken ct)
     {
-        await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
+        try
         {
+            await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
+            {
             // action.<name>.execute span — consumer-side, parented to the producer's ActivityContext
             // captured across the Channel<T> boundary (PLAN-2.1 Task 2 / CONTEXT-9 D1).
             var spanName = $"action.{plugin.Name.ToLowerInvariant()}.execute";
@@ -261,6 +272,15 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 // Do NOT rethrow — a poison item must not kill the consumer task.
             }
             NextItem:;
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Graceful shutdown — the consumer's CT was cancelled either while ReadAllAsync was
+            // awaiting the next item OR during in-flight validator/action work that didn't reach
+            // the inner try/catch. Either way, exit cleanly without logging or counter-incrementing
+            // (matches the inner-catch behavior at the foreach-body try block — same intent,
+            // just at the loop scope so cancellation between items also unwinds gracefully).
         }
     }
 

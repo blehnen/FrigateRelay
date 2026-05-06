@@ -312,42 +312,32 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
         var logger = new CapturingLogger<ChannelActionDispatcher>();
         using var dispatcher = BuildDispatcher([plugin], logger);
 
-        using var stoppingCts = new CancellationTokenSource();
         await dispatcher.StartAsync(CancellationToken.None);
 
-        try
-        {
-            // Enqueue with a separate write CTS so we can write while the dispatcher is up.
-            using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await dispatcher.EnqueueAsync(
-                MakeContext("e-cancel"),
-                plugin,
-                [blocking],
-                parallelValidators: true,
-                ct: writeCts.Token);
+        // Enqueue with a separate write CTS so we can write while the dispatcher is up.
+        using var writeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await dispatcher.EnqueueAsync(
+            MakeContext("e-cancel"),
+            plugin,
+            [blocking],
+            parallelValidators: true,
+            ct: writeCts.Token);
 
-            // Wait briefly so the consumer picks up the item and enters ValidateAsync.
-            await Task.Delay(100);
+        // Deterministic wait for the consumer to enter the validator. Without this signal
+        // the test could pass vacuously: StopAsync's drain-token timeout would fire before
+        // the validator ever blocked, so we'd never actually exercise the cancellation
+        // chain (REVIEW-3.2 Important #1). The TCS is set the instant ValidateAsync begins.
+        await blocking.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            // Signal host shutdown — the dispatcher's stopping CTS is separate but we
-            // simulate it by completing the channel writer and letting StopAsync run.
-        }
-        finally
-        {
-            // StopAsync cancels the internal stopping CTS, which propagates into
-            // ConsumeAsync's ct parameter and into the blocking validator's ct.
-            // The OperationCanceledException must be caught by the existing outer handler.
-            using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            try
-            {
-                await dispatcher.StopAsync(stopCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // StopAsync may be cancelled by the stopCts — that is acceptable here.
-                // What matters is that the dispatcher consumer task exits cleanly (tested below).
-            }
-        }
+        // Now trigger graceful host shutdown. StopAsync cancels the internal stopping CTS
+        // (REVIEW-3.2 Important #2 fix), which signals the validator's `ct`. The validator's
+        // Task.Delay(30s, ct) throws OperationCanceledException; that propagates out of
+        // Task.WhenAll, up the dispatch's call stack, and is caught by ConsumeAsync's
+        // existing outer `catch (OperationCanceledException) when (ct.IsCancellationRequested)`
+        // handler at ChannelActionDispatcher.cs:259, which exits the consumer loop gracefully.
+        // The drain-window CTS gives StopAsync up to 5 seconds to await the consumer task.
+        using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await dispatcher.StopAsync(stopCts.Token);
 
         // Action must NOT have been called: it fires only after all validators pass.
         plugin.Executed.Should().Be(0, "action must not execute when host cancels mid-validation");
@@ -442,11 +432,21 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
     /// </summary>
     private sealed class CancellationAwareValidator(string name) : IValidationPlugin
     {
+        /// <summary>
+        /// Signals when the validator has entered <see cref="ValidateAsync"/> and is about to
+        /// block on the cancellation token. Tests await this to ensure the consumer task is
+        /// genuinely in-flight before triggering host shutdown — without this, the
+        /// "host cancellation unwinds gracefully" test could pass vacuously by hitting its
+        /// own timeout before the validator ever ran (REVIEW-3.2 finding).
+        /// </summary>
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public string Name { get; } = name;
         public async Task<Verdict> ValidateAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
         {
+            Entered.TrySetResult();
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
-            return Verdict.Pass(); // never reached
+            return Verdict.Pass(); // never reached — the 30s delay is interrupted by ct cancellation on host shutdown.
         }
     }
 }
