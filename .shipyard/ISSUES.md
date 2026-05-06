@@ -483,11 +483,14 @@ Implemented Option 1: `ActionEntryTypeConverter : TypeConverter` decorating `Act
 
 ---
 
-### ID-29: Eviction-callback log captures stale `plugin.Name` from loop variable
+### ID-29: Eviction-callback log captures stale `plugin.Name` from loop variable  *[CLOSED 2026-05-06]*
 
 **Source:** reviewer (Phase 13 REVIEW-1.1, 2026-05-04)
 **Severity:** Low (log-only; counter tags unaffected)
-**Status:** Open
+**Status:** **Closed** (hotfix branch `hotfix/29-eviction-log-staleness`, v1.1.1)
+
+**Resolution:**
+One-line swap at `ChannelActionDispatcher.cs:101` — `plugin.Name` → `evicted.Plugin.Name`. The log message's `Action` field now reads from the same source as the counter tags (the evicted `DispatchItem` itself), eliminating the closure-capture staleness window. No test added — the bug surfaces only under queued-eviction edge cases that are difficult to deterministically reproduce in unit tests; the fix is mechanical and preserves the existing log-line shape.
 
 **Description:**
 At `src/FrigateRelay.Host/Dispatch/ChannelActionDispatcher.cs:100–101`, the `Channel.CreateBounded` eviction callback captures `plugin` from the surrounding `foreach (var plugin in plugins)` loop. The post-PLAN-1.1 code is:

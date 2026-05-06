@@ -98,7 +98,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             var channel = Channel.CreateBounded<DispatchItem>(channelOptions, evicted =>
             {
                 DispatcherDiagnostics.IncrementDrops(evicted, "channel_full");
-                LogDropped(_logger, evicted.Context.EventId, plugin.Name, capacity, null);
+                LogDropped(_logger, evicted.Context.EventId, evicted.Plugin.Name, capacity, null);
             });
 
             _channels[plugin] = channel;
