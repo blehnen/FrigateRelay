@@ -38,7 +38,8 @@ public sealed class Doods2ValidatorTests
         stub.LogEntries.Should().HaveCount(1);
         var body = stub.LogEntries[0].RequestMessage?.Body;
         body.Should().NotBeNull();
-        body!.Should().Contain("\"*\":50");
+        // Anchor on a JSON delimiter so "*":500 / "*":50.5 cannot accidentally satisfy this guard.
+        body!.Should().MatchRegex("\"\\*\"\\s*:\\s*50(?=[,}\\s])");
     }
 
     // -------------------------------------------------------------------------
