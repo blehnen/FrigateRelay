@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DOODS2 validator (#14).** New `FrigateRelay.Plugins.Doods2` validator plugin:
+  HTTP-only `IValidationPlugin` against a self-hosted [DOODS2 v2](https://github.com/snowzach/doods2)
+  inference server (`http://<host>:10200`). **HTTP-only** — gRPC was a feature of the legacy
+  Go-based `snowzach/doods` server and was intentionally dropped in the v2 Python rewrite
+  ("DOODS2 drops support for gRPC as I doubt very much anyone used it anyways" — upstream README);
+  do not search for a gRPC config knob in this plugin. Per-instance `DetectorName`
+  (`"default"` TFLite mobilenet / `"tensorflow"` Faster R-CNN / `"pytorch"` YOLOv5s — all
+  carry the COCO 80-label set on the orchestrator's server), `MinConfidence` 0.0–1.0 (DOODS2
+  returns 0–100 on the wire; the validator normalizes internally), `AllowedLabels`,
+  `OnError` (FailClosed/FailOpen), `Timeout`, and `AllowInvalidCertificates` knobs. Add to
+  `appsettings.json` under `Validators:<key>: { "Type": "Doods2", "BaseUrl": "http://doods:10200",
+  "DetectorName": "default", ... }` and reference the key from any `ActionEntry.Validators` list.
+  WireMock-driven unit tests covering allow / reject-low-confidence / reject-bad-label /
+  no-snapshot / timeout-FailClosed / timeout-FailOpen / server-error-FailClosed /
+  server-error-FailOpen / cancellation (9 tests total).
+
 - **Roboflow Inference validator (#13).** New `FrigateRelay.Plugins.Roboflow` validator
   plugin: HTTP-based `IValidationPlugin` against a self-hosted Roboflow Inference server
   (`http://<host>:9001`). Per-instance `ModelId`, `MinConfidence`, `AllowedLabels`,
