@@ -33,6 +33,8 @@ internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
         {
             var plugin = reader.GetString()
                 ?? throw new JsonException("ActionEntry string form must not be null.");
+            // String shorthand "BlueIris" → ActionEntry("BlueIris"); ParallelValidators defaults to false.
+            // There is no per-string ParallelValidators encoding — use object form for that.
             return new ActionEntry(plugin);
         }
 
@@ -42,7 +44,7 @@ internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
                 ?? throw new JsonException("ActionEntry object form deserialized to null.");
             if (string.IsNullOrEmpty(dto.Plugin))
                 throw new JsonException("ActionEntry object form requires a non-empty 'Plugin' field.");
-            return new ActionEntry(dto.Plugin, dto.SnapshotProvider, dto.Validators);
+            return new ActionEntry(dto.Plugin, dto.SnapshotProvider, dto.Validators, dto.ParallelValidators);
         }
 
         throw new JsonException(
@@ -62,6 +64,10 @@ internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
             foreach (var v in value.Validators) writer.WriteStringValue(v);
             writer.WriteEndArray();
         }
+        // Emit ParallelValidators only when non-default (true) — keeps round-trips compact
+        // and avoids polluting written JSON with the default false value.
+        if (value.ParallelValidators)
+            writer.WriteBoolean("ParallelValidators", true);
         writer.WriteEndObject();
     }
 
@@ -69,5 +75,6 @@ internal sealed class ActionEntryJsonConverter : JsonConverter<ActionEntry>
     private sealed record ActionEntryDto(
         string Plugin,
         string? SnapshotProvider = null,
-        IReadOnlyList<string>? Validators = null);
+        IReadOnlyList<string>? Validators = null,
+        bool ParallelValidators = false);
 }

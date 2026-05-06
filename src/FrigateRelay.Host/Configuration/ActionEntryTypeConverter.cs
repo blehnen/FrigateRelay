@@ -30,6 +30,11 @@ internal sealed class ActionEntryTypeConverter : TypeConverter
 
     /// <inheritdoc/>
     public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+        // Note: string shorthand "BlueIris" → ActionEntry("BlueIris"); ParallelValidators defaults to false.
+        // No change needed here when ActionEntry gains new optional fields — default values handle back-compat.
+        // Object-form entries ({"Plugin":"X","ParallelValidators":true}) are NOT routed through this converter;
+        // IConfiguration.Bind maps them property-by-property via reflection (see ActionEntryJsonConverter for
+        // the JSON path — the two converters operate on disjoint code paths).
         => value is string s
             ? new ActionEntry(s)
             : base.ConvertFrom(context, culture, value)!;

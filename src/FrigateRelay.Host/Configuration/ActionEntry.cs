@@ -25,9 +25,19 @@ namespace FrigateRelay.Host.Configuration;
 /// Consumers MUST treat <see langword="null"/> and empty-list identically:
 /// <c>(action.Validators?.Count ?? 0) == 0</c>.
 /// </param>
+/// <param name="ParallelValidators">
+/// When <see langword="true"/>, the action's validators run concurrently via
+/// <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>
+/// with strict-AND aggregation: ALL validators must return <c>Verdict.Pass()</c> for the action to fire.
+/// First-reject does NOT short-circuit other in-flight validators (CONTEXT-14 D6) — operators
+/// get full per-validator visibility on every dispatch via the existing
+/// <c>validators.rejected</c> per-validator counter.
+/// Default <see langword="false"/> preserves the v1.0 / v1.1 sequential-with-short-circuit behavior.
+/// </param>
 [TypeConverter(typeof(ActionEntryTypeConverter))]
 [JsonConverter(typeof(ActionEntryJsonConverter))]
 internal sealed record ActionEntry(
     string Plugin,
     string? SnapshotProvider = null,
-    IReadOnlyList<string>? Validators = null);
+    IReadOnlyList<string>? Validators = null,
+    bool ParallelValidators = false);   // NEW for #23 / CONTEXT-14 D5
