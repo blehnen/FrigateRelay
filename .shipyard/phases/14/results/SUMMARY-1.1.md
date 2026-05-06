@@ -22,7 +22,7 @@
 ## Decisions Made
 
 - **`Type` discriminator value: "Roboflow"** (matches `appsettings.json` operator-facing config: `Validators:<name>:Type: "Roboflow"`). String-equality `Ordinal` to match CPAI's pattern (case-sensitive — operators must spell it exactly).
-- **EventId range 7100–7101 for `LoggerMessage`s** — per RESEARCH §1.4 convention, CPAI uses 7001–7099, Roboflow uses 7100–7199. Picked 7100 (timeout) and 7101 (unavailable) leaving room for future expansion.
+- **EventId range 7101–7102 for `LoggerMessage`s** — per RESEARCH §1.4 convention, CPAI uses 7001–7099, Roboflow uses 7100–7199. Picked 7101 (timeout) and 7102 (unavailable). DOODS2 (PR-2) should start at 7201/7202 in its 7200–7299 range.
 - **API endpoint `POST /infer/object_detection`** verified against a live Roboflow Inference v1.2.7 instance (Apache 2.0) — the orchestrator probed `http://192.168.0.2:19004/openapi.json` and confirmed the request schema (`ObjectDetectionInferenceRequest`: `model_id`, `image: InferenceRequestImage{type,value}`, `confidence`, optional `api_key`) matches the validator's `RoboflowRequest` record exactly. No code adjustment needed from RESEARCH §7.1's documented shape.
 - **`InferenceRequestImage.type = "base64"`** chosen over `"url"` or `"numpy"` because the validator already has the snapshot bytes in-hand (from `SnapshotContext.ResolveAsync`) — no need to host the image at a URL or pickle a numpy array.
 - **Confidence scale 0.0–1.0** — Roboflow native scale, no normalization needed (unlike DOODS2 which uses 0–100).
