@@ -362,9 +362,9 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
-## Phase 13 — v1.1 Observability + Cleanup  *[NOT STARTED]*
+## Phase 13 — v1.1 Observability + Cleanup  *[COMPLETE 2026-05-04]*
 
-**Status:** Not started. v1.0.x is GA (v1.0.0 shipped 2026-05-03; v1.0.3 patched the `{camera_shortname}` allowlist drift). This phase ships the v1.1 minor: complete the observability story so operators can stand up dashboards out of the box, and collapse the `BlueIrisUrlTemplate`/`EventTokenTemplate` allowlist drift that caused the v1.0.2→v1.0.3 P0. Source of truth for scope: `PROJECT.md` "Post-v1.0 Scope — v1.1" section. Issues in scope: **#34** (refactor), **#35** (counter tags), **#36** (docs + reference compose stack). Issues #13, #14, #23 are explicitly v1.2 and out of scope here.
+**Status:** Complete. v1.1.0 shipped 2026-05-04 (PR #38 / #35 counter tags, PR #39 / #36 docs + compose stack, PR #40 / #34 BlueIrisUrlTemplate refactor). 242/242 tests, 0 warnings. Tag `v1.1.0` pushed to origin (`e53defc`). Source of truth for scope: `PROJECT.md` "Post-v1.0 Scope — v1.1" section. Issues #13, #14, #23 are explicitly v1.2 and out of scope here.
 
 **Goal.** Ship v1.1.0 with (a) every counter on `Meter "FrigateRelay"` carrying the structured tags an operator needs to pivot a dashboard by camera/subscription/action/validator/component; (b) end-to-end observability docs + a reference Grafana dashboard + a `docker/observability/` stack; (c) `BlueIrisUrlTemplate` reduced to a thin wrapper around `EventTokenTemplate` so a future allowed-token additive (e.g. `{score}`) requires editing exactly one allowlist.
 
