@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ChannelActionDispatcher` eviction-callback log now reads the action name from the evicted `DispatchItem` rather than the surrounding `foreach` loop variable. Previously, in queued-eviction edge cases, the log message's `Action` field could refer to a different plugin than the one whose item was actually dropped — counter tags were already correct (sourced from `evicted` per CONTEXT-13 OQ-2); the log line is now consistent with them. ID-29.
+
 ## [1.1.0] — 2026-05-04
 
 Observability + structural cleanup. All counters on `Meter "FrigateRelay"` now emit structured tags so operators can pivot a Grafana dashboard by camera, subscription, action, validator, and component. Ships a complete reference observability stack (OTel Collector + Prometheus + Grafana, plus a standalone Seq stack for logs) and a full operator guide. Closes the v1.0.2 → v1.0.3 P0 root cause structurally by collapsing `BlueIrisUrlTemplate` to a thin wrapper around `EventTokenTemplate`.
