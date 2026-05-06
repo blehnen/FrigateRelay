@@ -23,7 +23,9 @@ tdd: false
 risk: medium
 ---
 
-# Plan 2.1: DOODS2 plugin scaffold + dual-transport implementation + DI wiring (PR #14 — DOODS2 validator)
+# Plan 2.1: DOODS2 plugin scaffold + HTTP implementation + DI wiring (PR #14 — DOODS2 validator)
+
+> **⚠️ Stale-content notice (2026-05-06):** This plan was originally written for a dual-transport (HTTP + gRPC) implementation. **The gRPC scope was reverted during this plan's build** when the orchestrator probed the live DOODS2 v2 server and confirmed upstream's README ("DOODS2 drops support for gRPC as I doubt very much anyone used it anyways"). The actual built scope is HTTP-only. CONTEXT-14 D4 reversal note + PLAN-2.3.md document the reversal. The text below describes the original scope; the SUMMARY-2.1.md describes what actually shipped.
 
 ## Context
 

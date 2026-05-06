@@ -15,18 +15,6 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.7" />
-    <!-- gRPC, contained to this plugin only per CONTEXT-14 D4 + CLAUDE.md invariant.
-         Grpc.Tools is build-only (PrivateAssets=all) so codegen does NOT propagate to consumers. -->
-    <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />
-    <PackageReference Include="Grpc.Tools" Version="2.66.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Google.Protobuf" Version="3.28.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Protobuf Include="Protos\odrpc.proto" GrpcServices="Client" />
   </ItemGroup>
 
   <ItemGroup>

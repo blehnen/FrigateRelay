@@ -2,6 +2,8 @@
 
 Codebase patterns and external-API shapes the architect needs to plan #13 (Roboflow), #14 (DOODS2), and #23 (parallel validators).
 
+> **⚠️ Stale-content notice (2026-05-06):** §4 (gRPC integration plan) and §7.3 (DOODS2 gRPC API) describe scope that was **REVERTED during PLAN-2.1 build**. DOODS2 v2 (the Python rewrite) is HTTP-only upstream. CONTEXT-14 D4 was amended; PLAN-2.3 was REMOVED. The DOODS2 plugin ships HTTP-only. §4 and §7.3 are kept here for historical reasoning but should NOT be acted on — see `.shipyard/phases/14/plans/PLAN-2.3.md` for the reversal record.
+
 ---
 
 ## 1. CPAI plugin reference (clone shape for Roboflow + DOODS2)

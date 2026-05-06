@@ -1,6 +1,6 @@
 # Build Summary: Plan 2.1
 
-## Status: complete
+## Status: complete (gRPC scope reverted post-initial-build — see "Reversal Addendum" at bottom)
 
 ## Tasks Completed
 
@@ -114,8 +114,59 @@ Same pattern as Wave 1: builder agent ran out of internal turns mid-task. Specif
 - `git grep -n 'ServicePointManager' src/` — only doc-comment "never use" references ✓.
 - 3 atomic commits on `feature/14-doods2-validator`: `dbc9588` (proto+csproj), `bf59ca6` (Options+Response+Validator), `1963657` (Registrar+DI).
 
-## Next: PLAN-2.2 (HTTP-path tests) and PLAN-2.3 (gRPC-path tests + dep-containment)
+## Next: PLAN-2.2 only (PLAN-2.3 REMOVED — see Reversal Addendum)
 
-Wave 2 builder for PLAN-2.2 should target ~7 HTTP-path tests covering the same contract Roboflow's tests do (allow / reject low-confidence / reject bad-label / no-snapshot / timeout-FailClosed/Open / unavailable-FailClosed/Open / cancellation / api-key-not-needed-here / null-detection-handling). Plus the confidence-0–100-normalization invariant test that Roboflow doesn't need.
+Wave 2 builder for PLAN-2.2 targets ~9 HTTP-path tests covering the full validator contract (allow / reject-low-confidence / reject-bad-label / no-snapshot / timeout-FailClosed/Open / unavailable-FailClosed/Open / cancellation), absorbs PLAN-2.3's CHANGELOG bullet responsibility, and is the only remaining plan in Wave 2.
 
-PLAN-2.3 builder must also update the verification block per the architectural-invariant finding documented above.
+---
+
+## Reversal Addendum (2026-05-06)
+
+After the initial PLAN-2.1 build shipped (commits `dbc9588`, `bf59ca6`, `1963657`, `d027799`), the user pointed out that DOODS2 v2 (the Python rewrite at `snowzach/doods2`) is HTTP-only — the orchestrator's prior `/detectors` probe against the live server at `192.168.0.2:10200` confirmed this, but the implication wasn't drawn until that prompt. Verified with the upstream README:
+
+> "DOODS2 drops support for gRPC as I doubt very much anyone used it anyways."
+> — `snowzach/doods2` README
+
+gRPC was a feature of the legacy Go-based `snowzach/doods` server only. Maintaining a gRPC code path in the FrigateRelay plugin would target zero real users (operators on the legacy Go server can use that project's own gRPC client).
+
+### What changed in the reversal commit
+
+- **Source code:**
+  - `Doods2Options.Transport` property + `Doods2Transport` enum: removed.
+  - `Doods2Validator` constructor reduced from 5 params (with `odrpcClient`) to 4. gRPC code path (`DetectGrpcAsync`), `RpcException` catch blocks, gRPC-specific imports: removed.
+  - `PluginRegistrar`: no longer constructs `GrpcChannel` or registers a gRPC client.
+  - `FrigateRelay.Plugins.Doods2.csproj`: dropped `Grpc.Net.Client`, `Google.Protobuf`, `Grpc.Tools` PackageReferences and the `<Protobuf>` MSBuild item.
+  - `src/FrigateRelay.Plugins.Doods2/Protos/odrpc.proto` + `Protos/` directory: deleted.
+  - Validator now also catches `JsonException` (mirrors the Roboflow PR #42 review-feedback fix) so a non-JSON response from a misbehaving proxy routes through `OnError`.
+
+- **Plans:**
+  - `PLAN-2.3.md`: replaced with a REMOVED notice + reversal record.
+  - `PLAN-2.2.md`: expanded from 7 tests to 9 (absorbed PLAN-2.3's deferred cancellation test + a FailOpen-on-HTTP-error test mirroring PR #42's REVIEW-1.2 fix). Now also owns the CHANGELOG bullet (was PLAN-2.3's). Test target: 250 → 259.
+
+- **Project meta-docs:**
+  - `CONTEXT-14.md` D4: amended with explicit reversal note + rationale.
+  - `PROJECT.md` "v1.2 scope" / #14: updated to HTTP-only with reversal pointer.
+  - `ROADMAP.md` Phase 14: goal text + risk + deliverables updated to HTTP-only. Risk for #14 dropped from Medium to Low.
+  - `RESEARCH.md`: header notice added that §4 (gRPC integration plan) and §7.3 (DOODS2 gRPC API) are stale historical content; not to be acted on.
+  - `PLAN-2.1.md`: header notice added that the original dual-transport scope was reverted during this plan's build.
+
+### Architectural-invariant tension RESOLVED
+
+The "Issues Encountered" section above noted that `dotnet list src/FrigateRelay.Host/...csproj package --include-transitive` was leaking `Grpc.*` transitives into the Host's package graph despite source-level cleanness — a tension that wasn't going to be resolvable with build-time DI. After the reversal, the test passes cleanly:
+
+```
+$ dotnet list src/FrigateRelay.Host/FrigateRelay.Host.csproj package --include-transitive | grep -E 'Grpc\.|Google\.Protobuf'
+(empty)
+$ git grep -nE 'Grpc\.' src/
+(empty)
+```
+
+Both invariants hold. The PLAN-2.3 verification-block guidance (originally needed to relax the test) is no longer needed.
+
+### Reversal verification
+
+- `dotnet build FrigateRelay.sln -c Release` — 0 warnings, 0 errors after reversal.
+- `bash .github/scripts/run-tests.sh --skip-integration` — **258/258 passing** (test count unchanged; PLAN-2.2 will add 9 new).
+- `git grep -nE 'Grpc\.' src/` — empty ✓.
+- `dotnet list <abstractions|host>.csproj package --include-transitive | grep Grpc` — empty ✓.
+- Plugin source surface area: 4 files (`csproj`, `Doods2Options.cs`, `Doods2Response.cs`, `Doods2Validator.cs`, `PluginRegistrar.cs`) — no `Protos/`, no vendored license attribution to maintain.

@@ -1,6 +1,4 @@
 using FrigateRelay.Abstractions;
-using FrigateRelay.Plugins.Doods2.Grpc;
-using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -15,23 +13,15 @@ namespace FrigateRelay.Plugins.Doods2;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Per-instance <see cref="HttpClient"/> with per-instance TLS handler. Per-instance gRPC
-/// <see cref="GrpcChannel"/> reused across calls (HTTP/2 multiplexing — channel lifetime
-/// matches the keyed-singleton validator lifetime). Other validator types (CPAI, Roboflow)
-/// coexist by filtering on their own <c>Type</c> discriminator value.
+/// Per-instance <see cref="HttpClient"/> with per-instance TLS handler. Other validator types
+/// (CPAI, Roboflow) coexist by filtering on their own <c>Type</c> discriminator value.
 /// </para>
 /// <para>
 /// <strong>INTENTIONALLY no <c>AddResilienceHandler</c> on the validator <see cref="HttpClient"/>.</strong>
 /// Asymmetric with BlueIris/Pushover (which retry 3/6/9s). Validators are pre-action gates;
 /// per-attempt retry latency would systematically delay every notification.
 /// Single <see cref="Doods2Options.Timeout"/>; fail-{closed,open} per
-/// <see cref="Doods2Options.OnError"/> (CONTEXT-7 D4 / CONTEXT-14 D4 architect lock-in).
-/// </para>
-/// <para>
-/// <strong>Both transport clients are always registered for every instance.</strong> The
-/// validator picks which one to invoke based on <see cref="Doods2Options.Transport"/>, but
-/// keeping the unused client wired (rather than null) keeps the registrar branch-free and
-/// makes the validator constructor testable without conditional-DI gymnastics.
+/// <see cref="Doods2Options.OnError"/> (CONTEXT-7 D4 architect lock-in).
 /// </para>
 /// </remarks>
 public sealed class PluginRegistrar : IPluginRegistrar
@@ -82,26 +72,15 @@ public sealed class PluginRegistrar : IPluginRegistrar
                 });
 
             // Keyed validator plugin — resolved by EventPump via IServiceProvider.GetRequiredKeyedService.
-            // Both transport clients (HttpClient + GrpcChannel-backed gRPC client) are always built;
-            // the validator's ValidateAsync branches on Doods2Options.Transport at call time.
             context.Services.AddKeyedSingleton<IValidationPlugin>(instanceKey, (sp, key) =>
             {
                 var name = (string)key!;
                 var opts = sp.GetRequiredService<IOptionsMonitor<Doods2Options>>().Get(name);
-
                 var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient($"Doods2:{name}");
                 http.BaseAddress = new Uri(opts.BaseUrl);
                 http.Timeout = opts.Timeout;
-
-                // GrpcChannel is thread-safe and HTTP/2-multiplexed — single channel per validator
-                // instance is correct; do NOT recreate per-call. Channel lifetime = singleton.
-                // Note: GrpcChannel does NOT honor the per-instance TLS-skip handler; gRPC users
-                // who need that should terminate TLS at a sidecar or run plaintext (h2c).
-                var channel = GrpcChannel.ForAddress(opts.BaseUrl);
-                var grpcClient = new odrpc.odrpcClient(channel);
-
                 var logger = sp.GetRequiredService<ILogger<Doods2Validator>>();
-                return new Doods2Validator(name, opts, http, grpcClient, logger);
+                return new Doods2Validator(name, opts, http, logger);
             });
         }
     }
