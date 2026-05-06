@@ -412,9 +412,63 @@ Phases 1 and 2 can execute in parallel once the `.sln` exists (Phase 2 needs a s
 
 ---
 
+## Phase 14 — v1.2 Inference Engines + Parallel Validation  *[NOT STARTED]*
+
+**Status.** Not started. Phase 14 is the implementation phase for the v1.2 scope captured in `PROJECT.md` "Post-v1.1 Scope — v1.2 (more inference engines + parallel-AND validation)" (PROJECT.md:200–261). Three sequential PRs cover issues #13 (Roboflow Inference validator), #14 (DOODS2 validator with HTTP + gRPC transports), and #23 (per-action `ParallelValidators: true` opt-in). Decision rationale and the in-/out-of-scope boundary live in PROJECT.md; this section captures only the verifiable execution shape.
+
+**Goal.** Ship v1.2.0 with (a) two new self-hosted `IValidationPlugin` implementations — Roboflow Inference (`FrigateRelay.Plugins.Roboflow`) and DOODS2 (`FrigateRelay.Plugins.Doods2`, HTTP + gRPC transports operator-selectable per validator instance); (b) a per-`ActionEntry` `ParallelValidators: true` opt-in that runs the action's validators concurrently under a strict-AND aggregation, with default-false preserving today's sequential behavior; (c) at least one integration test that exercises ≥ 2 validators in parallel under a single `ActionEntry` so the multi-engine story is operationally proven, not hypothetical.
+
+**Dependencies.** Phase 13 (v1.1.0 GA on `main`; tagged counters and observability stack in place so any new counters introduced by #23 inherit the v1.1 tag matrix). The `[Unreleased]` ID-29 hotfix (eviction-callback log staleness) will likely roll out as v1.1.1 before or alongside Phase 14 — Phase 14 is **not** gated on it; the hotfix and v1.2 scope are independent.
+
+**Risk.** **Low–Medium**. Composite breakdown:
+- **#13 — Low.** HTTP-only validator that mirrors the established CPAI pattern (typed `HttpClient` per `IPluginRegistrar`, WireMock unit tests). No new dep families. Smaller surface than #14.
+- **#14 — Medium.** Highest risk in this phase. Vendored DOODS2 `.proto` + `Grpc.Tools` codegen + `Grpc.Net.Client` + `Google.Protobuf` are a new dep family for this codebase. The architectural invariant is that gRPC stays plugin-local — never reaches abstractions or host. In-process gRPC test server is straightforward but new ground for FrigateRelay's test infrastructure.
+- **#23 — Low–Medium.** Touches the validator execution loop in the host (the per-action chain that today runs sequentially). Feature-flagged with `ParallelValidators: false` as the default, so existing configs are unaffected by a regression here. Failure surface is bounded to actions that opt in.
+
+**Estimate.** 6–9 hours of active work across the three PRs. #14 dominates (proto vendoring, gRPC client wiring, transport-selection plumbing); #13 and #23 are smaller.
+
+**PR sequencing (decided).** Three sequential PRs against `main`, in the order #13 → #14 → #23 (PROJECT.md:237–245):
+1. **#13 first.** Smaller surface (HTTP-only); establishes the second-validator pattern that #14 reuses for its HTTP transport.
+2. **#14 second.** Builds on #13's pattern; adds the gRPC dep contained to this plugin only.
+3. **#23 last.** Lands after both #13 and #14 are merged so its integration test can exercise three validator types (CPAI + Roboflow + DOODS2) in a single AND chain — proves the parallel design holds beyond a CPAI-only toy case.
+
+CHANGELOG classifies all three as additive (semver minor). #23's `ParallelValidators` defaults to `false`, so existing `ActionEntry` configs are unaffected on upgrade.
+
+**Deliverables.**
+
+- **#13 — Roboflow Inference validator.** New `src/FrigateRelay.Plugins.Roboflow/` project: `RoboflowValidator : IValidationPlugin`, `RoboflowOptions` (`BaseUrl`, `ModelId`, `MinConfidence`, `AllowedLabels`, `OnError`, `Timeout`), `Roboflow.PluginRegistrar` registering a typed `HttpClient`. Self-hosted Roboflow Inference only — no Roboflow Hosted Cloud API in v1.2 (PROJECT.md:213–214). Per-instance `ModelId` so operators declare multiple validator instances if they need different models per camera. New `tests/FrigateRelay.Plugins.Roboflow.Tests/` with WireMock-driven coverage of allow/reject/timeout/OnError-FailClosed/OnError-FailOpen/cancellation. Optional Testcontainers integration test if `roboflow/inference` exists on a public registry with acceptable boot time; otherwise WireMock-only with a documented manual-smoke recipe.
+- **#14 — DOODS2 validator (HTTP + gRPC).** New `src/FrigateRelay.Plugins.Doods2/` project: `Doods2Validator : IValidationPlugin`, `Doods2Options` (`Transport: "Http" | "Grpc"`, `BaseUrl`, `MinConfidence`, `AllowedLabels`, `OnError`, `Timeout`), `Doods2.PluginRegistrar`. HTTP path: `POST /detect` with base64-encoded image + JSON detections back, WireMock-driven unit tests. gRPC path: vendored DOODS2 `.proto` compiled in-project via `Grpc.Tools`; `Grpc.Net.Client` + `Google.Protobuf` added as deps to **this plugin only** — not abstractions, not host. In-process gRPC test server for unit tests. Operator chooses transport per validator instance — both paths must ship and be tested in v1.2.
+- **#23 — Per-action `ParallelValidators: true`.** New boolean field on `ActionEntry` (default `false`). When `true`, the host's per-action validator chain runs concurrently via `Task.WhenAll`; each validator's own `Timeout` applies; aggregate fails closed if any validator times out (matches existing per-validator `OnError: FailClosed` semantics — "parallel" changes scheduling, not failure semantics). Aggregation: strict AND. First-validator-rejects does **not** short-circuit other in-flight validators — operators get full per-validator visibility on every dispatch (PROJECT.md:228). Each rejecting validator still emits its own `validators.rejected` counter (no behavioral change to the v1.1 counter tag matrix). Affected files: `ActionEntry` in `FrigateRelay.Abstractions`, the validator-execution path in `FrigateRelay.Host` (PR-time grep will confirm exact location), plus a new integration test exercising ≥ 2 validators in parallel under a single `ActionEntry`.
+
+**Verification (gates reproduced from PROJECT.md:248–256).**
+- `dotnet build FrigateRelay.sln -c Release` zero warnings on both Linux and Windows (warnings-as-errors invariant unchanged). New plugin projects compile clean.
+- **gRPC dep containment.** `dotnet list src/FrigateRelay.Abstractions/FrigateRelay.Abstractions.csproj package --include-transitive` and `dotnet list src/FrigateRelay.Host/FrigateRelay.Host.csproj package --include-transitive` both show **no** `Grpc.*` transitive entries. The dep lives in `FrigateRelay.Plugins.Doods2` only.
+- `git grep -nE 'Grpc\.' src/FrigateRelay.Host src/FrigateRelay.Abstractions` returns empty (host + abstractions stay gRPC-free; gRPC is plugin-local).
+- All existing tests pass. **Test-count gate:** 242 baseline (post-Phase 13) → 242+N expected; architect to determine N during Phase 14 PLAN dispatch (per-PR new-test minimums will be set at PR-1 / PR-2 / PR-3 planning briefs).
+- New unit tests per validator, at minimum: allow / reject / timeout / OnError-FailClosed / OnError-FailOpen / cancellation, driven by WireMock for HTTP transports and an in-process gRPC server for DOODS2's gRPC path.
+- New integration test demonstrating ≥ 2 validators running in parallel under a single `ActionEntry` with `ParallelValidators: true`. WireMock or Testcontainers as available; the CPAI + Roboflow combination is the smallest meaningful coverage, the CPAI + Roboflow + DOODS2 trio is the target if PR-3's test infrastructure allows it.
+- `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` still empty (architectural invariant unchanged).
+- Three merged PRs on `main` (one per issue), then `v1.2.0` tag — operator-cut per the CONTEXT-12 D7 manual tag-cut policy; release.yml auto-builds + pushes multi-arch GHCR images on the tag push.
+
+**Success criteria (reproduced from PROJECT.md:258–261).**
+- An operator can declare `Validators: ["cpai", "roboflow", "doods2"]` with `ParallelValidators: true` on a single action and see all three validators contribute decisions in production logs and counters.
+- Adding a hypothetical fourth validator follows the #13/#14 pattern: a new plugin project + `IPluginRegistrar` registration, no host changes required.
+- Existing v1.0/v1.1 deployments upgrade to v1.2 with no config changes — sequential validation remains the default. Operators opting into parallel mode flip exactly one boolean per action.
+
+### Phase 14 open questions (surface, do not decide silently)
+
+The v1.2 scope in `PROJECT.md` is closed; these are clarifications a planner will need at the start of Phase 14 PR dispatch but that the roadmap does not pre-decide:
+
+- **OQ-1 — DOODS2 `.proto` sourcing.** Vendor a copy of the upstream DOODS2 `.proto` at a pinned commit, or pull it via `git submodule`? Implications: vendoring is simpler for license attribution (single LICENSE-attribution line in the plugin's project notes) and keeps Dependabot's reach scoped to NuGet only; submodule requires a `.gitmodules` entry, recursive clone for contributors, and adds a second update path. Lean: vendor at a pinned commit with the upstream commit hash + license noted at the top of the `.proto`. Confirm at PR-2 planning.
+- **OQ-2 — Roboflow Inference Testcontainers image.** Does `roboflow/inference` exist on a public registry, and is its boot time acceptable for CI (target: under the existing 30s integration-test SLO from Phase 4)? If yes, ship a Testcontainers-driven integration test alongside #13's WireMock unit suite; if no, fall back to WireMock-only with a documented manual-smoke recipe in the PR description. Decide at PR-1 planning, after a five-minute `docker pull` + boot check.
+- **OQ-3 — `ParallelValidators` flag location precedence.** PROJECT.md:224 places the flag on `ActionEntry` only — no per-subscription default that the action could override. Surface here in case PR-3 planning reconsiders adding a per-subscription default for ergonomic reasons (operator with 9 actions all wanting parallel mode would otherwise repeat the boolean 9 times). Default position: `ActionEntry`-only as PROJECT.md states; only revisit if PR-3 planning surfaces concrete config-bloat evidence from the example fixtures.
+- **OQ-4 — First-validator-rejects logging behavior in parallel mode.** PROJECT.md:227–228 is explicit: each rejecting validator emits its own `validators.rejected` counter for per-validator dashboard visibility, and there is no aggregate "action_rejected_by_parallel_validators" counter. Surface in case PR-3 planning wants to add an aggregate counter for dashboard ergonomics. Default position: per-validator emission only as PROJECT.md states; if an aggregate counter is added later, it goes through the v1.1 tag-set discipline (no `event_id`; tags include `action`, `subscription`, `camera`, `label`).
+
+---
+
 ## Phase Count
 
-**13 phases.** Phases 1–12 delivered v1.0; Phase 13 is the v1.1 Observability + Cleanup work. Phases 1–2 parallelizable after the `.sln` exists; Phases 3–13 sequential.
+**14 phases.** Phases 1–12 delivered v1.0; Phase 13 delivered v1.1; Phase 14 delivers v1.2 (more inference engines + parallel-AND validation). Phases 1–2 parallelizable after the `.sln` exists; Phases 3–14 sequential.
 
 ## Questions Appendix
 

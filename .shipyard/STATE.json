@@ -1,8 +1,8 @@
 {
   "schema": 3,
-  "phase": 13,
-  "position": "Phase 13 COMPLETE on main at 06b4ba4. PR #38 (issue #35), PR #39 (issue #36), PR #40 (issue #34) all merged. 242/242 tests, 0 warnings. CHANGELOG [Unreleased] aggregates all three PRs' bullets — ready for promotion to [1.1.0] and `git tag v1.1.0` per RELEASING.md.",
-  "status": "phase_complete",
-  "updated_at": "2026-05-04T00:00:00Z",
+  "phase": 14,
+  "position": "Phase 14 scoped in PROJECT.md and ROADMAP.md (commit pending). Three sequential PRs cover #13 (Roboflow Inference), #14 (DOODS2 HTTP+gRPC), #23 (per-action ParallelValidators). Ready for /shipyard:plan 14.",
+  "status": "ready",
+  "updated_at": "2026-05-06T00:00:00Z",
   "blocker": null
 }
