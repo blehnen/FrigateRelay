@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FrigateRelay.Plugins.Doods2</RootNamespace>
+    <AssemblyName>FrigateRelay.Plugins.Doods2</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FrigateRelay.Abstractions\FrigateRelay.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FrigateRelay.Plugins.Doods2.Tests" />
+  </ItemGroup>
+
+</Project>

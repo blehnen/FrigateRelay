@@ -216,10 +216,9 @@ v1.1.0 shipped 2026-05-04 with full observability tagging and the `BlueIrisUrlTe
   - Transport: HTTP via `HttpClient` (typed client per `IPluginRegistrar`); WireMock-driven unit tests; Testcontainers integration test if `roboflow/inference` image is available, otherwise WireMock-only with a documented manual-smoke recipe.
 
 - **#14 — DOODS2 validator** (`FrigateRelay.Plugins.Doods2`).
-  - Operator-selectable transport: `Transport: "Http" | "Grpc"`. Both must be implemented and tested in v1.2 — gRPC is the perf-first path for high-throughput hosts (sub-millisecond serialisation, persistent HTTP/2 streams); HTTP matches the rest of the plugin family for simplicity. Operators choose per validator instance.
+  - **HTTP only** (CONTEXT-14 D4 reversed 2026-05-06). DOODS2 v2 (the Python rewrite at `snowzach/doods2`) deliberately dropped gRPC support per upstream README; the original-Go-server gRPC scope was reverted during PLAN-2.1 build. Operators on the legacy Go `snowzach/doods` server should use that project's gRPC client; this plugin targets v2.
   - HTTP path: `POST /detect` with base64-encoded image + JSON detections back. WireMock-driven unit tests.
-  - gRPC path: vendored DOODS2 `.proto` file compiled in-project via `Grpc.Tools`; `Grpc.Net.Client` + `Google.Protobuf` added as deps to **this plugin only** — not to `FrigateRelay.Abstractions`, not to `FrigateRelay.Host`. In-process gRPC test server for unit tests.
-  - Same `MinConfidence` / `AllowedLabels` / `OnError` / `Timeout` knobs as CPAI/Roboflow.
+  - Same `MinConfidence` / `AllowedLabels` / `OnError` / `Timeout` knobs as CPAI/Roboflow. Plus `DetectorName` (default/tensorflow/pytorch) per CONTEXT-14.
 
 - **#23 — Per-action `ParallelValidators: true`** in `ActionEntry`.
   - Default `false`; sequential behavior unchanged for existing config.
@@ -239,7 +238,7 @@ v1.1.0 shipped 2026-05-04 with full observability tagging and the `BlueIrisUrlTe
 Three sequential PRs against `main`:
 
 1. **#13 first** — Roboflow Inference plugin. Smaller surface than #14 (HTTP-only); establishes the second-validator pattern that #14 follows.
-2. **#14 second** — DOODS2 plugin (HTTP + gRPC). Builds on #13's pattern; adds the gRPC dep contained to this plugin only.
+2. **#14 second** — DOODS2 plugin (HTTP only — gRPC scope reverted; see #14 description above). Builds on #13's pattern; no new dep families.
 3. **#23 last** — parallel-AND opt-in. Lands after both #13 and #14 are in so its integration tests can exercise three validator types (CPAI + Roboflow + DOODS2) in a single AND chain — proves the design holds beyond the toy CPAI-only case.
 
 CHANGELOG classifies all three as additive (semver minor). #23's `ParallelValidators` defaults to `false`, so existing `ActionEntry` configs are unaffected.
@@ -247,12 +246,12 @@ CHANGELOG classifies all three as additive (semver minor). #23's `ParallelValida
 ### v1.2 verification gates
 
 - `dotnet build FrigateRelay.sln -c Release` zero warnings (warnings-as-errors, both Linux and Windows). New plugin projects compile clean.
-- gRPC dep containment: `dotnet list <abstractions|host>.csproj package --include-transitive` shows no `Grpc.*` transitive on either project. The dep lives in `FrigateRelay.Plugins.Doods2` only.
+- No gRPC anywhere (D4 reversed): `git grep -nE 'Grpc\.' src/` returns empty across the entire repo; no csproj declares Grpc.* packages.
 - All existing tests pass.
-- New unit tests per validator: at minimum allow / reject / timeout / OnError-FailClosed / OnError-FailOpen / cancellation, driven by WireMock for HTTP and an in-process gRPC server for DOODS2's gRPC path.
+- New unit tests per validator: at minimum allow / reject / timeout / OnError-FailClosed / OnError-FailOpen / cancellation, driven by WireMock (HTTP-only — DOODS2 gRPC scope reverted).
 - New integration test demonstrating ≥ 2 validators running in parallel under a single `ActionEntry` with `ParallelValidators: true`. WireMock or Testcontainers as available; the CPAI + Roboflow combination is the smallest meaningful coverage.
 - `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` still empty (architectural invariant unchanged).
-- `git grep -nE 'Grpc\.' src/FrigateRelay.Host src/FrigateRelay.Abstractions` returns empty (host + abstractions stay gRPC-free; gRPC is plugin-local).
+- `git grep -nE 'Grpc\.' src/` returns empty across the entire repo (D4 reversed; no gRPC anywhere).
 
 ### v1.2 success criteria
 

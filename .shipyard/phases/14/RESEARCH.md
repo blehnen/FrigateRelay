@@ -2,6 +2,8 @@
 
 Codebase patterns and external-API shapes the architect needs to plan #13 (Roboflow), #14 (DOODS2), and #23 (parallel validators).
 
+> **⚠️ Stale-content notice (2026-05-06):** §4 (gRPC integration plan) and §7.3 (DOODS2 gRPC API) describe scope that was **REVERTED during PLAN-2.1 build**. DOODS2 v2 (the Python rewrite) is HTTP-only upstream. CONTEXT-14 D4 was amended; PLAN-2.3 was REMOVED. The DOODS2 plugin ships HTTP-only. §4 and §7.3 are kept here for historical reasoning but should NOT be acted on — see `.shipyard/phases/14/plans/PLAN-2.3.md` for the reversal record.
+
 ---
 
 ## 1. CPAI plugin reference (clone shape for Roboflow + DOODS2)
@@ -217,8 +219,7 @@ The `Validators` section gate is shared — all three validator plugins are regi
     },
     "doods_persons": {
         "Type": "Doods2",
-        "Transport": "Http",
-        "BaseUrl": "http://doods2:8080",
+        "BaseUrl": "http://doods2:10200",
         "DetectorName": "default",
         "MinConfidence": 0.50,
         "AllowedLabels": ["person"],
@@ -465,10 +466,10 @@ bash .github/scripts/run-tests.sh --skip-integration | grep total: | awk '{ sum 
 | PR | New project | New tests minimum | Cumulative total |
 |---|---|---|---|
 | PR-1 (#13 Roboflow) | `tests/FrigateRelay.Plugins.Roboflow.Tests/` | **8** (allow / reject low-confidence / reject not-allowed-label / no-snapshot / timeout-FailClosed / timeout-FailOpen / unavailable-FailClosed / cancellation) | 250 |
-| PR-2 (#14 DOODS2) | `tests/FrigateRelay.Plugins.Doods2.Tests/` | **12** (HTTP path: 6 from PR-1 list × 1 + transport-config-validation × 1 = 7; gRPC path: 5 covering happy + reject + timeout + unavailable + cancellation) | 262 |
-| PR-3 (#23 parallel) | `tests/FrigateRelay.Host.Tests/` (existing) + `tests/FrigateRelay.IntegrationTests/` (existing) | **6** (sequential default unchanged / parallel happy / parallel any-reject / parallel any-timeout-FailClosed / parallel cancellation propagates / per-validator counter still emitted in parallel mode) plus **1** integration test exercising ≥ 2 validators concurrently end-to-end | 269 |
+| PR-2 (#14 DOODS2) | `tests/FrigateRelay.Plugins.Doods2.Tests/` | **9 HTTP-only** (allow-after-normalization / reject-low-confidence / reject-bad-label / no-snapshot / timeout-FailClosed/Open / unavailable-FailClosed/Open / cancellation). Was originally 12 (HTTP + gRPC) but the gRPC scope was reverted — see PLAN-2.3.md. | 267 |
+| PR-3 (#23 parallel) | `tests/FrigateRelay.Host.Tests/` (existing) + `tests/FrigateRelay.IntegrationTests/` (existing) | **6** (sequential default unchanged / parallel happy / parallel any-reject / parallel any-timeout-FailClosed / parallel cancellation propagates / per-validator counter still emitted in parallel mode) plus **1** integration test exercising ≥ 2 validators concurrently end-to-end | 274 |
 
-**Phase 14 final test target: 269 tests** (242 + 8 + 12 + 7).
+**Phase 14 final test target: 274 tests** (~242 baseline + 14 Roboflow + 9 DOODS2 + 7 parallel + 5 PluginRegistrar tests added late in PR #42 ≈ 274). Actual count drifts a few from this projection because PR #42 added regression-fix tests beyond the original spec.
 
 Architect should treat these as floors, not ceilings — additional defensive tests welcome, but each plan must hit at least its row's count.
 
