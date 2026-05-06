@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-action `ParallelValidators: true` opt-in (#23).** `ActionEntry` gains a new
+  boolean field that, when `true`, runs the action's validators concurrently via
+  `Task.WhenAll` instead of the existing sequential foreach with first-reject
+  short-circuit. **Strict-AND aggregation** — every validator must return
+  `Verdict.Pass()` for the action to fire. **No first-reject short-circuit** — every
+  validator runs to completion even if one rejects, so each rejecting validator emits
+  its own `frigaterelay.validators.rejected` counter for full per-validator dashboard
+  visibility (a deliberate cost-of-information tradeoff vs cancelling in-flight work).
+  Each validator's own `Timeout` enforces itself; aggregate fails closed if any
+  validator times out (matches existing per-validator `OnError: FailClosed` semantics —
+  parallel changes scheduling, not failure semantics). **Default `false`** preserves
+  the v1.0/v1.1 sequential-with-short-circuit behavior — existing `appsettings.json`
+  configs upgrade unchanged. Configure via `Subscriptions:N:Actions:M`:
+  ```json
+  { "Plugin": "Pushover", "Validators": ["cpai", "roboflow_persons"], "ParallelValidators": true }
+  ```
+  Operationally proven via `ParallelValidatorsSliceTests` integration suite — real
+  Mosquitto + WireMock for both validators with a `SemaphoreSlim` gate that
+  deterministically asserts both validator HTTP stubs reach the wire concurrently
+  before either returns.
+- **`ChannelActionDispatcher` graceful-shutdown hardening (PR #44 follow-up).** `StopAsync`
+  now calls `_stoppingCts.CancelAsync()` before completing channel writers so any
+  in-flight `ValidateAsync` / `ExecuteAsync` call that respects cancellation
+  (`HttpClient`, `Task.Delay`) is interrupted promptly on host shutdown rather than
+  having to time out naturally. Pre-existing latent gap: any future code that signalled
+  the dispatcher's internal CTS would have surfaced this. The consumer-loop's
+  `await foreach` over `ReadAllAsync(ct)` is now wrapped in an outer
+  `catch (OperationCanceledException) when (ct.IsCancellationRequested)` so cancellation
+  between items also unwinds gracefully — same intent as the existing inner-body catch,
+  applied at loop scope.
+
 - **DOODS2 validator (#14).** New `FrigateRelay.Plugins.Doods2` validator plugin:
   HTTP-only `IValidationPlugin` against a self-hosted [DOODS2 v2](https://github.com/snowzach/doods2)
   inference server (`http://<host>:10200`). **HTTP-only** — gRPC was a feature of the legacy
