@@ -39,6 +39,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -67,6 +68,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -95,6 +97,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
 
         await dispatcher.Received(1).EnqueueAsync(
@@ -104,6 +107,7 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string>(),
             Arg.Any<string?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
     }
 

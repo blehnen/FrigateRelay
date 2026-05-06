@@ -148,7 +148,8 @@ internal sealed class EventPump : BackgroundService
 
                             await _dispatcher.EnqueueAsync(
                                 dispatchContext, plugin, validators,
-                                sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider, ct).ConfigureAwait(false);
+                                sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider,
+                                parallelValidators: entry.ParallelValidators, ct).ConfigureAwait(false);
                             LogDispatchEnqueued(_logger, plugin.Name, sub.Name, dispatchContext.EventId, null);
                         }
                     }

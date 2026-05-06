@@ -135,6 +135,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         string subscription = "",
         string? perActionSnapshotProvider = null,
         string? subscriptionDefaultSnapshotProvider = null,
+        bool parallelValidators = false,
         CancellationToken ct = default)
     {
         if (!_channels.TryGetValue(action, out var channel))
@@ -146,7 +147,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         }
 
         var item = new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
-            subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider);
+            subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider,
+            ParallelValidators: parallelValidators);
         DispatcherDiagnostics.IncrementActionsDispatched(item);
 
         await channel.Writer.WriteAsync(item, ct).ConfigureAwait(false);

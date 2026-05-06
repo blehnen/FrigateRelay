@@ -26,6 +26,14 @@ namespace FrigateRelay.Host.Dispatch;
 /// <see langword="null"/> means fall through to the global tier.
 /// Populated by <c>EventPump</c>; consumed by the action executor in Plan 3.1.
 /// </param>
+/// <param name="ParallelValidators">
+/// When <see langword="true"/>, <c>ChannelActionDispatcher.ConsumeAsync</c> runs this item's
+/// validators concurrently via
+/// <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>
+/// with strict-AND aggregation (CONTEXT-14 D6).
+/// Populated by <c>EventPump</c> from <c>ActionEntry.ParallelValidators</c>.
+/// Default <see langword="false"/> preserves v1.0 / v1.1 sequential-with-short-circuit behavior.
+/// </param>
 internal readonly record struct DispatchItem(
     EventContext Context,
     IActionPlugin Plugin,
@@ -33,4 +41,5 @@ internal readonly record struct DispatchItem(
     ActivityContext ParentContext,
     string Subscription = "",
     string? PerActionSnapshotProvider = null,
-    string? SubscriptionSnapshotProvider = null);
+    string? SubscriptionSnapshotProvider = null,
+    bool ParallelValidators = false);   // NEW for #23 / CONTEXT-14 D5

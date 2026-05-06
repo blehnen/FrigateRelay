@@ -35,6 +35,12 @@ internal interface IActionDispatcher
     /// Per-subscription default snapshot provider from <c>SubscriptionOptions.DefaultSnapshotProvider</c>;
     /// <see langword="null"/> falls through to the global default.
     /// </param>
+    /// <param name="parallelValidators">
+    /// When <see langword="true"/>, validators are run concurrently via
+    /// <see cref="System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task})"/>
+    /// with strict-AND aggregation (CONTEXT-14 D6). Sourced from <c>ActionEntry.ParallelValidators</c>.
+    /// Default <see langword="false"/> preserves sequential behavior.
+    /// </param>
     /// <param name="ct">A token that signals the host is shutting down.</param>
     /// <returns>A <see cref="ValueTask"/> that completes when the item has been enqueued.</returns>
     ValueTask EnqueueAsync(
@@ -44,5 +50,6 @@ internal interface IActionDispatcher
         string subscription = "",
         string? perActionSnapshotProvider = null,
         string? subscriptionDefaultSnapshotProvider = null,
+        bool parallelValidators = false,
         CancellationToken ct = default);
 }
