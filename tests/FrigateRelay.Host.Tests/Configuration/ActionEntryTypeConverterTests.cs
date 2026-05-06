@@ -79,4 +79,52 @@ public sealed class ActionEntryTypeConverterTests
         result.Actions[1].SnapshotProvider.Should().Be("Frigate");
         result.Actions[1].Validators.Should().BeEquivalentTo(["CodeProjectAi"]);
     }
+
+    // -------------------------------------------------------------------------
+    // ParallelValidators round-trip tests (PLAN-3.1 Task 1, REVIEW-3.1 gap-fill)
+    //
+    // The 6 tests in ActionEntryJsonConverterTests cover the JsonSerializer.Deserialize
+    // path. These three cover the operator-facing IConfiguration.Bind path — which is the
+    // path that actually loads appsettings.json at startup. CONTEXT-14 D5 requires
+    // ParallelValidators to default to false on every binding shape so existing v1.0/v1.1
+    // configs upgrade unchanged.
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public void Bind_ObjectForm_WithParallelValidatorsTrue_BindsCorrectly()
+    {
+        // Operator opts in to parallel mode on a single action via object form.
+        var result = Bind("""{"Actions":[{"Plugin":"Pushover","Validators":["cpai","roboflow"],"ParallelValidators":true}]}""");
+
+        result.Actions.Should().HaveCount(1);
+        result.Actions[0].Plugin.Should().Be("Pushover");
+        result.Actions[0].Validators.Should().BeEquivalentTo(["cpai", "roboflow"]);
+        result.Actions[0].ParallelValidators.Should().BeTrue("operator wrote ParallelValidators=true");
+    }
+
+    [TestMethod]
+    public void Bind_ObjectForm_WithoutParallelValidators_DefaultsFalse()
+    {
+        // Backward-compat invariant: existing v1.1 object-form config without the new field
+        // must continue to bind with ParallelValidators=false (CONTEXT-14 D5).
+        var result = Bind("""{"Actions":[{"Plugin":"Pushover","Validators":["cpai"]}]}""");
+
+        result.Actions.Should().HaveCount(1);
+        result.Actions[0].ParallelValidators.Should().BeFalse(
+            "missing field must default to false for backward compat with v1.0/v1.1 configs");
+    }
+
+    [TestMethod]
+    public void Bind_StringShorthand_ParallelValidatorsDefaultsFalse()
+    {
+        // Backward-compat invariant: existing v1.0 string-shorthand config must continue to
+        // bind with ParallelValidators=false (the TypeConverter constructs `new ActionEntry(name)`
+        // and relies on the record's positional defaults for the new field).
+        var result = Bind("""{"Actions":["BlueIris"]}""");
+
+        result.Actions.Should().HaveCount(1);
+        result.Actions[0].Plugin.Should().Be("BlueIris");
+        result.Actions[0].ParallelValidators.Should().BeFalse(
+            "string-shorthand → TypeConverter → new ActionEntry(name) must use positional defaults");
+    }
 }
