@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Roboflow Inference validator (#13).** New `FrigateRelay.Plugins.Roboflow` validator
+  plugin: HTTP-based `IValidationPlugin` against a self-hosted Roboflow Inference server
+  (`http://<host>:9001`). Per-instance `ModelId`, `MinConfidence`, `AllowedLabels`,
+  `OnError` (FailClosed/FailOpen), and `Timeout` config. Add to `appsettings.json` under
+  `Validators:<key>: { "Type": "Roboflow", ... }` and reference the key from any
+  `ActionEntry.Validators` list. WireMock-driven unit tests; no Testcontainers
+  integration test (the upstream `roboflow/roboflow-inference-server-cpu` image is
+  ~16 GB, exceeding GitHub Actions disk budget).
+
+  **Manual smoke recipe** (operator runs locally — image tag pinned to the version
+  the validator was verified against):
+  ```bash
+  docker run --rm -p 9001:9001 \
+      -e ROBOFLOW_API_KEY=... \
+      roboflow/roboflow-inference-server-cpu:1.2.7
+  curl -X POST http://localhost:9001/infer/object_detection \
+      -H 'Content-Type: application/json' \
+      -d '{"model_id":"rfdetr-base/1","image":{"type":"base64","value":"<b64>"},"confidence":0.5}'
+  ```
+
 ### Fixed
 
 - `ChannelActionDispatcher` eviction-callback log now reads the action name from the evicted `DispatchItem` rather than the surrounding `foreach` loop variable. Previously, in queued-eviction edge cases, the log message's `Action` field could refer to a different plugin than the one whose item was actually dropped — counter tags were already correct (sourced from `evicted` per CONTEXT-13 OQ-2); the log line is now consistent with them. ID-29.

@@ -127,11 +127,13 @@ internal static class HostBootstrap
             registrars.Add(new FrigateRelay.Plugins.FrigateSnapshot.PluginRegistrar());
         if (builder.Configuration.GetSection("Pushover").Exists())
             registrars.Add(new FrigateRelay.Plugins.Pushover.PluginRegistrar());
-        // CodeProjectAi: only register when the top-level Validators section is present.
-        // The registrar itself iterates that section and only acts on Type=="CodeProjectAi"
-        // entries, but gating here keeps the registrar list clean for inspection / logging.
+        // CPAI/Roboflow: only register when the top-level Validators section is present.
+        // Each registrar iterates that section and only acts on its own Type discriminator.
         if (builder.Configuration.GetSection("Validators").Exists())
+        {
             registrars.Add(new FrigateRelay.Plugins.CodeProjectAi.PluginRegistrar());
+            registrars.Add(new FrigateRelay.Plugins.Roboflow.PluginRegistrar());   // NEW for #13
+        }
 
         using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
         var bootstrapLogger = bootstrapLoggerFactory.CreateLogger<IPluginRegistrar>();

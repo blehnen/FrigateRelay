@@ -196,3 +196,66 @@ CHANGELOG classifies #35 as additive (semver minor): metric names persist, only 
 - A new operator can go from zero to a working Grafana dashboard in under fifteen minutes following `docs/observability.md` + the `docker/observability/` stack.
 - Adding a future token (e.g. `{score}`) requires editing `EventTokenTemplate.AllowedTokens` only — the BlueIris-side allowlist no longer exists.
 - A future contributor adding a new counter to `DispatcherDiagnostics` cannot ship without choosing a tag set, because the per-counter doc-comment template makes it the obvious next field to fill in.
+
+## Post-v1.1 Scope — v1.2 (more inference engines + parallel-AND validation)
+
+v1.1.0 shipped 2026-05-04 with full observability tagging and the `BlueIrisUrlTemplate` consolidation; the post-release ID-29 hotfix (eviction-callback log staleness) is queued under `[Unreleased]` for the next tag. v1.2 is the deferred-from-v1.1 scope from #13/#14/#23: two additional self-hosted inference engines as `IValidationPlugin` implementations, plus a parallel-AND mode that makes multi-engine validation a first-class option.
+
+### Goals (v1.2)
+
+1. **Two new self-hosted validators.** Roboflow Inference (RF-DETR headline) and DOODS2 (TFLite / TF / YOLOv5 detector hub) ship as separate plugin projects following the existing `IValidationPlugin` + `IPluginRegistrar` pattern established by `FrigateRelay.Plugins.CodeProjectAi`.
+2. **Parallel-AND validator execution as a per-action opt-in.** Today validators run sequentially per-action (decision V3). v1.2 adds a per-action `ParallelValidators: true` flag — when set, all validators in `ActionEntry.Validators` run concurrently and the aggregate decision is strict AND (every validator must `Verdict.Allow` for the action to fire). Default remains sequential for backward compatibility.
+3. **Demonstrate the multi-engine story end-to-end.** Integration tests cover at least one action protected by ≥ 2 validators in parallel, proving the new mode operationally.
+
+### In scope (v1.2)
+
+- **#13 — Roboflow Inference validator** (`FrigateRelay.Plugins.Roboflow`).
+  - Self-hosted Roboflow Inference only (e.g. `http://roboflow:9001`). No support for the Roboflow Hosted Cloud API in v1.2 — matches the project's infra-friendly stance.
+  - Per-instance `ModelId` config (e.g. `rfdetr-base`); operators declare multiple validator instances (e.g. `roboflow_persons`, `roboflow_vehicles`) if they need different models per camera.
+  - Same config shape as CPAI: `Validators:<name>:Type: "Roboflow"`, plus `BaseUrl`, `ModelId`, `MinConfidence`, `AllowedLabels`, `OnError`, `Timeout`.
+  - Transport: HTTP via `HttpClient` (typed client per `IPluginRegistrar`); WireMock-driven unit tests; Testcontainers integration test if `roboflow/inference` image is available, otherwise WireMock-only with a documented manual-smoke recipe.
+
+- **#14 — DOODS2 validator** (`FrigateRelay.Plugins.Doods2`).
+  - Operator-selectable transport: `Transport: "Http" | "Grpc"`. Both must be implemented and tested in v1.2 — gRPC is the perf-first path for high-throughput hosts (sub-millisecond serialisation, persistent HTTP/2 streams); HTTP matches the rest of the plugin family for simplicity. Operators choose per validator instance.
+  - HTTP path: `POST /detect` with base64-encoded image + JSON detections back. WireMock-driven unit tests.
+  - gRPC path: vendored DOODS2 `.proto` file compiled in-project via `Grpc.Tools`; `Grpc.Net.Client` + `Google.Protobuf` added as deps to **this plugin only** — not to `FrigateRelay.Abstractions`, not to `FrigateRelay.Host`. In-process gRPC test server for unit tests.
+  - Same `MinConfidence` / `AllowedLabels` / `OnError` / `Timeout` knobs as CPAI/Roboflow.
+
+- **#23 — Per-action `ParallelValidators: true`** in `ActionEntry`.
+  - Default `false`; sequential behavior unchanged for existing config.
+  - When `true`: validators run concurrently via `Task.WhenAll`; each validator's own `Timeout` applies; aggregate fails closed if any validator times out (matching the existing per-validator `OnError: FailClosed` semantics — "parallel" changes scheduling, not failure semantics).
+  - Aggregation: strict AND. Each rejecting validator still emits its own `validators.rejected` counter for per-validator dashboard visibility (no behavioral change to the counter tag matrix from v1.1).
+  - First reject does **not** short-circuit other in-flight validators — operators get full per-validator visibility on every dispatch. Documented as a deliberate cost-of-information tradeoff (and intentionally simpler than the cancellation-token plumbing the alternative would require).
+
+### Out of scope (deferred to v1.3+)
+
+- **Vote-based aggregation.** v1.2's parallel mode is strict AND only. Future work could add `RequireVotes: N-of-M` for soft consensus.
+- **Roboflow Hosted Cloud API.** Adds an auth surface and quota error handling v1.2 does not need.
+- **Per-action validator config override.** All validators referenced by an `ActionEntry` use the validator instance's own config; no per-action `ModelId` override knob.
+- **First-result-wins cancellation.** Considered and deliberately rejected — the cancellation plumbing is a non-trivial surface and the per-validator visibility benefit is real.
+
+### v1.2 PR sequencing
+
+Three sequential PRs against `main`:
+
+1. **#13 first** — Roboflow Inference plugin. Smaller surface than #14 (HTTP-only); establishes the second-validator pattern that #14 follows.
+2. **#14 second** — DOODS2 plugin (HTTP + gRPC). Builds on #13's pattern; adds the gRPC dep contained to this plugin only.
+3. **#23 last** — parallel-AND opt-in. Lands after both #13 and #14 are in so its integration tests can exercise three validator types (CPAI + Roboflow + DOODS2) in a single AND chain — proves the design holds beyond the toy CPAI-only case.
+
+CHANGELOG classifies all three as additive (semver minor). #23's `ParallelValidators` defaults to `false`, so existing `ActionEntry` configs are unaffected.
+
+### v1.2 verification gates
+
+- `dotnet build FrigateRelay.sln -c Release` zero warnings (warnings-as-errors, both Linux and Windows). New plugin projects compile clean.
+- gRPC dep containment: `dotnet list <abstractions|host>.csproj package --include-transitive` shows no `Grpc.*` transitive on either project. The dep lives in `FrigateRelay.Plugins.Doods2` only.
+- All existing tests pass.
+- New unit tests per validator: at minimum allow / reject / timeout / OnError-FailClosed / OnError-FailOpen / cancellation, driven by WireMock for HTTP and an in-process gRPC server for DOODS2's gRPC path.
+- New integration test demonstrating ≥ 2 validators running in parallel under a single `ActionEntry` with `ParallelValidators: true`. WireMock or Testcontainers as available; the CPAI + Roboflow combination is the smallest meaningful coverage.
+- `git grep -nE 'App\.Metrics|OpenTracing|Jaeger\.' src/` still empty (architectural invariant unchanged).
+- `git grep -nE 'Grpc\.' src/FrigateRelay.Host src/FrigateRelay.Abstractions` returns empty (host + abstractions stay gRPC-free; gRPC is plugin-local).
+
+### v1.2 success criteria
+
+- An operator can declare `Validators: ["cpai", "roboflow", "doods2"]` with `ParallelValidators: true` on a single action and see all three validators contribute decisions in production logs and counters.
+- Adding a hypothetical fourth validator follows the #13/#14 pattern: a new plugin project + `IPluginRegistrar` registration, no host changes required.
+- Existing v1.0/v1.1 deployments upgrade to v1.2 with no config changes — sequential validation remains the default. Operators opting into parallel mode flip exactly one boolean per action.
