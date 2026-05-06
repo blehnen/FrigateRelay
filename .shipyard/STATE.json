@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 14,
-  "position": "Phase 14 planned. 8 plans across 3 waves (Wave 1 = PR #13 Roboflow; Wave 2 = PR #14 DOODS2 HTTP+gRPC; Wave 3 = PR #23 ParallelValidators). 21 tasks, 1570 plan-lines. VERIFICATION = PASS, CRITIQUE = READY (0 blocking issues). Test target: 242 baseline → 269 final.",
-  "status": "planned",
+  "position": "Wave 1 (PR #42 / issue #13 Roboflow) merged to main at 28d760b. Wave 2 (PR for #14 DOODS2 HTTP+gRPC) next: PLAN-2.1 scaffold + .proto vendor + DI; PLAN-2.2 HTTP tests; PLAN-2.3 gRPC tests + dep-containment.",
+  "status": "building",
   "updated_at": "2026-05-06T00:00:00Z",
   "blocker": null
 }
