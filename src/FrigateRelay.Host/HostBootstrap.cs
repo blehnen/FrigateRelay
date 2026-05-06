@@ -127,12 +127,13 @@ internal static class HostBootstrap
             registrars.Add(new FrigateRelay.Plugins.FrigateSnapshot.PluginRegistrar());
         if (builder.Configuration.GetSection("Pushover").Exists())
             registrars.Add(new FrigateRelay.Plugins.Pushover.PluginRegistrar());
-        // CPAI/Roboflow: only register when the top-level Validators section is present.
+        // CPAI/Roboflow/DOODS2: only register when the top-level Validators section is present.
         // Each registrar iterates that section and only acts on its own Type discriminator.
         if (builder.Configuration.GetSection("Validators").Exists())
         {
             registrars.Add(new FrigateRelay.Plugins.CodeProjectAi.PluginRegistrar());
-            registrars.Add(new FrigateRelay.Plugins.Roboflow.PluginRegistrar());   // NEW for #13
+            registrars.Add(new FrigateRelay.Plugins.Roboflow.PluginRegistrar());   // #13 (PR #42)
+            registrars.Add(new FrigateRelay.Plugins.Doods2.PluginRegistrar());     // #14 (this PR)
         }
 
         using var bootstrapLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());

@@ -41,6 +41,7 @@
     <ProjectReference Include="..\FrigateRelay.Plugins.Pushover\FrigateRelay.Plugins.Pushover.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.CodeProjectAi\FrigateRelay.Plugins.CodeProjectAi.csproj" />
     <ProjectReference Include="..\FrigateRelay.Plugins.Roboflow\FrigateRelay.Plugins.Roboflow.csproj" />
+    <ProjectReference Include="..\FrigateRelay.Plugins.Doods2\FrigateRelay.Plugins.Doods2.csproj" />
   </ItemGroup>
 
   <!-- Publish flags: self-contained, untrimmed, no AOT, no single-file (CONTEXT-10 D3).
