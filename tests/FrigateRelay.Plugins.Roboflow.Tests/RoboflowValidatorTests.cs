@@ -1,4 +1,3 @@
-using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Plugins.Roboflow;
 using Microsoft.Extensions.Logging;
@@ -30,6 +29,7 @@ public sealed class RoboflowValidatorTests
         var verdict = await validator.ValidateAsync(MakeContext(), MakeSnapshotContext(), CancellationToken.None);
 
         verdict.Passed.Should().BeTrue();
+        verdict.Score.Should().BeApproximately(0.92, 0.001);
     }
 
     // -------------------------------------------------------------------------
@@ -192,6 +192,31 @@ public sealed class RoboflowValidatorTests
         // whichever subtype HttpClient raises. ThrowsAsync matches the base type correctly.
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => validator.ValidateAsync(MakeContext(), MakeSnapshotContext(), cts.Token));
+
+        // Pre-cancelled token must short-circuit before reaching the HTTP layer. If a future
+        // refactor moves the cancellation check after the network call, this guard fails.
+        stub.LogEntries.Should().BeEmpty("a cancelled token must not reach the HTTP layer");
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 9: HTTP 500 + FailOpen → Pass (closes the unavailable-FailOpen coverage gap)
+    // -------------------------------------------------------------------------
+    /// <summary>Server returns 500, OnError=FailOpen → allow with EventId 7102 logged.</summary>
+    [TestMethod]
+    public async Task ValidateAsync_HttpServerError_FailOpen_ReturnsAllow()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create().WithPath("/infer/object_detection").UsingPost())
+            .RespondWith(Response.Create().WithStatusCode(500));
+
+        var logger = new CapturingLogger<RoboflowValidator>();
+        var validator = MakeValidator(stub.Url!, minConf: 0.5, labels: ["person"],
+            onError: RoboflowValidatorErrorMode.FailOpen, logger: logger);
+
+        var verdict = await validator.ValidateAsync(MakeContext(), MakeSnapshotContext(), CancellationToken.None);
+
+        verdict.Passed.Should().BeTrue();
+        logger.Entries.Should().Contain(e => e.Id.Id == 7102 && e.Level == LogLevel.Warning);
     }
 
     // -------------------------------------------------------------------------
