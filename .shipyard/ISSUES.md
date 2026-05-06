@@ -450,6 +450,55 @@ Phase 12 closeout commit added `Path.GetFullPath(value)` canonicalization at CLI
 
 ---
 
+### ID-30: Validator HttpClient.BaseAddress + Timeout configured in keyed-singleton factory rather than `AddHttpClient` builder
+
+**Source:** CodeRabbit review on PR #43 (2026-05-06, nitpick #4)
+**Severity:** Low / Style (no operator-visible impact, no security implication)
+**Status:** Open
+
+**Description:**
+All three validator-plugin registrars (CPAI, Roboflow, DOODS2) mutate `HttpClient.BaseAddress` + `Timeout` on the resolved `HttpClient` inside their `AddKeyedSingleton<IValidationPlugin>` factory:
+
+```csharp
+context.Services.AddKeyedSingleton<IValidationPlugin>(instanceKey, (sp, key) =>
+{
+    var name = (string)key!;
+    var opts = sp.GetRequiredService<IOptionsMonitor<TOptions>>().Get(name);
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient($"<Type>:{name}");
+    http.BaseAddress = new Uri(opts.BaseUrl);   // ← mutated here
+    http.Timeout = opts.Timeout;                // ← mutated here
+    // ...
+});
+```
+
+The standard `IHttpClientFactory` pattern is to configure the client itself at registration time via `AddHttpClient(name, (sp, client) => ...)` so the factory hands back a fully-prepared client:
+
+```csharp
+context.Services
+    .AddHttpClient(clientName, (sp, client) =>
+    {
+        var opts = sp.GetRequiredService<IOptionsMonitor<TOptions>>().Get(instanceKey);
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = opts.Timeout;
+    })
+    .ConfigurePrimaryHttpMessageHandler(sp => /* ...unchanged... */);
+```
+
+It works today because the keyed-singleton factory runs once per instance, so the mutation only happens once. But it splits client configuration across two registration points and is fragile if anyone later adds `ConfigureHttpClient` upstream of the keyed singleton (which would silently lose the per-instance overrides).
+
+**Affected files:**
+- `src/FrigateRelay.Plugins.CodeProjectAi/PluginRegistrar.cs` (~lines 75-84)
+- `src/FrigateRelay.Plugins.Roboflow/PluginRegistrar.cs` (~lines 75-84)
+- `src/FrigateRelay.Plugins.Doods2/PluginRegistrar.cs` (~lines 75-84)
+
+**Remediation:**
+Apply the centralization pattern to all three registrars atomically in a single cleanup commit on a v1.2.x branch. Tests should not need changes — behavior is identical, only registration shape differs. Verify via existing `*PluginRegistrarTests` (Roboflow has 5 of these from PR #42; CPAI + DOODS2 do not yet — adding them as part of the cleanup would be valuable.
+
+**Why deferred:**
+Surfaced during PR #43 (DOODS2) CodeRabbit review. Applying to DOODS2 only would create stylistic inconsistency across the three registrars. Better to land all three together post-Phase-14 ship.
+
+---
+
 ## Closed Issues
 
 ### ID-2: `IActionDispatcher`/`DispatcherOptions` should be `internal` *[CLOSED 2026-04-27]*
