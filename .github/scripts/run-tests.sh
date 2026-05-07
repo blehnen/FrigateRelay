@@ -84,6 +84,10 @@ for proj in "${PROJECTS[@]}"; do
       fi
     fi
   else
-    dotnet run --project "$proj" -c "$CONFIG" --no-build "${PASS_THROUGH_ARGS[@]}"
+    if [[ ${#PASS_THROUGH_ARGS[@]} -gt 0 ]]; then
+      dotnet run --project "$proj" -c "$CONFIG" --no-build -- "${PASS_THROUGH_ARGS[@]}"
+    else
+      dotnet run --project "$proj" -c "$CONFIG" --no-build
+    fi
   fi
 done

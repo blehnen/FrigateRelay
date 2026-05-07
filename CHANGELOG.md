@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- #8 — `run-tests.sh` `--coverage` branch now passes `--filter` and other MTP passthrough args to `dotnet run`.
 - #13 — Operator-controlled values flowing into `errors.Add(...)` in `StartupValidation` and `ProfileResolver` are sanitized for `\r`/`\n` so a name containing a newline can no longer split a single startup-diagnostic log line into two (CWE-117).
 - #15 — secret-scan tripwire extended to cover RFC 1918 10.x.x.x and 172.16-31.x.x ranges.
 - #19 — New `ValidateNames` startup pass enforces the permissive-printable allowlist `^[A-Za-z0-9_. -]+$` for subscription, profile, plugin, and validator names; CRLF, slashes, colons, and at-signs are rejected (CWE-117 structural fix complementing the #13 defensive fix). Spaced names like `"DriveWay Person"` continue to bind cleanly.
@@ -19,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- #8 — `run-tests.sh` `--coverage` branch now passes `--filter` and other MTP passthrough args to `dotnet run`. Fast-mode branch also wraps `--` separator correctly so `--filter "X"` works locally as well as in Jenkins.
 - #14 — `ActionEntryTypeConverter` rejects empty / whitespace plugin names at the converter boundary with `FormatException`, matching the JSON path.
 
 ### Documentation
