@@ -2,39 +2,25 @@
 
 ## Open Issues
 
-### ID-1: Simplify IEventMatchSink justification in PLAN-3.1
+### ID-1: Simplify IEventMatchSink justification in PLAN-3.1  *[CLOSED 2026-05-07]*
 
 **Source:** verifier (Phase 3 spec-compliance review)
 **Severity:** Non-blocking (clarity improvement)
-**Status:** Open
+**Status:** **Closed-as-WONTFIX** (issue triage 2026-05-07)
 
-**Description:**
-PLAN-3.1 Task 1 Context section includes a detailed multi-paragraph explanation of why `IEventMatchSink` is added to Abstractions. The justification is correct, but could be condensed to a single sentence for readability:
-
-> "IEventMatchSink keeps Host plugin-agnostic by delegating event routing and dedupe logic to the plugin implementation."
-
-**Current text (lines in PLAN-3.1 Context):**
-"EventPump becomes a trivial fan-out... Plugin implements it doing matcher + dedupe + log. Simpler."
-
-**Suggested revision:**
-Replace the above with the one-liner above, or similar.
-
-**Impact:** Documentation clarity only. No code changes needed.
-
-**Owner:** (None assigned; deferred for Phase 3 builder to address if desired)
+**Resolution:**
+PLAN-3.1 is a frozen Phase 3 historical artifact. No active builder reads it; clarity improvements to a closed-phase plan provide no operator or contributor value. Closed without code change.
 
 ---
 
-### ID-3: `TargetFramework` missing from BlueIris csproj(s)
+### ID-3: `TargetFramework` missing from BlueIris csproj(s)  *[CLOSED 2026-05-07]*
 
 **Source:** verifier (Phase 4 post-build review, REVIEW-1.2)
 **Severity:** Minor
-**Status:** Open
+**Status:** **Closed-as-WONTFIX** (issue triage 2026-05-07)
 
-**Description:**
-`src/FrigateRelay.Plugins.BlueIris/FrigateRelay.Plugins.BlueIris.csproj` (and possibly the test csproj) may be missing an explicit `<TargetFramework>net10.0</TargetFramework>`, relying solely on `Directory.Build.props` inheritance. Build passes but explicit declaration is preferred for clarity and tooling support.
-
-**Impact:** Non-functional. Build succeeds via inheritance.
+**Resolution:**
+Single-source TFM via `Directory.Build.props` inheritance is the documented project convention (CLAUDE.md "Architecture invariants"). Adding `<TargetFramework>net10.0</TargetFramework>` to individual csprojs would diverge from convention without operational benefit.
 
 ---
 
@@ -88,16 +74,14 @@ Graceful shutdown no longer produces Error-status spans in OTel traces.
 
 ---
 
-### ID-7: CONTEXT-4 D3 lists `{score}` placeholder but parser does not accept it
+### ID-7: CONTEXT-4 D3 lists `{score}` placeholder but parser does not accept it  *[CLOSED 2026-05-07]*
 
 **Source:** verifier (Phase 4 post-build review, REVIEW-2.2)
 **Severity:** Note (doc stale)
-**Status:** Open
+**Status:** **Closed-as-WONTFIX** (issue triage 2026-05-07)
 
-**Description:**
-CONTEXT-4 D3 defines 5 URL template placeholders including `{score}`. The architect dropped `{score}` during plan design (recorded in PLAN-1.2 Task 2 and the pre-execution VERIFICATION.md Section G) because `EventContext` has no `Score` property. The code is correct — the parser's allowlist contains only `{camera}`, `{label}`, `{event_id}`, `{zone}`. However, CONTEXT-4 D3 has not been updated to remove `{score}` from the table.
-
-**Impact:** The stale CONTEXT-4 doc will mislead the Phase 5 builder who reuses the templater for `BlueIrisSnapshot`. Remove the `{score}` row from CONTEXT-4 D3, or add a strikethrough/note that it was deferred.
+**Resolution:**
+CONTEXT-4 is a frozen Phase 4 build doc. Phase 5 reused the templater for `BlueIrisSnapshot` without confusion; Phases 5–14 have shipped without anyone hitting this gap. The predicted "Phase 5 builder will be misled" risk did not materialize.
 
 ---
 
@@ -116,21 +100,14 @@ In `.github/scripts/run-tests.sh`, the `--coverage` branch (lines 67-70) calls `
 
 ---
 
-### ID-9: User-facing documentation deferred to Phase 12
+### ID-9: User-facing documentation deferred to Phase 12  *[CLOSED 2026-05-07]*
 
 **Source:** documenter (Phase 4 post-build review, DOCUMENTATION-4)
 **Severity:** Minor
-**Status:** Deferred (user decision, 2026-04-25)
+**Status:** **Closed-as-DONE** (issue triage 2026-05-07)
 
-**Description:**
-Phase 4 ships a working MQTT → BlueIris vertical slice but the repo has no `README.md`, no `docs/` tree, and no operator-facing configuration documentation. XML doc-comments on the public abstractions surface are in good shape; the gap is operator/user docs.
-
-**Decision:** Defer all documentation generation to ship time (Phase 12) per user choice. Rationale: Phases 5–7 add Snapshot providers, Pushover, and CodeProject.AI validator — operator docs written now would need substantial rewrites once those plugins land. Architecture and plugin-author docs similarly benefit from waiting until the plugin patterns are stable across 3+ implementations.
-
-**Reactivation triggers:**
-- A new contributor asks how to configure FrigateRelay — write a minimal `README.md` quickstart.
-- Phase 11 (Operations & Docs) begins per ROADMAP — generate the full docs tree.
-- An external user opens an issue asking for setup instructions.
+**Resolution:**
+Phase 11 shipped LICENSE, README, plugin scaffold, and plugin-author guide. Phase 12 (parity-cutover) shipped operator-facing configuration docs. The v1.0.0 → v1.2.0 release cycle has produced a README quickstart, `appsettings` examples, and per-plugin documentation. The deferral has been satisfied.
 
 ---
 
@@ -324,27 +301,14 @@ Phase 10 Dockerfile (PLAN-2.1).
 
 ---
 
-### ID-17: `ValidateObservability` does not validate the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var fallback
+### ID-17: `ValidateObservability` does not validate the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var fallback  *[CLOSED 2026-05-07]*
 
 **Source:** reviewer (Phase 9 REVIEW-2.2, 2026-04-27)
 **Severity:** Important
-**Status:** Open
+**Status:** **Closed-as-DUPLICATE** (issue triage 2026-05-07)
 
-**Description:**
-`HostBootstrap.cs` lines 56–57 resolve `otlpEndpoint` from `builder.Configuration["Otel:OtlpEndpoint"]` first, then falls back to `Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")`. If the env var is set to a malformed value (e.g. `"not-a-uri"`) while the config key is empty, `ValidateObservability` (which only checks `config["Otel:OtlpEndpoint"]`) reports no error. The OTLP exporter registration at line 65 then calls `new Uri(otlpEndpoint)`, which throws `UriFormatException` at startup — bypassing the fail-fast validation path entirely and producing a less actionable stack trace rather than the structured error message.
-
-**Fix:** In `ValidateObservability`, apply the same env-var fallback logic used in `HostBootstrap`:
-```csharp
-var endpoint = config["Otel:OtlpEndpoint"]
-    ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
-    errors.Add($"Otel:OtlpEndpoint '{endpoint}' is not a valid absolute URI.");
-```
-Alternatively, resolve the merged endpoint value once in `ValidateAll` and pass it to both the validation and wiring sites to keep them in sync.
-
-**Reactivation triggers:**
-- Next builder pass touching `StartupValidation.cs` or `HostBootstrap.cs`.
-- Any operator report of a cryptic `UriFormatException` at startup.
+**Resolution:**
+Duplicate of the first ID-17 entry above (filed twice with different severities). The fix described — applying `config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")` precedence in `ValidateObservability` — is already in place at `src/FrigateRelay.Host/StartupValidation.cs:75` (verified during 2026-05-07 triage). No code change required.
 
 ---
 

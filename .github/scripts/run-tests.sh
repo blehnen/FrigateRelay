@@ -67,7 +67,8 @@ for proj in "${PROJECTS[@]}"; do
     dotnet run --project "$proj" -c "$CONFIG" --no-build -- \
       --coverage \
       --coverage-output-format cobertura \
-      --coverage-output "coverage/${name}/coverage.cobertura.xml"
+      --coverage-output "coverage/${name}/coverage.cobertura.xml" \
+      "${PASS_THROUGH_ARGS[@]}"
 
     # MTP's Microsoft.Testing.Extensions.CodeCoverage honors --coverage-output
     # inside the mcr.microsoft.com/dotnet/sdk:10.0 container but ignores it on
@@ -83,6 +84,10 @@ for proj in "${PROJECTS[@]}"; do
       fi
     fi
   else
-    dotnet run --project "$proj" -c "$CONFIG" --no-build "${PASS_THROUGH_ARGS[@]}"
+    if [[ ${#PASS_THROUGH_ARGS[@]} -gt 0 ]]; then
+      dotnet run --project "$proj" -c "$CONFIG" --no-build -- "${PASS_THROUGH_ARGS[@]}"
+    else
+      dotnet run --project "$proj" -c "$CONFIG" --no-build
+    fi
   fi
 done

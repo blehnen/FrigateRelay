@@ -30,12 +30,23 @@ internal sealed class ActionEntryTypeConverter : TypeConverter
 
     /// <inheritdoc/>
     public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+    {
         // Note: string shorthand "BlueIris" → ActionEntry("BlueIris"); ParallelValidators defaults to false.
         // No change needed here when ActionEntry gains new optional fields — default values handle back-compat.
         // Object-form entries ({"Plugin":"X","ParallelValidators":true}) are NOT routed through this converter;
         // IConfiguration.Bind maps them property-by-property via reflection (see ActionEntryJsonConverter for
         // the JSON path — the two converters operate on disjoint code paths).
-        => value is string s
-            ? new ActionEntry(s)
-            : base.ConvertFrom(context, culture, value)!;
+        if (value is string s)
+        {
+            // #14: reject empty/whitespace names at the converter boundary.
+            // IsNullOrWhiteSpace is stricter than the JSON path's IsNullOrEmpty on purpose —
+            // IConfiguration.Bind can hand us a whitespace-only string from blank config values.
+            if (string.IsNullOrWhiteSpace(s))
+                throw new FormatException($"ActionEntry plugin name cannot be empty or whitespace (received: '{StartupValidation.Sanitize(s)}').");
+
+            return new ActionEntry(s);
+        }
+
+        return base.ConvertFrom(context, culture, value)!;
+    }
 }

@@ -95,6 +95,7 @@ A full example config lives at `config/appsettings.Example.json`. A minimal exce
 - **`CameraShortName` (optional, per subscription):** an alternate camera identifier surfaced through the `{camera_shortname}` URL-template token. Use when the downstream system (typically Blue Iris) names the camera differently from the originating source — e.g. Frigate id `"driveway"` vs Blue Iris shortname `"DriveWayHD"`. Without it, BI's HTTP trigger API returns 200 OK on the wrong name but silently does nothing.
 - **SnapshotProvider override:** `"SnapshotProvider": "Frigate"` on an action overrides the subscription default. Resolution order: per-action → per-subscription → global `DefaultSnapshotProvider`.
 - **Validators** attach to specific action entries and gate that action independently.
+- **Name validation (v1.2.1+):** subscription names, profile keys, plugin names, and validator instance keys must match `^[A-Za-z0-9_. -]+$` — alphanumerics, space, dot, dash, and underscore are accepted. Slashes, colons, at-signs, control characters, and CRLF are rejected at startup with a structured diagnostic. Spaced names like `"DriveWay Person"` and `"Front Door"` continue to bind cleanly. Empty or whitespace-only plugin names also fail fast at the converter boundary with a `FormatException` — supply a non-empty name in either the string-shorthand (`"BlueIris"`) or object form (`{"Plugin": "BlueIris"}`).
 
 ## Observability
 

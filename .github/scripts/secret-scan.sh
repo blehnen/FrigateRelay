@@ -34,6 +34,8 @@ LABELS=(
   "Bearer token"
   "GitHub PAT"
   "AWS Access Key"
+  "RFC-1918 10.x.x.x"
+  "RFC-1918 172.16-31.x.x"
 )
 
 PATTERNS=(
@@ -44,6 +46,8 @@ PATTERNS=(
   'Bearer\s+[A-Za-z0-9._\-]{20,}'
   'ghp_[A-Za-z0-9]{36}'
   'AKIA[A-Z0-9]{16}'
+  '10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+  '172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]{1,3}\.[0-9]{1,3}'
 )
 
 FIXTURE=".github/secret-scan-fixture.txt"
