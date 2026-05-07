@@ -1,8 +1,8 @@
 {
   "schema": 3,
-  "phase": 15,
-  "position": "v1.2.1 SHIPPED 2026-05-07. PR #45 merged at b294bb3; CHANGELOG promotion at c427b2b; v1.2.1 tag cut. release.yml completed SUCCESS (8m42s) — smoke gate green, multi-arch GHCR push complete (linux/amd64 + linux/arm64 to ghcr.io/blehnen/frigaterelay:1.2.1, :latest, :1). 151 Host tests passing (133 + 18 net-new across the full Phase 15 cycle). Phase 15 closed. Next: /shipyard:plan 16 for v1.3.0 (MetricsTags:KnownCameras + Task.Delay polling refactor + PluginRegistrar shape unification).",
-  "status": "shipped",
-  "updated_at": "2026-05-07T21:31:05Z",
+  "phase": 16,
+  "position": "Phase 16 (v1.3.0) planned. 3 plans / 8 tasks / 1 wave. PLAN-1.1 MetricsTagWriter+KnownCameras (#18, 3 tasks, TDD), PLAN-1.2 WaitForEntriesAsync refactor (#22, 2 tasks), PLAN-1.3 Registrar unification + CPAI backfill (#30, 3 tasks). Verifier verdict: PASS (1 WARN — CounterIncrementTests.cs + EventPumpSpanTests.cs shared between PLAN-1.1 and PLAN-1.2; sequential dispatch resolves). Critic verdict: READY. Builder pre-build verifications: baseline compile + 151 test count + RC-4 EnqueueAsync signature at CounterIncrementTests.cs:418-421. Ready for /shipyard:build 16.",
+  "status": "planned",
+  "updated_at": "2026-05-07T22:02:12Z",
   "blocker": null
 }
