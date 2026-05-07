@@ -852,3 +852,4 @@
 - [2026-05-06T00:00:00Z] Phase 14 planned (v1.2). 8 plans, 21 tasks across 3 waves. VERIFICATION=PASS, CRITIQUE=READY.
 - [2026-05-06T19:49:32Z] Session ended during build (may need /shipyard:resume)
 - [2026-05-06T19:51:46Z] Session ended during build (may need /shipyard:resume)
+- [2026-05-07T00:00:00Z] Phase 14 / v1.2 trio MERGED to main: PR #42 (#13 Roboflow), PR #43 (#14 DOODS2), PR #44 (#23 ParallelValidators + StopAsync hardening). 49 net-new tests across the phase (242 → 291). CHANGELOG [Unreleased] ready for promotion to [1.2.0]. Awaiting operator-cut `git tag v1.2.0`.
