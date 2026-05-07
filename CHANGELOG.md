@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- #8 — `run-tests.sh` `--coverage` branch now passes `--filter` and other MTP passthrough args to `dotnet run`.
+- #15 — secret-scan tripwire extended to cover RFC 1918 10.x.x.x and 172.16-31.x.x ranges.
+- #24 — Third-party GitHub Actions SHA-pinned across release.yml, ci.yml, secret-scan.yml, docs.yml (SLSA L2+).
+
 ### Fixed
 
 - #14 — `ActionEntryTypeConverter` rejects empty / whitespace plugin names at the converter boundary with `FormatException`, matching the JSON path.
