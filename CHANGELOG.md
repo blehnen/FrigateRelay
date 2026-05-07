@@ -7,14 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-05-07
+
+Security + hygiene patch closing 10 issues. No public API change. Hardens the structured-logging boundary against CRLF injection from operator-controlled config values (CWE-117), restricts OTLP endpoint URI schemes (CWE-183), closes the residual Windows-Serilog-path gap from Phase 10's Linux-only allowlist hardening (CWE-22), and pins all third-party GitHub Actions to commit SHAs across the release / CI / secret-scan / docs workflows for SLSA L2+. Also extends the secret-scan tripwire to cover RFC 1918 10.x and 172.16-31.x ranges, brings the `[TypeConverter]` plugin-name path into parity with the JSON converter, and adds operator-doc warnings on the smoke broker and example compose binding.
+
 ### Security
 
 - #13 — Operator-controlled values flowing into `errors.Add(...)` in `StartupValidation` and `ProfileResolver` are sanitized for `\r`/`\n` so a name containing a newline can no longer split a single startup-diagnostic log line into two (CWE-117).
 - #15 — secret-scan tripwire extended to cover RFC 1918 10.x.x.x and 172.16-31.x.x ranges.
-- #19 — New `ValidateNames` startup pass enforces the permissive-printable allowlist `^[A-Za-z0-9_. -]+$` for subscription, profile, plugin, and validator names; CRLF, slashes, colons, and at-signs are rejected (CWE-117 structural fix complementing the #13 defensive fix). Spaced names like `"DriveWay Person"` continue to bind cleanly.
+- #19 — New `ValidateNames` startup pass enforces the permissive-printable allowlist `^[A-Za-z0-9_. -]+$` for subscription, profile, plugin, and validator names; CRLF, slashes, colons, and at-signs are rejected (CWE-117 structural fix complementing the #13 defensive fix). Spaced names like `"DriveWay Person"` continue to bind cleanly. Whitespace-only names are also rejected.
 - #20 — `Otel:OtlpEndpoint` URI scheme restricted to `http` / `https` / `grpc` at startup; `file://`, `ftp://`, etc. now produce a structured diagnostic instead of an `ArgumentException` from deep inside the OTLP exporter on first metric/span flush (CWE-183).
 - #24 — Third-party GitHub Actions SHA-pinned across release.yml, ci.yml, secret-scan.yml, docs.yml (SLSA L2+).
-- #27 — `Serilog:WriteTo:*:Args:path` now rejects Windows-style absolute paths (e.g. `C:\Windows\...`) when the host is Windows, closing the residual CWE-22 gap left after Phase 10's Linux-allowlist hardening. Implementation accepts an injectable `Func<bool>? isWindows` predicate so the unit test runs cross-platform without a Windows agent.
+- #27 — `Serilog:WriteTo:*:Args:path` now rejects Windows-style absolute paths (e.g. `C:\Windows\...`, `D:/logs/...`, and the drive-relative `C:foo` form) when the host is Windows, closing the residual CWE-22 gap left after Phase 10's Linux-allowlist hardening. Implementation accepts an injectable `Func<bool>? isWindows` predicate so the unit test runs cross-platform without a Windows agent.
 
 ### Fixed
 
@@ -25,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - #25 — Prominent WARNING header on `docker/mosquitto-smoke.conf` clarifying CI-only / anonymous-only character.
 - #26 — `docker/docker-compose.example.yml` recommends `127.0.0.1:8080:8080` binding for untrusted networks.
+- README + `docs/observability.md` updated with the v1.2.1 name allowlist (#19), OTLP scheme restriction (#20), and Serilog-file-sink Windows-path validation (#27) — operators see the rules in the docs adjacent to the relevant config keys, not just in the rejection diagnostic at startup.
 
 ## [1.2.0] — 2026-05-07
 
