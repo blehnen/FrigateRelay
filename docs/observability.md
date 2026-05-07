@@ -126,6 +126,13 @@ Otel__OtlpEndpoint=http://otel-collector:4318/v1/metrics
 same endpoint. Logs are not routed through OTLP — they go through Serilog sinks (see Seq
 section below).
 
+**Validated at startup (v1.2.1+):** the `Otel:OtlpEndpoint` value (whether sourced from
+`appsettings.json`, `Otel__OtlpEndpoint`, or the SDK-native `OTEL_EXPORTER_OTLP_ENDPOINT`
+fallback) is parsed and its scheme is checked against the allowlist `{ http, https, grpc }`
+before the host starts. A typo like `file:///tmp/x` or `ftp://...` produces a structured
+startup diagnostic naming the offending value and scheme — the host fails fast instead of
+crashing later inside the OTLP exporter on first metric/span flush.
+
 ---
 
 ## Reference observability stacks
@@ -205,6 +212,30 @@ or both.
 runs natively on the host (or in any container with `network_mode: host`). If FrigateRelay
 runs as a container on the same Compose network as the `seq` service, swap `localhost` for
 the service name `seq` (e.g., `http://seq:5341`).
+
+### Serilog rolling-file sink (path validation, v1.2.1+)
+
+`Serilog:WriteTo:*:Args:path` values — used by the rolling-file sink — are validated at
+startup. The accepted shapes are:
+
+- **Relative paths** (recommended): `logs/frigaterelay-.log`. Resolves relative to the host
+  working directory.
+- **Linux absolute paths within the allowlist**: `/var/log/frigaterelay/...` or
+  `/app/logs/...`.
+
+The following shapes are rejected at startup with a structured diagnostic:
+
+- Paths containing `..` (path-traversal segments).
+- UNC paths beginning with `\\`.
+- Linux absolute paths outside the two allowed prefixes.
+- **Windows-style absolute paths** (e.g. `C:\logs\app.log`, `D:/logs/app.log`) — only
+  enforced when the host runs on Windows. Linux containers and Linux hosts ignore this
+  check. Operators running FrigateRelay natively on Windows should use a relative path.
+
+`Serilog:WriteTo:*:Args:path` from `appsettings.Local.json`, env vars, or any other
+`IConfiguration` source is checked uniformly. The validation runs as part of the same
+collect-all startup pass as the rest of FrigateRelay's config checks — operators see every
+problem at once instead of fixing one and discovering the next on the next restart.
 
 ---
 
