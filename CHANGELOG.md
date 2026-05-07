@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- #14 — `ActionEntryTypeConverter` rejects empty / whitespace plugin names at the converter boundary with `FormatException`, matching the JSON path.
+
 ### Documentation
 
 - #25 — Prominent WARNING header on `docker/mosquitto-smoke.conf` clarifying CI-only / anonymous-only character.

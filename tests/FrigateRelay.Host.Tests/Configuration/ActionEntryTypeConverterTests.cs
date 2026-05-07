@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using FluentAssertions;
 using FrigateRelay.Host.Configuration;
@@ -126,5 +127,37 @@ public sealed class ActionEntryTypeConverterTests
         result.Actions[0].Plugin.Should().Be("BlueIris");
         result.Actions[0].ParallelValidators.Should().BeFalse(
             "string-shorthand → TypeConverter → new ActionEntry(name) must use positional defaults");
+    }
+
+    // -------------------------------------------------------------------------
+    // Empty / whitespace guard tests (#14)
+    // -------------------------------------------------------------------------
+
+    [TestMethod]
+    public void ConvertFrom_EmptyString_ThrowsFormatException()
+    {
+        // #14: empty string must be rejected at the converter boundary, not allowed to
+        // produce an ActionEntry with an empty Plugin name that surfaces as a confusing
+        // "unknown plugin ''" message from StartupValidation.
+        var converter = new ActionEntryTypeConverter();
+
+        Action act = () => converter.ConvertFrom(null, CultureInfo.InvariantCulture, "");
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*empty*");
+    }
+
+    [TestMethod]
+    public void ConvertFrom_WhitespaceOnlyString_ThrowsFormatException()
+    {
+        // #14: whitespace-only string (e.g. "   ") must also be rejected — IsNullOrWhiteSpace
+        // is stricter than the JSON path's IsNullOrEmpty to catch IConfiguration.Bind
+        // scenarios where a blank value comes through as spaces.
+        var converter = new ActionEntryTypeConverter();
+
+        Action act = () => converter.ConvertFrom(null, CultureInfo.InvariantCulture, "   ");
+
+        act.Should().Throw<FormatException>()
+            .WithMessage("*'   '*");
     }
 }
