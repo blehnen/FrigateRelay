@@ -135,4 +135,57 @@ public sealed class StartupValidationNameAllowlistTests
         errors[0].Should().ContainEquivalentOf("subscription",
             "error message must identify the kind of name that was rejected");
     }
+
+    // -----------------------------------------------------------------------
+    // Test 6 (coverage): invalid plugin name in PROFILE path (vs subscription path in Test 3).
+    //         Closes the StartupValidation.cs:78 patch-coverage gap.
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void ValidateNames_PluginNameWithColonInProfile_RejectsWithPluginInMessage()
+    {
+        var options = new HostSubscriptionsOptions
+        {
+            Profiles = new Dictionary<string, ProfileOptions>
+            {
+                ["GoodProfile"] = new ProfileOptions { Actions = [new ActionEntry("Bad:Plugin")] }
+            },
+            Subscriptions = []
+        };
+        var errors = new List<string>();
+
+        StartupValidation.ValidateNames(options, errors);
+
+        errors.Should().ContainSingle("plugin name in a profile must be checked, not just in subscriptions");
+        errors[0].Should().ContainEquivalentOf("plugin",
+            "error message must identify the kind of name that was rejected");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 7 (coverage): invalid validator key in PROFILE path.
+    //         Closes the StartupValidation.cs:105 patch-coverage gap.
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void ValidateNames_ValidatorKeyWithSlashInProfile_RejectsWithValidatorInMessage()
+    {
+        var options = new HostSubscriptionsOptions
+        {
+            Profiles = new Dictionary<string, ProfileOptions>
+            {
+                ["GoodProfile"] = new ProfileOptions
+                {
+                    Actions = [new ActionEntry("GoodPlugin") { Validators = ["Bad/Key"] }]
+                }
+            },
+            Subscriptions = []
+        };
+        var errors = new List<string>();
+
+        StartupValidation.ValidateNames(options, errors);
+
+        errors.Should().ContainSingle("validator key in a profile action must be checked, not just in subscription actions");
+        errors[0].Should().ContainEquivalentOf("validator",
+            "error message must identify the kind of name that was rejected");
+    }
 }

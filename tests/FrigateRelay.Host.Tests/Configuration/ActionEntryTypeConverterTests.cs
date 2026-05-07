@@ -160,4 +160,18 @@ public sealed class ActionEntryTypeConverterTests
         act.Should().Throw<FormatException>()
             .WithMessage("*'   '*");
     }
+
+    [TestMethod]
+    public void ConvertFrom_NonStringValue_FallsThroughToBase()
+    {
+        // Coverage: non-string source values are not the converter's contract — they fall
+        // through to base.ConvertFrom which rejects unrecognized types with NotSupportedException.
+        // Asserting the throw confirms we don't silently swallow the call.
+        var converter = new ActionEntryTypeConverter();
+
+        Action act = () => converter.ConvertFrom(null, CultureInfo.InvariantCulture, 42);
+
+        act.Should().Throw<NotSupportedException>(
+            "non-string source values fall through to base.ConvertFrom which rejects them");
+    }
 }
