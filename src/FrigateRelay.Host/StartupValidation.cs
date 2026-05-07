@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Snapshots;
@@ -24,6 +25,87 @@ internal static class StartupValidation
     {
         if (value is null) return string.Empty;
         return value.Replace("\r", @"\r").Replace("\n", @"\n");
+    }
+
+    /// <summary>
+    /// Permissive-printable allowlist: alphanumeric, space, dot, dash, underscore (D1).
+    /// Rejects CRLF, null bytes, control chars, slashes, colons, and at-signs.
+    /// Not <c>[GeneratedRegex]</c> because <c>internal static class</c> cannot be <c>partial</c>.
+    /// </summary>
+    private static readonly Regex NameAllowlist = new("^[A-Za-z0-9_. -]+$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Validates that subscription names, profile keys, plugin names, and validator instance
+    /// keys contain only the permissive-printable character set defined in D1
+    /// (<c>^[A-Za-z0-9_. -]+$</c>). Accumulates errors into <paramref name="errors"/>
+    /// (D7 collect-all). Called from <see cref="ValidateAll"/> before profile resolution
+    /// so profile keys are checked before any lookup is attempted (ID-19 closure).
+    /// </summary>
+    internal static void ValidateNames(HostSubscriptionsOptions options, List<string> errors)
+    {
+        const string allowedDesc = "only [A-Za-z0-9_. -] are permitted (CRLF, control chars, slashes, colons, and at-signs are rejected).";
+
+        // Subscription names.
+        foreach (var sub in options.Subscriptions)
+        {
+            if (!string.IsNullOrEmpty(sub.Name) && !NameAllowlist.IsMatch(sub.Name))
+                errors.Add($"Subscription name '{Sanitize(sub.Name)}' is invalid; {allowedDesc}");
+        }
+
+        // Profile keys.
+        foreach (var key in options.Profiles.Keys)
+        {
+            if (!string.IsNullOrEmpty(key) && !NameAllowlist.IsMatch(key))
+                errors.Add($"Profile name '{Sanitize(key)}' is invalid; {allowedDesc}");
+        }
+
+        // Plugin names referenced in subscriptions.
+        foreach (var sub in options.Subscriptions)
+        {
+            foreach (var entry in sub.Actions)
+            {
+                if (!string.IsNullOrEmpty(entry.Plugin) && !NameAllowlist.IsMatch(entry.Plugin))
+                    errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
+            }
+        }
+
+        // Plugin names referenced in profiles.
+        foreach (var profile in options.Profiles.Values)
+        {
+            foreach (var entry in profile.Actions)
+            {
+                if (!string.IsNullOrEmpty(entry.Plugin) && !NameAllowlist.IsMatch(entry.Plugin))
+                    errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
+            }
+        }
+
+        // Validator instance keys in subscriptions.
+        foreach (var sub in options.Subscriptions)
+        {
+            foreach (var entry in sub.Actions)
+            {
+                if (entry.Validators is null) continue;
+                foreach (var validatorKey in entry.Validators)
+                {
+                    if (!string.IsNullOrEmpty(validatorKey) && !NameAllowlist.IsMatch(validatorKey))
+                        errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
+                }
+            }
+        }
+
+        // Validator instance keys in profiles.
+        foreach (var profile in options.Profiles.Values)
+        {
+            foreach (var entry in profile.Actions)
+            {
+                if (entry.Validators is null) continue;
+                foreach (var validatorKey in entry.Validators)
+                {
+                    if (!string.IsNullOrEmpty(validatorKey) && !NameAllowlist.IsMatch(validatorKey))
+                        errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -54,6 +136,9 @@ internal static class StartupValidation
             ValidateObservability(configuration, errors);
             ValidateSerilogPath(configuration, errors);   // ID-21: reject path-traversal / UNC / off-allowlist absolute paths
         }
+
+        // Pass 0.5 — name allowlist (D1 permissive-printable; before resolve so profile keys are checked).
+        ValidateNames(options, errors);
 
         // Pass 1 — profile resolution (D1 mutex + undefined-profile guard).
         var resolved = ProfileResolver.Resolve(options, errors);
@@ -88,8 +173,15 @@ internal static class StartupValidation
         // ID-17: validate whichever value HostBootstrap will actually use — config key first,
         // OTEL_EXPORTER_OTLP_ENDPOINT env var as fallback. If neither is set, no validation needed.
         var endpoint = config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
-            errors.Add($"Otel:OtlpEndpoint '{Sanitize(endpoint)}' is not a valid absolute URI.");
+        if (!string.IsNullOrWhiteSpace(endpoint))
+        {
+            // ID-20: scheme allowlist — produce a structured diagnostic at startup instead of
+            // an ArgumentException from deep inside the OTLP exporter on first metric/span flush.
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+                errors.Add($"Otel:OtlpEndpoint '{Sanitize(endpoint)}' is not a valid absolute URI.");
+            else if (uri.Scheme is not ("http" or "https" or "grpc"))
+                errors.Add($"Otel:OtlpEndpoint '{Sanitize(endpoint)}' has unsupported scheme '{Sanitize(uri.Scheme)}'; allowed: http, https, grpc.");
+        }
 
         var seq = config["Serilog:Seq:ServerUrl"];
         if (!string.IsNullOrWhiteSpace(seq) && !Uri.TryCreate(seq, UriKind.Absolute, out _))
