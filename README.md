@@ -104,7 +104,9 @@ See [docs/observability.md](docs/observability.md) for the full counter inventor
 
 ## Validator engine status
 
-FrigateRelay ships with one validator plugin today — **CodeProject.AI** — but **active CodeProject.AI development has stopped upstream**. The plugin's request shape (`POST /v1/vision/detection`) is also the API exposed by **[Blue Onyx](https://github.com/xnorpx/blue-onyx)**, so the existing plugin is the supported path to either backend.
+FrigateRelay ships three validator plugins as of v1.2.0: **CodeProject.AI** (also serves [Blue Onyx](https://github.com/xnorpx/blue-onyx) — same wire format), **Roboflow Inference**, and **DOODS2**. Multiple validators can be attached per action, and v1.2.0 adds an opt-in `ParallelValidators: true` flag that runs them concurrently with strict-AND aggregation (see CHANGELOG for details).
+
+**About CodeProject.AI:** active upstream development has stopped, but the plugin is **not deprecated** — the request shape (`POST /v1/vision/detection`) is also the API exposed by Blue Onyx, so existing CPAI users and Blue Onyx users both depend on it. The deprecation concerns the upstream CodeProject.AI *service*, not the plugin contract.
 
 ### Supported backends (verified)
 
@@ -121,13 +123,32 @@ FrigateRelay ships with one validator plugin today — **CodeProject.AI** — bu
   }
   ```
   **Performance caveat:** Blue Onyx supports NVIDIA GPU acceleration **only via its Windows EXE/service distribution**. The Docker image is CPU-only — slower than CPAI's CUDA-enabled Docker image on the same hardware. Acceptable for event-driven validation in the FrigateRelay pipeline (sub-real-time, one inference per matched event); operators with high event rates and no Windows GPU host should benchmark before swapping.
-
-### Future backends (v1.1 roadmap)
-
-- **Roboflow Inference / RF-DETR** (#13) — different detection model architecture; needs its own plugin.
-- **DOODS2** (#14) — TFLite / TensorFlow / YOLOv5 detector hub; needs its own plugin.
-
-The CPAI plugin is **not marked obsolete** — both CPAI users and Blue Onyx users depend on it. The deprecation is about the upstream CodeProject.AI *service*, not the plugin contract or the API shape.
+- **Roboflow Inference** (added v1.2.0, #13) — self-hosted [Roboflow Inference server](https://github.com/roboflow/inference) with any Roboflow-hosted or custom-trained model (e.g. RF-DETR). One validator instance per model — declare multiple instances to gate different actions on different models.
+  ```jsonc
+  "Validators": {
+    "roboflow_persons": {
+      "Type": "Roboflow",
+      "BaseUrl": "http://roboflow-host:9001",
+      "ModelId": "rfdetr-base/1",       // include the version suffix
+      "MinConfidence": 0.5,
+      "AllowedLabels": ["person"],
+      "OnError": "FailClosed"
+    }
+  }
+  ```
+- **DOODS2** (added v1.2.0, #14) — self-hosted [DOODS2 v2](https://github.com/snowzach/doods2) detector hub (TFLite / TensorFlow / PyTorch backends, all with the COCO 80-label set). HTTP-only — gRPC was dropped upstream in the v2 Python rewrite.
+  ```jsonc
+  "Validators": {
+    "doods2_driveway": {
+      "Type": "Doods2",
+      "BaseUrl": "http://doods2-host:8080",
+      "DetectorName": "default",        // "default" | "tensorflow" | "pytorch"
+      "MinConfidence": 0.5,
+      "AllowedLabels": ["person", "car"],
+      "OnError": "FailClosed"
+    }
+  }
+  ```
 
 ## Migrating from FrigateMQTTProcessingService
 
@@ -159,7 +180,7 @@ See `docs/plugin-author-guide.md` for the full walkthrough: contract interfaces,
 
 ## Project status
 
-`v1.0.0` shipped 2026-05-03 — see [`CHANGELOG.md`](CHANGELOG.md) and the [release page](https://github.com/blehnen/FrigateRelay/releases/tag/v1.0.0). Multi-arch images are published to `ghcr.io/blehnen/frigaterelay:1.0.0`, `:1`, and `:latest`. v1.0.1 is in progress (operator-reported bugs + docs cleanup); the v1.1 plan adds the alternative validator plugins listed under "Validator engine status" above.
+`v1.2.0` is the current release — adds the Roboflow Inference (#13) and DOODS2 (#14) validator plugins listed under "Validator engine status" above, the per-action `ParallelValidators: true` opt-in (#23), and a `ChannelActionDispatcher` graceful-shutdown hardening fix. See [`CHANGELOG.md`](CHANGELOG.md) for the full per-version history (`v1.0.0` → `v1.0.3` → `v1.1.0` → `v1.2.0`) and the [releases page](https://github.com/blehnen/FrigateRelay/releases) for tagged artifacts. Multi-arch images are published to `ghcr.io/blehnen/frigaterelay:<semver>`, `:<major>`, and `:latest`.
 
 ## License
 

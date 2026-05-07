@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-05-07
+
+Adds two new validator plugins (Roboflow Inference, DOODS2) and a per-action `ParallelValidators: true` opt-in for running validators concurrently with strict-AND aggregation. Also includes a `ChannelActionDispatcher` graceful-shutdown hardening fix (in-flight HTTP calls are now cancelled promptly on host shutdown) and the ID-29 eviction-log carryover from the v1.1.x window.
+
 ### Added
 
 - **Per-action `ParallelValidators: true` opt-in (#23).** `ActionEntry` gains a new
