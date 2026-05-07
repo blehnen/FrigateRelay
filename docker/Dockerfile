@@ -36,6 +36,8 @@ COPY src/FrigateRelay.Plugins.BlueIris/FrigateRelay.Plugins.BlueIris.csproj     
 COPY src/FrigateRelay.Plugins.FrigateSnapshot/FrigateRelay.Plugins.FrigateSnapshot.csproj src/FrigateRelay.Plugins.FrigateSnapshot/
 COPY src/FrigateRelay.Plugins.Pushover/FrigateRelay.Plugins.Pushover.csproj       src/FrigateRelay.Plugins.Pushover/
 COPY src/FrigateRelay.Plugins.CodeProjectAi/FrigateRelay.Plugins.CodeProjectAi.csproj    src/FrigateRelay.Plugins.CodeProjectAi/
+COPY src/FrigateRelay.Plugins.Roboflow/FrigateRelay.Plugins.Roboflow.csproj       src/FrigateRelay.Plugins.Roboflow/
+COPY src/FrigateRelay.Plugins.Doods2/FrigateRelay.Plugins.Doods2.csproj           src/FrigateRelay.Plugins.Doods2/
 
 RUN RID=$(cat /tmp/rid) && \
     dotnet restore src/FrigateRelay.Host/FrigateRelay.Host.csproj -r "$RID" --locked-mode
