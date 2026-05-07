@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 15,
-  "position": "Phase 15 (v1.2.1) planned. 4 plans / 9 tasks / 1 wave (all parallel). PLAN-1.1 (StartupValidation hardening, 3 tasks, 11 net-new tests, TDD), PLAN-1.2 (ActionEntryTypeConverter, 1 task, 2 tests, TDD), PLAN-1.3 (CI hygiene, 3 tasks, non-TDD), PLAN-1.4 (Docker doc hygiene, 2 tasks, doc-only). Verifier verdict: PASS (3 advisory, 0 blocking). Critic verdict: CAUTION (PLAN-1.3 secret-scan scan-arg typo fixed inline; SHA resolution needs gh api two-step at build; CHANGELOG.md serialize last). Ready for /shipyard:build 15.",
-  "status": "planned",
-  "updated_at": "2026-05-07T16:46:03Z",
+  "position": "Phase 15 (v1.2.1 hardening) build COMPLETE on feature/phase-15-v1.2.1. 10 plan commits + 1 review-followup. 146/146 Host tests pass (133 + 13 net-new). All 10 IDs closed. VERIFICATION PASS, AUDIT NO_CRITICAL, SIMPLIFICATION CLEAN, DOCUMENTATION GAPS_NON_BLOCKING (3 small operator-doc additions). Awaiting PR merge + operator tag-cut v1.2.1.",
+  "status": "complete",
+  "updated_at": "2026-05-07T18:38:49Z",
   "blocker": null
 }
