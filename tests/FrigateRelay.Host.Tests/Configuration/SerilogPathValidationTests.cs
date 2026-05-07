@@ -199,4 +199,37 @@ public sealed class SerilogPathValidationTests
             .WithMessage("*path traversal*",
                 "aggregated message must include the path-traversal rejection detail");
     }
+
+    // -----------------------------------------------------------------------
+    // ID-27: Windows-style absolute path rejection (D5 injectable predicate seam).
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void ValidateSerilogPath_WindowsRootedPath_OnWindowsHost_AddsRejectionError()
+    {
+        var config = ConfigWithSinkPath(@"C:\Windows\System32\evil.log");
+        var errors = new List<string>();
+
+        StartupValidation.ValidateSerilogPath(config, errors, isWindows: () => true);
+
+        errors.Should().ContainSingle("Windows-rooted path on a Windows host must produce one error");
+        errors[0].Should().Contain("Windows-style absolute path",
+            "error message must explain why the path was rejected");
+    }
+
+    [TestMethod]
+    public void ValidateSerilogPath_WindowsRootedPath_OnNonWindowsHost_Accepted()
+    {
+        // D:\logs\app.log would still be flagged on Windows, but on a non-Windows host it does not
+        // start with '/' (so the Linux allowlist doesn't fire) and the Windows guard is gated off.
+        // This proves the seam works: the same path produces zero / one errors depending on the
+        // injected predicate, with no test-runtime OS dependency.
+        var config = ConfigWithSinkPath(@"D:\logs\app.log");
+        var errors = new List<string>();
+
+        StartupValidation.ValidateSerilogPath(config, errors, isWindows: () => false);
+
+        errors.Should().BeEmpty(
+            "Windows-style path on a non-Windows host bypasses the Windows guard; no other check fires");
+    }
 }

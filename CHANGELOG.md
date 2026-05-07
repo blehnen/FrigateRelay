@@ -10,8 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - #8 — `run-tests.sh` `--coverage` branch now passes `--filter` and other MTP passthrough args to `dotnet run`.
+- #13 — Operator-controlled values flowing into `errors.Add(...)` in `StartupValidation` and `ProfileResolver` are sanitized for `\r`/`\n` so a name containing a newline can no longer split a single startup-diagnostic log line into two (CWE-117).
 - #15 — secret-scan tripwire extended to cover RFC 1918 10.x.x.x and 172.16-31.x.x ranges.
+- #19 — New `ValidateNames` startup pass enforces the permissive-printable allowlist `^[A-Za-z0-9_. -]+$` for subscription, profile, plugin, and validator names; CRLF, slashes, colons, and at-signs are rejected (CWE-117 structural fix complementing the #13 defensive fix). Spaced names like `"DriveWay Person"` continue to bind cleanly.
+- #20 — `Otel:OtlpEndpoint` URI scheme restricted to `http` / `https` / `grpc` at startup; `file://`, `ftp://`, etc. now produce a structured diagnostic instead of an `ArgumentException` from deep inside the OTLP exporter on first metric/span flush (CWE-183).
 - #24 — Third-party GitHub Actions SHA-pinned across release.yml, ci.yml, secret-scan.yml, docs.yml (SLSA L2+).
+- #27 — `Serilog:WriteTo:*:Args:path` now rejects Windows-style absolute paths (e.g. `C:\Windows\...`) when the host is Windows, closing the residual CWE-22 gap left after Phase 10's Linux-allowlist hardening. Implementation accepts an injectable `Func<bool>? isWindows` predicate so the unit test runs cross-platform without a Windows agent.
 
 ### Fixed
 

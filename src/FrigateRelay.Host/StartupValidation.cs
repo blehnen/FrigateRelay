@@ -190,22 +190,29 @@ internal static class StartupValidation
 
     /// <summary>
     /// Validates that every <c>Serilog:WriteTo:*:Args:path</c> value is safe to open at startup.
-    /// Rejects paths that contain <c>..</c> (path traversal), start with <c>\\</c> (UNC), or are
-    /// absolute paths outside the allowed prefixes (<c>/var/log/frigaterelay/</c>, <c>/app/logs/</c>).
+    /// Rejects paths that contain <c>..</c> (path traversal), start with <c>\\</c> (UNC), are
+    /// absolute paths outside the allowed prefixes (<c>/var/log/frigaterelay/</c>, <c>/app/logs/</c>),
+    /// or — when running on Windows — are Windows-style absolute paths (e.g. <c>C:\Windows\...</c>).
     /// Relative paths and absent/empty values are accepted without error.
-    /// Accumulates into <paramref name="errors"/> — never throws (D7 collect-all, ID-21 closure).
+    /// Accumulates into <paramref name="errors"/> — never throws (D7 collect-all, ID-21 + ID-27 closure).
     /// </summary>
+    /// <param name="config">Configuration root.</param>
+    /// <param name="errors">Collect-all error accumulator (D7).</param>
+    /// <param name="isWindows">
+    /// Optional platform predicate (D5 test seam). When <c>null</c> (production default), resolves to
+    /// <see cref="System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform"/>. Tests inject a
+    /// fixed predicate to exercise both branches deterministically without requiring a Windows test
+    /// agent.
+    /// </param>
     /// <remarks>
-    /// Windows-style absolute paths (e.g. <c>C:\Windows\...</c>) are not explicitly blocked here
-    /// because the container target is Linux-only (Alpine, non-root). They will either be accepted
-    /// (treated as relative) or fall through as harmless on non-Windows hosts. A future hardening
-    /// pass may add a <c>Path.IsPathRooted</c> check with OS guard for broader coverage.
     /// Do NOT log the raw path value via <c>ILogger</c> — it is operator-controlled and could
-    /// contain log-spoofing payloads (ID-13). It surfaces only in the aggregated exception message.
+    /// contain log-spoofing payloads (ID-13). It surfaces only in the aggregated exception message,
+    /// sanitized via <see cref="Sanitize"/>.
     /// </remarks>
-    internal static void ValidateSerilogPath(IConfiguration config, ICollection<string> errors)
+    internal static void ValidateSerilogPath(IConfiguration config, ICollection<string> errors, Func<bool>? isWindows = null)
     {
         var allowlist = new[] { "/var/log/frigaterelay/", "/app/logs/" };
+        var onWindows = (isWindows ?? (() => System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)))();
         foreach (var sink in config.GetSection("Serilog:WriteTo").GetChildren())
         {
             var path = sink["Args:path"];
@@ -218,8 +225,16 @@ internal static class StartupValidation
             else if (path.StartsWith('/') &&
                      !allowlist.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
                 errors.Add($"Serilog:WriteTo path '{Sanitize(path)}' is an absolute path outside the allowed prefixes ({string.Join(", ", allowlist)}).");
+            else if (onWindows && IsWindowsRootedPath(path))
+                errors.Add($"Serilog:WriteTo path '{Sanitize(path)}' is a Windows-style absolute path and is not permitted.");
         }
     }
+
+    // Detects a Windows-style absolute path (drive letter form, e.g. C:\foo or D:/bar) without
+    // relying on Path.IsPathRooted, which depends on the host OS and would return false on Linux
+    // for these patterns. Used by ValidateSerilogPath only when the host is Windows (D5 predicate).
+    private static bool IsWindowsRootedPath(string path) =>
+        path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/');
 
     /// <summary>
     /// Verifies that every action name referenced by a subscription is registered as an
