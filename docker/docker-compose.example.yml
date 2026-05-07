@@ -18,6 +18,8 @@ services:
     volumes:
       - ./config/appsettings.Local.json:/app/appsettings.Local.json:ro
     ports:
+      # Default binds to 0.0.0.0 (reachable on all interfaces of the Docker host).
+      # On untrusted networks restrict to loopback: - "127.0.0.1:8080:8080"
       - "8080:8080"
     # healthcheck inherited from the image's HEALTHCHECK directive.
     # Override here only if your environment needs different interval/timeout.
