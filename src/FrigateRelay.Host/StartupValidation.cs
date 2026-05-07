@@ -12,6 +12,21 @@ namespace FrigateRelay.Host;
 internal static class StartupValidation
 {
     /// <summary>
+    /// Escapes operator-controlled string values for safe inclusion in structured log
+    /// error messages. Returns <see cref="string.Empty"/> for <see langword="null"/>;
+    /// for non-null, replaces carriage-return (<c>\r</c>) and line-feed (<c>\n</c>)
+    /// characters with their printable escape sequences (<c>\\r</c> and <c>\\n</c>)
+    /// so the result is always a single safe log line (ID-13 / CWE-117 closure).
+    /// </summary>
+    /// <param name="value">The operator-supplied string (may be null).</param>
+    /// <returns>A sanitized, single-line representation of <paramref name="value"/>.</returns>
+    internal static string Sanitize(string? value)
+    {
+        if (value is null) return string.Empty;
+        return value.Replace("\r", @"\r").Replace("\n", @"\n");
+    }
+
+    /// <summary>
     /// Runs the full collect-all startup validation pipeline in the correct order:
     /// profile resolution → action-plugin existence → snapshot-provider existence →
     /// per-action validator existence. All passes share a single error accumulator;
@@ -74,11 +89,11 @@ internal static class StartupValidation
         // OTEL_EXPORTER_OTLP_ENDPOINT env var as fallback. If neither is set, no validation needed.
         var endpoint = config["Otel:OtlpEndpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
         if (!string.IsNullOrWhiteSpace(endpoint) && !Uri.TryCreate(endpoint, UriKind.Absolute, out _))
-            errors.Add($"Otel:OtlpEndpoint '{endpoint}' is not a valid absolute URI.");
+            errors.Add($"Otel:OtlpEndpoint '{Sanitize(endpoint)}' is not a valid absolute URI.");
 
         var seq = config["Serilog:Seq:ServerUrl"];
         if (!string.IsNullOrWhiteSpace(seq) && !Uri.TryCreate(seq, UriKind.Absolute, out _))
-            errors.Add($"Serilog:Seq:ServerUrl '{seq}' is not a valid absolute URI.");
+            errors.Add($"Serilog:Seq:ServerUrl '{Sanitize(seq)}' is not a valid absolute URI.");
     }
 
     /// <summary>
@@ -105,12 +120,12 @@ internal static class StartupValidation
             if (string.IsNullOrWhiteSpace(path)) continue;
 
             if (path.Contains(".."))
-                errors.Add($"Serilog:WriteTo path '{path}' contains '..' path traversal segments and is rejected.");
+                errors.Add($"Serilog:WriteTo path '{Sanitize(path)}' contains '..' path traversal segments and is rejected.");
             else if (path.StartsWith(@"\\", StringComparison.Ordinal))
-                errors.Add($"Serilog:WriteTo path '{path}' is a UNC path and is not permitted.");
+                errors.Add($"Serilog:WriteTo path '{Sanitize(path)}' is a UNC path and is not permitted.");
             else if (path.StartsWith('/') &&
                      !allowlist.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
-                errors.Add($"Serilog:WriteTo path '{path}' is an absolute path outside the allowed prefixes ({string.Join(", ", allowlist)}).");
+                errors.Add($"Serilog:WriteTo path '{Sanitize(path)}' is an absolute path outside the allowed prefixes ({string.Join(", ", allowlist)}).");
         }
     }
 
@@ -135,8 +150,8 @@ internal static class StartupValidation
                 if (!registeredNames.Contains(entry.Plugin))
                 {
                     errors.Add(
-                        $"Subscription '{sub.Name}' references unknown action plugin '{entry.Plugin}'. " +
-                        $"Registered plugins: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))}]. " +
+                        $"Subscription '{Sanitize(sub.Name)}' references unknown action plugin '{Sanitize(entry.Plugin)}'. " +
+                        $"Registered plugins: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}]. " +
                         $"Either register the plugin or remove the reference from appsettings.");
                 }
             }
@@ -161,8 +176,8 @@ internal static class StartupValidation
         if (!string.IsNullOrEmpty(globalDefaultProviderName) && !registeredNames.Contains(globalDefaultProviderName))
         {
             errors.Add(
-                $"Global Snapshots:DefaultProviderName '{globalDefaultProviderName}' is not a registered snapshot provider. " +
-                $"Registered providers: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))}]. " +
+                $"Global Snapshots:DefaultProviderName '{Sanitize(globalDefaultProviderName)}' is not a registered snapshot provider. " +
+                $"Registered providers: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}]. " +
                 $"Either register the provider or remove the reference from appsettings.");
         }
 
@@ -171,9 +186,9 @@ internal static class StartupValidation
             if (!string.IsNullOrEmpty(sub.DefaultSnapshotProvider) && !registeredNames.Contains(sub.DefaultSnapshotProvider))
             {
                 errors.Add(
-                    $"Subscription '{sub.Name}' references unknown snapshot provider '{sub.DefaultSnapshotProvider}' " +
+                    $"Subscription '{Sanitize(sub.Name)}' references unknown snapshot provider '{Sanitize(sub.DefaultSnapshotProvider)}' " +
                     $"as its DefaultSnapshotProvider. Registered providers: " +
-                    $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))}].");
+                    $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}].");
             }
 
             foreach (var entry in sub.Actions)
@@ -181,9 +196,9 @@ internal static class StartupValidation
                 if (!string.IsNullOrEmpty(entry.SnapshotProvider) && !registeredNames.Contains(entry.SnapshotProvider))
                 {
                     errors.Add(
-                        $"Subscription '{sub.Name}' action '{entry.Plugin}' references unknown snapshot provider " +
-                        $"'{entry.SnapshotProvider}'. Registered providers: " +
-                        $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))}].");
+                        $"Subscription '{Sanitize(sub.Name)}' action '{Sanitize(entry.Plugin)}' references unknown snapshot provider " +
+                        $"'{Sanitize(entry.SnapshotProvider)}'. Registered providers: " +
+                        $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}].");
                 }
             }
         }
@@ -214,7 +229,7 @@ internal static class StartupValidation
                     if (plugin is null)
                     {
                         errors.Add(
-                            $"Validator '{key}' is referenced by Subscription[{i}].Actions[{j}].Validators " +
+                            $"Validator '{Sanitize(key)}' is referenced by Subscription[{i}].Actions[{j}].Validators " +
                             $"but not registered. Check the top-level Validators section and ensure each " +
                             $"instance has a recognized Type.");
                     }

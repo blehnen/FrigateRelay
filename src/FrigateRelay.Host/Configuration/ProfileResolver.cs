@@ -39,7 +39,7 @@ internal static class ProfileResolver
             {
                 // D1: mutex violation — both set.
                 errors.Add(
-                    $"Subscription '{sub.Name}' may declare either 'Profile' or 'Actions', not both.");
+                    $"Subscription '{StartupValidation.Sanitize(sub.Name)}' may declare either 'Profile' or 'Actions', not both.");
                 continue;
             }
 
@@ -47,7 +47,7 @@ internal static class ProfileResolver
             {
                 // D1: mutex violation — neither set.
                 errors.Add(
-                    $"Subscription '{sub.Name}' must declare either 'Profile' or 'Actions'.");
+                    $"Subscription '{StartupValidation.Sanitize(sub.Name)}' must declare either 'Profile' or 'Actions'.");
                 continue;
             }
 
@@ -57,9 +57,9 @@ internal static class ProfileResolver
                 if (!options.Profiles.TryGetValue(profileName, out var profileOptions))
                 {
                     var defined = string.Join(", ",
-                        options.Profiles.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase));
+                        options.Profiles.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).Select(StartupValidation.Sanitize));
                     errors.Add(
-                        $"Subscription '{sub.Name}' references undefined profile '{profileName}'. " +
+                        $"Subscription '{StartupValidation.Sanitize(sub.Name)}' references undefined profile '{StartupValidation.Sanitize(profileName)}'. " +
                         $"Defined profiles: [{defined}].");
                     continue;
                 }
