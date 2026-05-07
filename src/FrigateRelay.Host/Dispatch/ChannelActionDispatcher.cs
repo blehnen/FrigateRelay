@@ -118,6 +118,15 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     /// <inheritdoc />
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Cancel the internal stopping CTS first so any in-flight ValidateAsync /
+        // ExecuteAsync that respects cancellation (HttpClient calls, Task.Delay) is
+        // interrupted promptly. This is the signal the consumer-loop's outer
+        // `catch (OperationCanceledException) when (ct.IsCancellationRequested)`
+        // handler relies on for graceful unwinding (CONTEXT-9 D4 / ID-6 fix).
+        // IHostedService.StopAsync receives the host's drain-window token, NOT a
+        // signal to cancel internal work, so we must trigger _stoppingCts manually.
+        await _stoppingCts.CancelAsync().ConfigureAwait(false);
+
         // Complete all writers so ReadAllAsync exits when the queue drains.
         foreach (var channel in _channels.Values)
             channel.Writer.Complete();
@@ -135,6 +144,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         string subscription = "",
         string? perActionSnapshotProvider = null,
         string? subscriptionDefaultSnapshotProvider = null,
+        bool parallelValidators = false,
         CancellationToken ct = default)
     {
         if (!_channels.TryGetValue(action, out var channel))
@@ -146,7 +156,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         }
 
         var item = new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
-            subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider);
+            subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider,
+            ParallelValidators: parallelValidators);
         DispatcherDiagnostics.IncrementActionsDispatched(item);
 
         await channel.Writer.WriteAsync(item, ct).ConfigureAwait(false);
@@ -167,8 +178,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         ChannelReader<DispatchItem> reader,
         CancellationToken ct)
     {
-        await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
+        try
         {
+            await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
+            {
             // action.<name>.execute span — consumer-side, parented to the producer's ActivityContext
             // captured across the Channel<T> boundary (PLAN-2.1 Task 2 / CONTEXT-9 D1).
             var spanName = $"action.{plugin.Name.ToLowerInvariant()}.execute";
@@ -206,42 +219,27 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                     // A failing verdict short-circuits THIS action only; the consumer continues to
                     // the next DispatchItem. Other actions in the same event proceed independently
                     // because each is its own DispatchItem (CONTEXT-7 D6 / PROJECT.md V3).
-                    foreach (var validator in item.Validators)
+                    bool anyRejected;
+                    if (item.ParallelValidators)
                     {
-                        // validator.<name>.check span — one per validator per action invocation (PLAN-2.1 Task 2).
-                        var validatorSpanName = $"validator.{validator.Name.ToLowerInvariant()}.check";
-                        using var vActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
-                            validatorSpanName, ActivityKind.Internal);
-                        vActivity?.SetTag("event.id", item.Context.EventId);
-                        vActivity?.SetTag("validator", validator.Name);
-                        vActivity?.SetTag("action", plugin.Name);
-                        vActivity?.SetTag("subscription", item.Subscription);
+                        // Parallel path (CONTEXT-14 D6): all validators run concurrently via Task.WhenAll.
+                        // No first-reject short-circuit — every validator runs to completion.
+                        // OperationCanceledException from host shutdown propagates out of Task.WhenAll
+                        // and up to the outer catch (OperationCanceledException) block at line ~261.
+                        anyRejected = await RunValidatorsInParallelAsync(item, plugin, shared, ct).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // Sequential path (original behavior, back-compat invariant):
+                        // first-reject short-circuits THIS action only (PROJECT.md V3).
+                        anyRejected = await RunValidatorsSequentiallyAsync(item, plugin, shared, ct).ConfigureAwait(false);
+                    }
 
-                        var verdict = await validator.ValidateAsync(item.Context, shared, ct).ConfigureAwait(false);
-                        vActivity?.SetTag("verdict", verdict.Passed ? "pass" : "fail");
-                        if (!verdict.Passed)
-                            vActivity?.SetTag("reason", verdict.Reason);
-
-                        if (verdict.Passed)
-                        {
-                            DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
-                        }
-                        else
-                        {
-                            DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
-                            LogValidatorRejected(
-                                _logger,
-                                item.Context.EventId,
-                                item.Context.Camera,
-                                item.Context.Label,
-                                plugin.Name,
-                                validator.Name,
-                                verdict.Reason ?? "(no reason)",
-                                null);
-                            actionActivity?.SetTag("outcome", "validator_rejected");
-                            actionActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
-                            goto NextItem; // short-circuits THIS action only (PROJECT.md V3).
-                        }
+                    if (anyRejected)
+                    {
+                        actionActivity?.SetTag("outcome", "validator_rejected");
+                        actionActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
+                        goto NextItem;
                     }
                 }
                 else
@@ -274,6 +272,121 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 // Do NOT rethrow — a poison item must not kill the consumer task.
             }
             NextItem:;
+            }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Graceful shutdown — the consumer's CT was cancelled either while ReadAllAsync was
+            // awaiting the next item OR during in-flight validator/action work that didn't reach
+            // the inner try/catch. Either way, exit cleanly without logging or counter-incrementing
+            // (matches the inner-catch behavior at the foreach-body try block — same intent,
+            // just at the loop scope so cancellation between items also unwinds gracefully).
+        }
+    }
+
+    /// <summary>
+    /// Runs each validator in <paramref name="item"/> sequentially, short-circuiting on the first
+    /// rejection (original v1.0/v1.1 behavior). Returns <see langword="true"/> if any validator
+    /// rejected; <see langword="false"/> if all passed.
+    /// </summary>
+    private async Task<bool> RunValidatorsSequentiallyAsync(
+        DispatchItem item, IActionPlugin plugin, SnapshotContext shared, CancellationToken ct)
+    {
+        foreach (var validator in item.Validators)
+        {
+            var (_, verdict) = await RunOneValidatorAsync(validator, item, plugin, shared, ct).ConfigureAwait(false);
+
+            if (verdict.Passed)
+            {
+                DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
+            }
+            else
+            {
+                DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
+                LogValidatorRejected(
+                    _logger,
+                    item.Context.EventId,
+                    item.Context.Camera,
+                    item.Context.Label,
+                    plugin.Name,
+                    validator.Name,
+                    verdict.Reason ?? "(no reason)",
+                    null);
+                return true; // short-circuit: this action does not execute.
+            }
+        }
+        return false; // all validators passed.
+    }
+
+    /// <summary>
+    /// Runs all validators in <paramref name="item"/> concurrently via <c>Task.WhenAll</c>.
+    /// Strict-AND aggregation: if ANY validator rejects, returns <see langword="true"/>.
+    /// No first-reject short-circuit — every validator runs to completion (CONTEXT-14 D6).
+    /// Per-validator counters and logs are emitted for each result (CONTEXT-14 OQ-4).
+    /// <para>
+    /// <see cref="OperationCanceledException"/> from host shutdown propagates naturally out of
+    /// <c>Task.WhenAll</c> to the outer graceful-shutdown handler in <see cref="ConsumeAsync"/>.
+    /// </para>
+    /// </summary>
+    private async Task<bool> RunValidatorsInParallelAsync(
+        DispatchItem item, IActionPlugin plugin, SnapshotContext shared, CancellationToken ct)
+    {
+        var tasks = item.Validators
+            .Select(v => RunOneValidatorAsync(v, item, plugin, shared, ct))
+            .ToList();
+
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        bool anyRejected = false;
+        foreach (var (validator, verdict) in results)
+        {
+            if (verdict.Passed)
+            {
+                DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
+            }
+            else
+            {
+                DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
+                LogValidatorRejected(
+                    _logger,
+                    item.Context.EventId,
+                    item.Context.Camera,
+                    item.Context.Label,
+                    plugin.Name,
+                    validator.Name,
+                    verdict.Reason ?? "(no reason)",
+                    null);
+                anyRejected = true;
+            }
+        }
+        return anyRejected;
+    }
+
+    /// <summary>
+    /// Executes a single validator, wrapping the call with its distributed-trace span.
+    /// The span name, tags, and verdict tagging are identical between the sequential and
+    /// parallel paths — this helper keeps them in one place.
+    /// <para>
+    /// <see cref="OperationCanceledException"/> is NOT caught here; it propagates to the caller
+    /// so <c>Task.WhenAll</c> can rethrow it and the graceful-shutdown handler fires.
+    /// </para>
+    /// </summary>
+    private static async Task<(IValidationPlugin Validator, Verdict Verdict)> RunOneValidatorAsync(
+        IValidationPlugin validator, DispatchItem item, IActionPlugin plugin, SnapshotContext shared, CancellationToken ct)
+    {
+        var validatorSpanName = $"validator.{validator.Name.ToLowerInvariant()}.check";
+        using var vActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+            validatorSpanName, ActivityKind.Internal);
+        vActivity?.SetTag("event.id", item.Context.EventId);
+        vActivity?.SetTag("validator", validator.Name);
+        vActivity?.SetTag("action", plugin.Name);
+        vActivity?.SetTag("subscription", item.Subscription);
+
+        var verdict = await validator.ValidateAsync(item.Context, shared, ct).ConfigureAwait(false);
+        vActivity?.SetTag("verdict", verdict.Passed ? "pass" : "fail");
+        if (!verdict.Passed)
+            vActivity?.SetTag("reason", verdict.Reason);
+
+        return (validator, verdict);
     }
 }

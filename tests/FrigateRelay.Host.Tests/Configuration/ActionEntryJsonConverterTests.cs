@@ -88,4 +88,59 @@ public sealed class ActionEntryJsonConverterTests
         var rewritten = JsonSerializer.Serialize(entry, Options);
         rewritten.Should().NotContain("Validators"); // omit when null
     }
+
+    // --- ParallelValidators round-trip tests (PLAN-3.1 Task 1) ---
+
+    [TestMethod]
+    public void Serialize_ParallelValidators_True_IncludesField()
+    {
+        var entry = new ActionEntry("X", ParallelValidators: true);
+        var json = JsonSerializer.Serialize(entry, Options);
+        json.Should().Contain("\"ParallelValidators\":true");
+    }
+
+    [TestMethod]
+    public void Serialize_ParallelValidators_False_OmitsField()
+    {
+        // Default false must NOT appear in serialized JSON — compact round-trips.
+        var entry = new ActionEntry("X");
+        var json = JsonSerializer.Serialize(entry, Options);
+        json.Should().NotContain("ParallelValidators");
+    }
+
+    [TestMethod]
+    public void Deserialize_ObjectForm_ParallelValidators_True_RoundTrips()
+    {
+        var json = """{"Plugin":"X","ParallelValidators":true}""";
+        var entry = JsonSerializer.Deserialize<ActionEntry>(json, Options)!;
+        entry.Plugin.Should().Be("X");
+        entry.ParallelValidators.Should().BeTrue();
+    }
+
+    [TestMethod]
+    public void Deserialize_ObjectForm_ParallelValidators_Absent_DefaultsFalse()
+    {
+        var json = """{"Plugin":"BlueIris"}""";
+        var entry = JsonSerializer.Deserialize<ActionEntry>(json, Options)!;
+        entry.ParallelValidators.Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void Deserialize_StringForm_ParallelValidators_DefaultsFalse()
+    {
+        var entry = JsonSerializer.Deserialize<ActionEntry>("\"BlueIris\"", Options)!;
+        entry.ParallelValidators.Should().BeFalse();
+    }
+
+    [TestMethod]
+    public void Roundtrip_ObjectForm_ParallelValidators_True_PreservesAllFields()
+    {
+        var entry = new ActionEntry("Pushover", "Frigate", ["v1"], ParallelValidators: true);
+        var json = JsonSerializer.Serialize(entry, Options);
+        var roundtrip = JsonSerializer.Deserialize<ActionEntry>(json, Options)!;
+        roundtrip.Plugin.Should().Be("Pushover");
+        roundtrip.SnapshotProvider.Should().Be("Frigate");
+        roundtrip.Validators.Should().BeEquivalentTo(["v1"]);
+        roundtrip.ParallelValidators.Should().BeTrue();
+    }
 }

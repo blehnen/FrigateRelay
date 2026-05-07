@@ -228,7 +228,7 @@ public sealed class EventPumpTests
     private sealed class NoOpDispatcher : IActionDispatcher
     {
         public static readonly NoOpDispatcher Instance = new();
-        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, bool parallelValidators, CancellationToken ct) => ValueTask.CompletedTask;
     }
 
     /// <summary>
@@ -239,9 +239,11 @@ public sealed class EventPumpTests
     private sealed class CapturingDispatcher : IActionDispatcher
     {
         public List<EventContext> Captured { get; } = new();
-        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, CancellationToken ct)
+        public List<bool> CapturedParallelValidators { get; } = new();
+        public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, bool parallelValidators, CancellationToken ct)
         {
             Captured.Add(ctx);
+            CapturedParallelValidators.Add(parallelValidators);
             return ValueTask.CompletedTask;
         }
     }

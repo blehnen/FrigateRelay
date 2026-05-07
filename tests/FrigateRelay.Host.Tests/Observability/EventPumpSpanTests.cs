@@ -303,7 +303,8 @@ public sealed class EventPumpSpanTests
         public ValueTask EnqueueAsync(
             EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators,
             string subscription, string? perActionSnapshotProvider,
-            string? subscriptionDefaultSnapshotProvider, CancellationToken ct) => ValueTask.CompletedTask;
+            string? subscriptionDefaultSnapshotProvider, bool parallelValidators,
+            CancellationToken ct) => ValueTask.CompletedTask;
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider
