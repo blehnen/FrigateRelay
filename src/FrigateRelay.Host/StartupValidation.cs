@@ -48,14 +48,14 @@ internal static class StartupValidation
         // Subscription names.
         foreach (var sub in options.Subscriptions)
         {
-            if (!string.IsNullOrEmpty(sub.Name) && !NameAllowlist.IsMatch(sub.Name))
+            if (!string.IsNullOrEmpty(sub.Name) && (string.IsNullOrWhiteSpace(sub.Name) || !NameAllowlist.IsMatch(sub.Name)))
                 errors.Add($"Subscription name '{Sanitize(sub.Name)}' is invalid; {allowedDesc}");
         }
 
         // Profile keys.
         foreach (var key in options.Profiles.Keys)
         {
-            if (!string.IsNullOrEmpty(key) && !NameAllowlist.IsMatch(key))
+            if (!string.IsNullOrEmpty(key) && (string.IsNullOrWhiteSpace(key) || !NameAllowlist.IsMatch(key)))
                 errors.Add($"Profile name '{Sanitize(key)}' is invalid; {allowedDesc}");
         }
 
@@ -64,7 +64,7 @@ internal static class StartupValidation
         {
             foreach (var entry in sub.Actions)
             {
-                if (!string.IsNullOrEmpty(entry.Plugin) && !NameAllowlist.IsMatch(entry.Plugin))
+                if (!string.IsNullOrEmpty(entry.Plugin) && (string.IsNullOrWhiteSpace(entry.Plugin) || !NameAllowlist.IsMatch(entry.Plugin)))
                     errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
             }
         }
@@ -74,7 +74,7 @@ internal static class StartupValidation
         {
             foreach (var entry in profile.Actions)
             {
-                if (!string.IsNullOrEmpty(entry.Plugin) && !NameAllowlist.IsMatch(entry.Plugin))
+                if (!string.IsNullOrEmpty(entry.Plugin) && (string.IsNullOrWhiteSpace(entry.Plugin) || !NameAllowlist.IsMatch(entry.Plugin)))
                     errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
             }
         }
@@ -87,7 +87,7 @@ internal static class StartupValidation
                 if (entry.Validators is null) continue;
                 foreach (var validatorKey in entry.Validators)
                 {
-                    if (!string.IsNullOrEmpty(validatorKey) && !NameAllowlist.IsMatch(validatorKey))
+                    if (!string.IsNullOrEmpty(validatorKey) && (string.IsNullOrWhiteSpace(validatorKey) || !NameAllowlist.IsMatch(validatorKey)))
                         errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
                 }
             }
@@ -101,7 +101,7 @@ internal static class StartupValidation
                 if (entry.Validators is null) continue;
                 foreach (var validatorKey in entry.Validators)
                 {
-                    if (!string.IsNullOrEmpty(validatorKey) && !NameAllowlist.IsMatch(validatorKey))
+                    if (!string.IsNullOrEmpty(validatorKey) && (string.IsNullOrWhiteSpace(validatorKey) || !NameAllowlist.IsMatch(validatorKey)))
                         errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
                 }
             }
@@ -230,11 +230,13 @@ internal static class StartupValidation
         }
     }
 
-    // Detects a Windows-style absolute path (drive letter form, e.g. C:\foo or D:/bar) without
-    // relying on Path.IsPathRooted, which depends on the host OS and would return false on Linux
-    // for these patterns. Used by ValidateSerilogPath only when the host is Windows (D5 predicate).
+    // Detects a Windows-style drive-letter path. Covers C:\foo (rooted), C:/foo (forward-slash
+    // rooted), and the drive-relative form C:foo (resolves relative to CWD on the named drive
+    // on Windows — still an undesired redirection for a Serilog file-sink path). Doesn't rely
+    // on Path.IsPathRooted, which depends on the host OS and would return false on Linux for
+    // any of these forms. Used by ValidateSerilogPath only when the host is Windows (D5 predicate).
     private static bool IsWindowsRootedPath(string path) =>
-        path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/');
+        path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
 
     /// <summary>
     /// Verifies that every action name referenced by a subscription is registered as an

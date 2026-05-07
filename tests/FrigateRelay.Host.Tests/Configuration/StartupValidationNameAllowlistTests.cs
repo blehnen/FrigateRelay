@@ -116,4 +116,23 @@ public sealed class StartupValidationNameAllowlistTests
         errors.Should().BeEmpty(
             "the D1 permissive-printable regex allows spaces; 'DriveWay Person' must not be rejected");
     }
+
+    // -----------------------------------------------------------------------
+    // Test 5 (CodeRabbit-flagged regression): whitespace-only subscription name → rejected
+    //         Space is in the allowlist [A-Za-z0-9_. -], so without an explicit IsNullOrWhiteSpace
+    //         guard, "   " would silently pass NameAllowlist.IsMatch and reach ProfileResolver.
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void ValidateNames_WhitespaceOnlySubscriptionName_Rejected()
+    {
+        var options = OptionsWithSubscriptionName("   ");
+        var errors = new List<string>();
+
+        StartupValidation.ValidateNames(options, errors);
+
+        errors.Should().ContainSingle("whitespace-only name must not bypass the allowlist");
+        errors[0].Should().ContainEquivalentOf("subscription",
+            "error message must identify the kind of name that was rejected");
+    }
 }

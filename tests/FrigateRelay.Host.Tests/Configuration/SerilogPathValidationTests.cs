@@ -232,4 +232,24 @@ public sealed class SerilogPathValidationTests
         errors.Should().BeEmpty(
             "Windows-style path on a non-Windows host bypasses the Windows guard; no other check fires");
     }
+
+    // -----------------------------------------------------------------------
+    // CodeRabbit-flagged regression: drive-relative form C:foo (no separator at index 2)
+    // resolves relative to CWD on the named drive on Windows — still an undesired redirection
+    // for a Serilog file-sink path. The previous IsWindowsRootedPath required path[2] to be
+    // '\\' or '/', which would have let "C:foo" pass through.
+    // -----------------------------------------------------------------------
+
+    [TestMethod]
+    public void ValidateSerilogPath_DriveRelativePath_OnWindowsHost_AddsRejectionError()
+    {
+        var config = ConfigWithSinkPath("C:foo");
+        var errors = new List<string>();
+
+        StartupValidation.ValidateSerilogPath(config, errors, isWindows: () => true);
+
+        errors.Should().ContainSingle("drive-relative C:foo on Windows must produce one error");
+        errors[0].Should().Contain("Windows-style absolute path",
+            "drive-relative form is treated as Windows-rooted because it resolves against the named drive's CWD");
+    }
 }

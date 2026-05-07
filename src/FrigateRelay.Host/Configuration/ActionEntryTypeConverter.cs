@@ -42,7 +42,7 @@ internal sealed class ActionEntryTypeConverter : TypeConverter
             // IsNullOrWhiteSpace is stricter than the JSON path's IsNullOrEmpty on purpose —
             // IConfiguration.Bind can hand us a whitespace-only string from blank config values.
             if (string.IsNullOrWhiteSpace(s))
-                throw new FormatException($"ActionEntry plugin name cannot be empty or whitespace (received: '{s}').");
+                throw new FormatException($"ActionEntry plugin name cannot be empty or whitespace (received: '{StartupValidation.Sanitize(s)}').");
 
             return new ActionEntry(s);
         }

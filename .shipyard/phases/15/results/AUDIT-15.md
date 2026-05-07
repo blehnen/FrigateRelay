@@ -75,7 +75,7 @@ Secret-shaped fields (e.g. `Pushover.AppToken`, `BlueIris.TriggerUrlTemplate` us
 | `NameAllowlist` regex catastrophic backtracking (ReDoS)? | No. `^[A-Za-z0-9_. -]+$` is linear. No alternation, no nested quantifiers. |
 | `IsWindowsRootedPath` helper (drive-letter pattern)? | Not a regex — explicit char-by-char check. Linear, length-bounded. |
 | `Sanitize` helper itself a ReDoS / allocation surface? | No. `string.Replace("\r", @"\r").Replace("\n", @"\n")` — two linear passes. Worst case O(n) where n = name length. |
-| `ValidateObservability` scheme allowlist — can attacker bypass? | No. The check happens after `Uri.TryCreate` which canonicalizes the scheme. Check is pattern-match against `"http"|"https"|"grpc"` — exact equality. |
+| `ValidateObservability` scheme allowlist — can attacker bypass? | No. The check happens after `Uri.TryCreate` which canonicalizes the scheme. Check is pattern-match against `"http"`, `"https"`, `"grpc"` — exact equality. |
 
 ## Recommendations (non-blocking)
 
