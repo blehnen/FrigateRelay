@@ -50,7 +50,13 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
                 parallelValidators: false,
                 ct: cts.Token);
 
-            await Task.Delay(200);
+            // Deterministic wait: the first (failing) validator must have been called and
+            // the dispatcher must have completed processing this dispatch item. Sequential
+            // short-circuit guarantees the second validator was NOT called once the first
+            // returned, but we wait on the FAILING validator's call to confirm processing
+            // actually happened (otherwise a 0/0/0 state would also pass the assertions).
+            await WaitUntilAsync(() => failing.Calls == 1, TimeSpan.FromSeconds(5),
+                "first validator to be called");
 
             plugin.Executed.Should().Be(0, "action must not fire when first validator fails");
             failing.Calls.Should().Be(1, "first validator must be called");
@@ -91,7 +97,8 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
                 parallelValidators: true,
                 ct: cts.Token);
 
-            await Task.Delay(300);
+            await WaitUntilAsync(() => plugin.Executed == 1, TimeSpan.FromSeconds(5),
+                "action plugin to execute after both validators pass");
 
             plugin.Executed.Should().Be(1, "action must execute when all validators pass");
             v1.Calls.Should().Be(1, "v1 must be called");
@@ -133,7 +140,12 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
                 parallelValidators: true,
                 ct: cts.Token);
 
-            await Task.Delay(300);
+            // Wait until ALL three validators have been called — strict-AND with no
+            // short-circuit means every validator runs regardless of outcome (D6).
+            await WaitUntilAsync(
+                () => v1.Calls == 1 && v2.Calls == 1 && v3.Calls == 1,
+                TimeSpan.FromSeconds(5),
+                "all three validators to be called");
 
             plugin.Executed.Should().Be(0, "action must NOT execute when any validator rejects");
 
@@ -190,7 +202,9 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
                 parallelValidators: true,
                 ct: cts.Token);
 
-            await Task.Delay(300);
+            // Both rejecting validators must have emitted their own counter increment.
+            await WaitUntilAsync(() => capturedTags.Count >= 2, TimeSpan.FromSeconds(5),
+                "two validators.rejected counter samples (one per rejecting validator)");
 
             meterListener.RecordObservableInstruments();
 
@@ -221,10 +235,11 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// A validator that internally times out and returns <c>Verdict.Fail("validator_timeout")</c>
-    /// (via its own catch block, not the dispatcher's) still blocks the action when running in
-    /// parallel mode — fail-closed invariant. The immediately-passing co-validator's pass counter
-    /// is incremented.
+    /// A validator that internally translates its own timeout into <c>Verdict.Fail("validator_timeout")</c>
+    /// (FailClosed semantics applied by the validator itself, before returning) still blocks the
+    /// action when running in parallel mode — fail-closed invariant. The immediately-passing
+    /// co-validator's pass counter is still incremented because parallel mode does not short-circuit
+    /// on a single rejection.
     /// </summary>
     [TestMethod]
     public async Task Dispatch_ParallelValidatorsTrue_OneValidatorTimesOutFailClosed_ActionDoesNotExecute()
@@ -268,7 +283,14 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
                 parallelValidators: true,
                 ct: cts.Token);
 
-            await Task.Delay(500);  // enough for the slow validator to finish
+            // Wait until both counters have been emitted: one rejected (slow validator
+            // returned Fail) and one passed (fast validator). Polling is bounded — the
+            // slow validator's internal Task.Delay is 50 ms, so 5 s is generous on CI.
+            await WaitUntilAsync(
+                () => rejectedTags.Count >= 1 && passedTags.Count >= 1,
+                TimeSpan.FromSeconds(5),
+                "both rejected (slow) and passed (fast) counter samples");
+
             meterListener.RecordObservableInstruments();
 
             plugin.Executed.Should().Be(0,
@@ -374,6 +396,23 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
         return new ChannelActionDispatcher(plugins, logger, options, snapshotResolver: null);
     }
 
+    /// <summary>
+    /// Polls <paramref name="predicate"/> every 10 ms until it returns true or
+    /// <paramref name="timeout"/> elapses. Replaces wall-clock <c>Task.Delay</c>
+    /// settle windows that pass on fast machines but flake on busy CI runners.
+    /// </summary>
+    private static async Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout, string description)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (predicate()) return;
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+        throw new TimeoutException(
+            $"Timed out after {timeout.TotalMilliseconds:F0} ms waiting for: {description}");
+    }
+
     // -----------------------------------------------------------------------
     // Test doubles
     // -----------------------------------------------------------------------
@@ -404,23 +443,22 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
 
     /// <summary>
     /// Simulates a validator that internally waits for a brief delay and then returns
-    /// <c>Verdict.Fail(failReason)</c> — modelling a validator that catches its own
-    /// timeout exception and returns fail-closed per its <c>OnError</c> config.
-    /// No exception leaks to the dispatcher.
+    /// <c>Verdict.Fail(failReason)</c> — modelling a real validator whose own
+    /// <c>OnError: FailClosed</c> path observed an internal timeout and translated it
+    /// into a failing verdict before returning. The dispatcher never sees an exception;
+    /// it only sees a slow validator that ultimately rejected. Used together with a
+    /// fast-passing co-validator to prove parallel scheduling preserves per-validator
+    /// counter emission AND strict-AND aggregation in a fail-closed scenario.
     /// </summary>
     private sealed class SlowFailValidator(string name, TimeSpan delay, string failReason) : IValidationPlugin
     {
         public string Name { get; } = name;
         public async Task<Verdict> ValidateAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
         {
-            try
-            {
-                await Task.Delay(delay, CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // swallow — fail-closed
-            }
+            // Intentionally NOT cancellable: this models a validator that has already
+            // caught its own internal timeout and is on its return path with a baked-in
+            // FailClosed verdict. The dispatcher's host CT does not interrupt this branch.
+            await Task.Delay(delay, CancellationToken.None).ConfigureAwait(false);
             return Verdict.Fail(failReason);
         }
     }

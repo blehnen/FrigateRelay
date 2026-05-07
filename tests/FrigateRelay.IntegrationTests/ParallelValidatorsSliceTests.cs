@@ -159,12 +159,17 @@ public sealed class ParallelValidatorsSliceTests
             wireMockRoboflow.FindLogEntries(Request.Create().UsingPost().WithPath("/infer/object_detection"))
                 .Should().HaveCount(1, "Roboflow validator must run — it is the rejecting validator");
 
-            // Give the dispatcher a moment to settle before asserting BlueIris is empty.
-            await Task.Delay(500).ConfigureAwait(false);
-
-            // Action must NOT fire (strict-AND aggregation: Roboflow rejected).
-            wireMockBlueIris.FindLogEntries(Request.Create().UsingGet().WithPath("/admin"))
-                .Should().BeEmpty("BlueIris action must be suppressed when any validator rejects");
+            // Bounded-window negative assertion: BlueIris must remain empty for the
+            // entire 1.5 s window after both validators returned. A single fixed sleep
+            // would silently pass if a regression triggered /admin slightly after the
+            // sleep ended on a busy CI runner; polling continuously catches that case.
+            var settleDeadline = DateTime.UtcNow.AddMilliseconds(1500);
+            while (DateTime.UtcNow < settleDeadline)
+            {
+                wireMockBlueIris.FindLogEntries(Request.Create().UsingGet().WithPath("/admin"))
+                    .Should().BeEmpty("BlueIris action must remain suppressed for the entire settle window when any validator rejects");
+                await Task.Delay(50).ConfigureAwait(false);
+            }
         }
         finally
         {

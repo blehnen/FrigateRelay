@@ -17,9 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validator runs to completion even if one rejects, so each rejecting validator emits
   its own `frigaterelay.validators.rejected` counter for full per-validator dashboard
   visibility (a deliberate cost-of-information tradeoff vs cancelling in-flight work).
-  Each validator's own `Timeout` enforces itself; aggregate fails closed if any
-  validator times out (matches existing per-validator `OnError: FailClosed` semantics —
-  parallel changes scheduling, not failure semantics). **Default `false`** preserves
+  Each validator's own `Timeout` enforces itself and the validator's `OnError`
+  decides whether a timeout returns `Verdict.Fail(...)` (`FailClosed`) or
+  `Verdict.Pass()` (`FailOpen`). The dispatcher only AND-aggregates the verdicts —
+  a `FailOpen`-configured validator that times out still passes the action through.
+  Parallel changes scheduling, not failure semantics. **Default `false`** preserves
   the v1.0/v1.1 sequential-with-short-circuit behavior — existing `appsettings.json`
   configs upgrade unchanged. Configure via `Subscriptions:N:Actions:M`:
   ```json
