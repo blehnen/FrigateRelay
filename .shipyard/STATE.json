@@ -1,8 +1,8 @@
 {
   "schema": 3,
   "phase": 14,
-  "position": "Phase 14 / v1.2 trio MERGED to main: PR #42 (#13 Roboflow), PR #43 (#14 DOODS2), PR #44 (#23 ParallelValidators + StopAsync hardening). 291/291 tests passing (282 unit + 9 integration). CHANGELOG [Unreleased] is fully populated and ready for promotion to [1.2.0]. Next: operator-cut `git tag v1.2.0` per RELEASING.md → release.yml builds + pushes multi-arch GHCR images.",
-  "status": "ready_to_release",
-  "updated_at": "2026-05-07T00:00:00Z",
+  "position": "Phase 14/v1.2.0 awaiting tag; Phases 15 (v1.2.1 hardening) + 16 (v1.3.0) scoped from issue triage 2026-05-07. ISSUES.md cull: 5 closed (ID-1/3/7 WONTFIX, ID-9 DONE, ID-17-dup DUPLICATE). 13 open issues bundled. Design doc at .shipyard/phases/15-and-16-issues-cleanup-design.md; ROADMAP extended with Phase 15+16 entries. Ready for /shipyard:plan 15.",
+  "status": "ready",
+  "updated_at": "2026-05-07T16:05:01Z",
   "blocker": null
 }
