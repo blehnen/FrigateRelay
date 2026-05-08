@@ -358,7 +358,7 @@ public sealed class CounterIncrementTests
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
-            await Task.Delay(400); // ID-22 polling improvement deferred
+            await logger.WaitForEntriesAsync(1, TimeSpan.FromSeconds(2));
             await cts.CancelAsync();
             await pump.StopAsync(CancellationToken.None);
         }
@@ -392,7 +392,7 @@ public sealed class CounterIncrementTests
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await pump.StartAsync(cts.Token);
-        await Task.Delay(300); // ID-22 polling improvement deferred
+        await logger.WaitForEntriesAsync(1, TimeSpan.FromSeconds(2));
         await cts.CancelAsync();
         await pump.StopAsync(CancellationToken.None);
     }
@@ -417,14 +417,38 @@ public sealed class CounterIncrementTests
         {
             var ctx = MakeContext("e-disp");
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            // MeterListener fallback (issue #22 / PLAN-1.2): the dispatcher's success path emits no
+            // log message, so we cannot use logger.WaitForEntriesAsync for the success branch.
+            // A TaskCompletionSource triggered by the terminal metric provides a deterministic wait
+            // covering all three terminal states (PLAN-1.2 authorized fallback for this site only):
+            //   * happy path -> actions.succeeded
+            //   * action exception path -> actions.failed (with retries) or actions.exhausted (post-budget)
+            //   * validator rejected (short-circuit, no action runs) -> validators.rejected
+            var terminalSignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var terminalNames = new HashSet<string>
+            {
+                "frigaterelay.actions.succeeded",
+                "frigaterelay.actions.failed",
+                "frigaterelay.actions.exhausted",
+                "frigaterelay.validators.rejected",
+            };
+            using var meterListener = new MeterListener();
+            meterListener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == "FrigateRelay" && terminalNames.Contains(instrument.Name))
+                    listener.EnableMeasurementEvents(instrument);
+            };
+            meterListener.SetMeasurementEventCallback<long>((_, _, _, _) =>
+                terminalSignal.TrySetResult(true));
+            meterListener.Start();
+
             await dispatcher.EnqueueAsync(ctx, plugin, validators, subscription,
                 perActionSnapshotProvider: null,
                 subscriptionDefaultSnapshotProvider: null,
                 ct: cts.Token);
 
-            // Give consumer time to process: ThrowingPlugin fails immediately,
-            // StubPlugin succeeds immediately. (ID-22 polling improvement deferred.)
-            await Task.Delay(shouldThrow ? 200 : 100);
+            await terminalSignal.Task.WaitAsync(TimeSpan.FromSeconds(2), cts.Token);
         }
         finally
         {
