@@ -3,6 +3,7 @@ using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Options;
 
 namespace FrigateRelay.Host;
@@ -49,6 +50,7 @@ internal sealed class EventPump : BackgroundService
     private readonly Dictionary<string, IActionPlugin> _actionsByName;
     private readonly IServiceProvider _services;
     private readonly ILogger<EventPump> _logger;
+    private readonly MetricsTagWriter _metricsTagWriter;
 
     public EventPump(
         IEnumerable<IEventSource> sources,
@@ -57,7 +59,8 @@ internal sealed class EventPump : BackgroundService
         IActionDispatcher dispatcher,
         IEnumerable<IActionPlugin> actionPlugins,
         IServiceProvider services,
-        ILogger<EventPump> logger)
+        ILogger<EventPump> logger,
+        MetricsTagWriter metricsTagWriter)
     {
         _sources = sources.ToList();
         _dedupe = dedupe;
@@ -66,6 +69,7 @@ internal sealed class EventPump : BackgroundService
         _actionsByName = actionPlugins.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
         _services = services;
         _logger = logger;
+        _metricsTagWriter = metricsTagWriter;
     }
 
     /// <inheritdoc />
@@ -90,7 +94,8 @@ internal sealed class EventPump : BackgroundService
                 receiveActivity?.SetTag("event.id", context.EventId);
                 receiveActivity?.SetTag("event.source", source.Name);
 
-                DispatcherDiagnostics.IncrementEventsReceived(context);
+                DispatcherDiagnostics.IncrementEventsReceived(
+                    _metricsTagWriter.NormalizeCameraTag(context.Camera), context.Label);
 
                 var subs = _subsMonitor.CurrentValue.Subscriptions;
 
@@ -112,7 +117,8 @@ internal sealed class EventPump : BackgroundService
                     if (!_dedupe.TryEnter(sub, context)) continue;
                     LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
 
-                    DispatcherDiagnostics.IncrementEventsMatched(context, sub.Name);
+                    DispatcherDiagnostics.IncrementEventsMatched(
+                        _metricsTagWriter.NormalizeCameraTag(context.Camera), context.Label, sub.Name);
 
                     // Apply per-subscription EventContext augmentations before dispatch (#32).
                     // Today only CameraShortName; future host-managed per-subscription overrides

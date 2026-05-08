@@ -126,124 +126,215 @@ internal static class DispatcherDiagnostics
 
     /// <summary>
     /// Increments <c>frigaterelay.events.received</c> with <c>camera</c> and <c>label</c> tags
-    /// derived from <paramref name="ctx"/>.
+    /// derived from <paramref name="ctx"/>. Camera tag uses the raw value from <paramref name="ctx"/>.
     /// </summary>
     /// <param name="ctx">The event context for the received MQTT event.</param>
     internal static void IncrementEventsReceived(EventContext ctx) =>
+        IncrementEventsReceived(ctx.Camera, ctx.Label);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.events.received</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="label">The label tag value.</param>
+    internal static void IncrementEventsReceived(string? camera, string? label) =>
         EventsReceived.Add(1, new TagList
         {
-            { "camera", ctx.Camera },
-            { "label", ctx.Label },
+            { "camera", camera },
+            { "label", label },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.events.matched</c> with <c>subscription</c>, <c>camera</c>, and
-    /// <c>label</c> tags.
+    /// <c>label</c> tags. Camera tag uses the raw value from <paramref name="ctx"/>.
     /// </summary>
     /// <param name="ctx">The event context for the matched event.</param>
     /// <param name="subscription">The subscription name that matched.</param>
     internal static void IncrementEventsMatched(EventContext ctx, string subscription) =>
+        IncrementEventsMatched(ctx.Camera, ctx.Label, subscription);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.events.matched</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="label">The label tag value.</param>
+    /// <param name="subscription">The subscription name that matched.</param>
+    internal static void IncrementEventsMatched(string? camera, string? label, string subscription) =>
         EventsMatched.Add(1, new TagList
         {
             { "subscription", subscription },
-            { "camera", ctx.Camera },
-            { "label", ctx.Label },
+            { "camera", camera },
+            { "label", label },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.actions.dispatched</c> with <c>subscription</c>, <c>camera</c>,
-    /// and <c>action</c> tags derived from <paramref name="item"/>.
+    /// and <c>action</c> tags derived from <paramref name="item"/>. Camera tag uses the raw value.
     /// </summary>
     /// <param name="item">The dispatch item being enqueued.</param>
     internal static void IncrementActionsDispatched(DispatchItem item) =>
+        IncrementActionsDispatched(item.Context.Camera, item.Subscription, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.actions.dispatched</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementActionsDispatched(string? camera, string subscription, string action) =>
         ActionsDispatched.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
-            { "action", item.Plugin.Name },
+            { "subscription", subscription },
+            { "camera", camera },
+            { "action", action },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.actions.succeeded</c> with <c>subscription</c>, <c>camera</c>,
-    /// and <c>action</c> tags derived from <paramref name="item"/>.
+    /// and <c>action</c> tags derived from <paramref name="item"/>. Camera tag uses the raw value.
     /// </summary>
     /// <param name="item">The dispatch item whose action succeeded.</param>
     internal static void IncrementActionsSucceeded(DispatchItem item) =>
+        IncrementActionsSucceeded(item.Context.Camera, item.Subscription, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.actions.succeeded</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementActionsSucceeded(string? camera, string subscription, string action) =>
         ActionsSucceeded.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
-            { "action", item.Plugin.Name },
+            { "subscription", subscription },
+            { "camera", camera },
+            { "action", action },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.actions.failed</c> with <c>subscription</c>, <c>camera</c>,
-    /// and <c>action</c> tags derived from <paramref name="item"/>.
+    /// and <c>action</c> tags derived from <paramref name="item"/>. Camera tag uses the raw value.
     /// </summary>
     /// <param name="item">The dispatch item whose action failed after all retries.</param>
     internal static void IncrementActionsFailed(DispatchItem item) =>
+        IncrementActionsFailed(item.Context.Camera, item.Subscription, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.actions.failed</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementActionsFailed(string? camera, string subscription, string action) =>
         ActionsFailed.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
-            { "action", item.Plugin.Name },
+            { "subscription", subscription },
+            { "camera", camera },
+            { "action", action },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.validators.passed</c> with <c>subscription</c>, <c>camera</c>,
-    /// <c>validator</c>, and <c>action</c> tags.
+    /// <c>validator</c>, and <c>action</c> tags. Camera tag uses the raw value from <paramref name="item"/>.
     /// </summary>
     /// <param name="item">The dispatch item being validated.</param>
     /// <param name="validatorName">The name of the validator that passed.</param>
     internal static void IncrementValidatorsPassed(DispatchItem item, string validatorName) =>
+        IncrementValidatorsPassed(item.Context.Camera, item.Subscription, validatorName, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.validators.passed</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="validatorName">The name of the validator that passed.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementValidatorsPassed(string? camera, string subscription, string validatorName, string action) =>
         ValidatorsPassed.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
+            { "subscription", subscription },
+            { "camera", camera },
             { "validator", validatorName },
-            { "action", item.Plugin.Name },
+            { "action", action },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.validators.rejected</c> with <c>subscription</c>, <c>camera</c>,
-    /// <c>validator</c>, and <c>action</c> tags.
+    /// <c>validator</c>, and <c>action</c> tags. Camera tag uses the raw value from <paramref name="item"/>.
     /// </summary>
     /// <param name="item">The dispatch item being validated.</param>
     /// <param name="validatorName">The name of the validator that rejected.</param>
     internal static void IncrementValidatorsRejected(DispatchItem item, string validatorName) =>
+        IncrementValidatorsRejected(item.Context.Camera, item.Subscription, validatorName, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.validators.rejected</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="validatorName">The name of the validator that rejected.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementValidatorsRejected(string? camera, string subscription, string validatorName, string action) =>
         ValidatorsRejected.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
+            { "subscription", subscription },
+            { "camera", camera },
             { "validator", validatorName },
-            { "action", item.Plugin.Name },
+            { "action", action },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.dispatch.drops</c> with <c>subscription</c>, <c>camera</c>,
-    /// and <c>reason</c> tags derived from <paramref name="item"/>.
+    /// and <c>reason</c> tags derived from <paramref name="item"/>. Camera tag uses the raw value.
     /// </summary>
     /// <param name="item">The evicted dispatch item.</param>
     /// <param name="reason">The drop reason (e.g., <c>"channel_full"</c>).</param>
     internal static void IncrementDrops(DispatchItem item, string reason) =>
+        IncrementDrops(item.Context.Camera, item.Subscription, reason);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.dispatch.drops</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="reason">The drop reason (e.g., <c>"channel_full"</c>).</param>
+    internal static void IncrementDrops(string? camera, string subscription, string reason) =>
         Drops.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
+            { "subscription", subscription },
+            { "camera", camera },
             { "reason", reason },
         });
 
     /// <summary>
     /// Increments <c>frigaterelay.dispatch.exhausted</c> with <c>subscription</c>, <c>camera</c>,
-    /// and <c>action</c> tags derived from <paramref name="item"/>.
+    /// and <c>action</c> tags derived from <paramref name="item"/>. Camera tag uses the raw value.
     /// </summary>
     /// <param name="item">The dispatch item whose retry pipeline was exhausted.</param>
     internal static void IncrementExhausted(DispatchItem item) =>
+        IncrementExhausted(item.Context.Camera, item.Subscription, item.Plugin.Name);
+
+    /// <summary>
+    /// Increments <c>frigaterelay.dispatch.exhausted</c> with an explicit (pre-normalized) camera value.
+    /// Call sites that normalize the camera tag via <c>MetricsTagWriter</c> use this overload.
+    /// </summary>
+    /// <param name="camera">The (possibly normalized) camera tag value.</param>
+    /// <param name="subscription">The subscription name.</param>
+    /// <param name="action">The action (plugin) name.</param>
+    internal static void IncrementExhausted(string? camera, string subscription, string action) =>
         Exhausted.Add(1, new TagList
         {
-            { "subscription", item.Subscription },
-            { "camera", item.Context.Camera },
-            { "action", item.Plugin.Name },
+            { "subscription", subscription },
+            { "camera", camera },
+            { "action", action },
         });
 
     /// <summary>

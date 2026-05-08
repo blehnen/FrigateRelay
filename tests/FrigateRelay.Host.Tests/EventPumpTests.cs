@@ -5,6 +5,7 @@ using FrigateRelay.Host;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -48,7 +49,7 @@ public sealed class EventPumpTests
         };
         var source = new FakeSource("FrigateMqtt", new[] { context });
 
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger, CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         // StartAsync invokes ExecuteAsync; awaiting StopAsync then awaits the running task.
@@ -115,7 +116,8 @@ public sealed class EventPumpTests
         var capturingDispatcher = new CapturingDispatcher();
         var pump = new EventPump(
             new IEventSource[] { source }, dedupe, monitor, capturingDispatcher,
-            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger);
+            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger,
+            CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await pump.StartAsync(cts.Token);
@@ -173,7 +175,8 @@ public sealed class EventPumpTests
         var capturingDispatcher = new CapturingDispatcher();
         var pump = new EventPump(
             new IEventSource[] { source }, dedupe, monitor, capturingDispatcher,
-            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger);
+            new IActionPlugin[] { stubPlugin }, EmptyServiceProvider.Instance, logger,
+            CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await pump.StartAsync(cts.Token);
@@ -211,7 +214,7 @@ public sealed class EventPumpTests
             SnapshotFetcher = _ => ValueTask.FromResult<byte[]?>(null),
         };
         var source = new FakeSource("FrigateMqtt", new[] { Make("e1"), Make("e2") });
-        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger);
+        var pump = new EventPump(new IEventSource[] { source }, dedupe, monitor, NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(), EmptyServiceProvider.Instance, logger, CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await pump.StartAsync(cts.Token);
@@ -302,5 +305,15 @@ public sealed class EventPumpTests
             => Entries.Add(new LogEntry(level, id, formatter(state, exception)));
 
         public sealed record LogEntry(LogLevel Level, EventId Id, string Message);
+    }
+
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
+
+    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
+    {
+        public T CurrentValue { get; } = value;
+        public T Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<T, string?> listener) => null;
     }
 }

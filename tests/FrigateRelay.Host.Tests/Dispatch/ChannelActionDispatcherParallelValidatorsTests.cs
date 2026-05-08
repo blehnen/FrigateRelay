@@ -2,6 +2,7 @@ using System.Diagnostics.Metrics;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Dispatch;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -393,7 +394,17 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
     {
         logger ??= new CapturingLogger<ChannelActionDispatcher>();
         var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
-        return new ChannelActionDispatcher(plugins, logger, options, snapshotResolver: null);
+        return new ChannelActionDispatcher(plugins, logger, options, CreatePassthroughTagWriter(), snapshotResolver: null);
+    }
+
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
+
+    private sealed class StaticOptionsMonitor<T>(T value) : Microsoft.Extensions.Options.IOptionsMonitor<T>
+    {
+        public T CurrentValue { get; } = value;
+        public T Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<T, string?> listener) => null;
     }
 
     /// <summary>

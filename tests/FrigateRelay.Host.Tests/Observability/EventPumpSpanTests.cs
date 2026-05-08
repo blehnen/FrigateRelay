@@ -6,6 +6,7 @@ using FrigateRelay.Host;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -269,7 +270,7 @@ public sealed class EventPumpSpanTests
         {
             var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
             var dLogger = new CapturingLogger<ChannelActionDispatcher>();
-            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts);
+            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, CreatePassthroughTagWriter());
             await realDispatcher.StartAsync(CancellationToken.None);
             dispatcher = realDispatcher;
         }
@@ -278,7 +279,7 @@ public sealed class EventPumpSpanTests
         {
             var pump = new EventPump(
                 new[] { source }, dedupe, monitor, dispatcher,
-                plugins, EmptyServiceProvider.Instance, logger);
+                plugins, EmptyServiceProvider.Instance, logger, CreatePassthroughTagWriter());
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
@@ -339,6 +340,16 @@ public sealed class EventPumpSpanTests
     }
 
     private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
+    {
+        public T CurrentValue { get; } = value;
+        public T Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<T, string?> listener) => null;
+    }
+
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
+
+    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
     {
         public T CurrentValue { get; } = value;
         public T Get(string? name) => CurrentValue;
