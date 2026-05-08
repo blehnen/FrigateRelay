@@ -103,6 +103,8 @@ FrigateRelay emits OpenTelemetry metrics and traces under `Meter "FrigateRelay"`
 
 See [docs/observability.md](docs/observability.md) for the full counter inventory, cardinality guidance, OTLP collector setup, and Grafana dashboard import. A reference compose stack lives in [docker/observability/](docker/observability/).
 
+- **Bounding camera-tag cardinality (v1.3.0+):** populate `Otel:MetricsTags:KnownCameras: string[]` to fold any unknown camera value to the literal `"other"` before it reaches the metrics SDK — defends against attacker-influenced or misconfigured camera names that would otherwise create unbounded time series. Default is empty (passthrough). Case-insensitive (`OrdinalIgnoreCase`). See [docs/observability.md#bounding-camera-tag-cardinality-otelmetricstagsknowncameras-v130](docs/observability.md) for the full config shape and rationale.
+
 ## Validator engine status
 
 FrigateRelay ships three validator plugins as of v1.2.0: **CodeProject.AI** (also serves [Blue Onyx](https://github.com/xnorpx/blue-onyx) — same wire format), **Roboflow Inference**, and **DOODS2**. Multiple validators can be attached per action, and v1.2.0 adds an opt-in `ParallelValidators: true` flag that runs them concurrently with strict-AND aggregation (see CHANGELOG for details).

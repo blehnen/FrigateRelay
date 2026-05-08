@@ -83,6 +83,59 @@ or plugin-specific config properties.
 
 ---
 
+## Bounding camera-tag cardinality (`Otel:MetricsTags:KnownCameras`, v1.3.0+)
+
+Rule 2 says the `camera` tag is "bounded by the set of cameras in Frigate config." That bound
+is normally fine — operator-named cameras are usually a stable, small set. But the camera name
+travels through the MQTT topic, and a misconfigured upstream tool, a typo in Frigate config, or
+an attacker-influenced topic publish can introduce arbitrary values that each materialize as a
+new time series. With enough such values, the OTel SDK and downstream Prometheus / Grafana
+storage grow without bound — a slow-motion cardinality DoS.
+
+The `Otel:MetricsTags:KnownCameras` allowlist (added in v1.3.0, issue #18) bounds this:
+
+```json
+{
+  "Otel": {
+    "MetricsTags": {
+      "KnownCameras": ["Front", "Driveway", "Backyard"]
+    }
+  }
+}
+```
+
+Behavior:
+- **Empty array (the default)** — passthrough. The `camera` tag value is whatever
+  `EventContext.Camera` carries. **All current operators get this behavior unchanged after
+  upgrading** — the feature is opt-in.
+- **Non-empty array** — any `camera` value not in the allowlist is folded to the literal
+  string `"other"` before the counter increment. Known cameras pass through unchanged.
+
+Matching is **case-insensitive** (`StringComparer.OrdinalIgnoreCase`). An operator can write
+`"Driveway"` in the config and Frigate can publish lowercase `"driveway"` and the two will
+match. This is intentionally **divergent from the project convention elsewhere** (subscription /
+profile / plugin / validator names are case-sensitive) — the goal here is operational
+protection against camera-name explosion, not catching operator typos in the allowlist itself.
+
+The match returns the **caller's original casing** on hit, not the allowlist's casing — only
+membership is case-insensitive. So if Frigate publishes `"driveway"` and the allowlist contains
+`"Driveway"`, the metric tag is `"driveway"`.
+
+Environment-variable form:
+
+```bash
+Otel__MetricsTags__KnownCameras__0=Front
+Otel__MetricsTags__KnownCameras__1=Driveway
+Otel__MetricsTags__KnownCameras__2=Backyard
+```
+
+Scope (v1.3.0): `KnownCameras` only. The `label` tag (also operator-influenceable in theory)
+is not folded in this release because realized label cardinality is bounded by the detector
+model's class set (typically the COCO 80-class set). If a future operator hits label-cardinality
+issues, a `KnownLabels` field can be added in a follow-up release.
+
+---
+
 ## How to enable OTLP export
 
 By default, FrigateRelay does not export telemetry — it only emits metrics internally.
