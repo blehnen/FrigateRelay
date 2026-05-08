@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced 4 fixed-time `Task.Delay` polling sites in observability tests with deterministic `CapturingLogger<T>.WaitForEntriesAsync` (issue #22). Three sites use the new logger-polling helper directly; the dispatcher-success-path site uses an authorized `MeterListener`-based terminal-metric wait (the success path emits no log message), with `actions.succeeded`, `actions.failed`, `actions.exhausted`, and `validators.rejected` as the terminal-state set.
 - ROADMAP greppable invariant for #22 corrected to `git grep -nE 'Task\.Delay\([0-9]' tests/FrigateRelay.Host.Tests/Observability/` (numeric delays only); the 2 `Task.Delay(Timeout.Infinite, ct)` cancellation-await sites in fake `IEventSource` stubs are structurally correct and intentionally retained.
 
+### Changed
+
+- Unified HttpClient registration shape across the three validation-plugin registrars (CodeProjectAi, Roboflow, DOODS2): `BaseAddress` and `Timeout` now live in the `AddHttpClient` builder lambda rather than in the keyed-singleton factory body (issue #30). Internal cleanup; no operator-visible behavior change.
+- CPAI plugin-registrar tests backfilled (5 new tests) to bring CodeProject.AI to test-coverage parity with Roboflow and DOODS2 (issue #30 surface coverage).
+
 ## [1.2.1] — 2026-05-07
 
 Security + hygiene patch closing 10 issues. No public API change. Hardens the structured-logging boundary against CRLF injection from operator-controlled config values (CWE-117), restricts OTLP endpoint URI schemes (CWE-183), closes the residual Windows-Serilog-path gap from Phase 10's Linux-only allowlist hardening (CWE-22), and pins all third-party GitHub Actions to commit SHAs across the release / CI / secret-scan / docs workflows for SLSA L2+. Also extends the secret-scan tripwire to cover RFC 1918 10.x and 172.16-31.x ranges, brings the `[TypeConverter]` plugin-name path into parity with the JSON converter, and adds operator-doc warnings on the smoke broker and example compose binding.
