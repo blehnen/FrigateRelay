@@ -134,6 +134,21 @@ is not folded in this release because realized label cardinality is bounded by t
 model's class set (typically the COCO 80-class set). If a future operator hits label-cardinality
 issues, a `KnownLabels` field can be added in a follow-up release.
 
+**Note — null/empty camera passthrough:** `null` or empty camera values pass through unchanged
+in all cases (whether or not `KnownCameras` is set). If your Frigate source emits events with
+no camera name, those metrics will carry a null/empty tag. This is distinct from `"other"` —
+`"other"` only appears for non-empty, non-member values. If you observe null/empty-tagged
+metrics, check your Frigate source configuration; the cardinality protection only applies to
+non-empty operator-influenceable strings.
+
+**Log vs metric correlation:** When `KnownCameras` is configured, structured log entries
+(`LogMatchedEvent`, `LogValidatorRejected`, etc.) always carry the **raw** camera value from
+`EventContext.Camera`, while metric tags carry the **normalized** value (`"other"` for
+non-members). If you see a spike in `frigaterelay.validators.rejected{camera="other"}` and try
+to correlate against log lines by filtering on `camera`, you will find no matching entries
+under `"other"` — the log line will show the actual camera name that was folded. Correlate
+using the `subscription` or `event_id` fields rather than `camera`.
+
 ---
 
 ## How to enable OTLP export
