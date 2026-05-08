@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `Otel:MetricsTags:KnownCameras` config (issue #18) bounds the cardinality of the `camera` metrics tag — operators populate the allowlist; unknown cameras are folded to `"other"`. Default empty array preserves current behavior. Case-insensitive (`OrdinalIgnoreCase`).
+
 ## [1.2.1] — 2026-05-07
 
 Security + hygiene patch closing 10 issues. No public API change. Hardens the structured-logging boundary against CRLF injection from operator-controlled config values (CWE-117), restricts OTLP endpoint URI schemes (CWE-183), closes the residual Windows-Serilog-path gap from Phase 10's Linux-only allowlist hardening (CWE-22), and pins all third-party GitHub Actions to commit SHAs across the release / CI / secret-scan / docs workflows for SLSA L2+. Also extends the secret-scan tripwire to cover RFC 1918 10.x and 172.16-31.x ranges, brings the `[TypeConverter]` plugin-name path into parity with the JSON converter, and adds operator-doc warnings on the smoke broker and example compose binding.
