@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-05-11
+
+Minor release. Adds a new operator-visible config key for bounding metrics
+camera-tag cardinality (the SemVer-minor justification), plus two internal
+quality improvements: deterministic observability test polling and unified
+HttpClient registration shape across the three validation-plugin registrars.
+
 ### Added
 
 - New `Otel:MetricsTags:KnownCameras` config (issue #18) bounds the cardinality of the `camera` metrics tag — operators populate the allowlist; unknown cameras are folded to `"other"`. Default empty array preserves current behavior. Case-insensitive (`OrdinalIgnoreCase`).
@@ -15,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Replaced 4 fixed-time `Task.Delay` polling sites in observability tests with deterministic `CapturingLogger<T>.WaitForEntriesAsync` (issue #22). Three sites use the new logger-polling helper directly; the dispatcher-success-path site uses an authorized `MeterListener`-based terminal-metric wait (the success path emits no log message), with `actions.succeeded`, `actions.failed`, `actions.exhausted`, and `validators.rejected` as the terminal-state set.
 - ROADMAP greppable invariant for #22 corrected to `git grep -nE 'Task\.Delay\([0-9]' tests/FrigateRelay.Host.Tests/Observability/` (numeric delays only); the 2 `Task.Delay(Timeout.Infinite, ct)` cancellation-await sites in fake `IEventSource` stubs are structurally correct and intentionally retained.
+- Extracted canonical `StaticOptionsMonitor<T>` test double to `tests/FrigateRelay.TestHelpers/`, replacing six per-file `StaticMonitor<T>` / `StaticOptionsMonitor<T>` copies across the Host test suite (CodeRabbit PR #46 dedupe).
+- `CapturingLogger<T>.Entries` writes and `WaitForEntriesAsync` polling reads are now `Lock`-synchronized so background-thread log writes can't race with the test thread's poll loop (CodeRabbit PR #46).
 
 ### Changed
 
