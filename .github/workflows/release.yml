@@ -27,6 +27,11 @@ name: release
 on:
   push:
     tags: [ "v*" ]
+  # Manual re-trigger for transient infra failures (MCR 403s, runner network blips,
+  # etc.) — pick a tag ref from the UI and replay the full smoke + multi-arch push
+  # without having to delete and re-push the tag. The concurrency group below
+  # serializes against any in-flight run on the same ref.
+  workflow_dispatch:
 
 # REVIEW-2.2 fix: serialize releases on the same tag — prevents :latest race
 # if the same tag is force-pushed or pushed twice in quick succession.
