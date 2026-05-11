@@ -191,7 +191,7 @@ Checked against Phase 15 baseline (v1.2.1, 151 Host tests):
 
 ## Commit History (Phase 16)
 
-```
+```text
 943ef0e shipyard(phase-16): CHANGELOG entry for registrar unification (#30)
 5681b8d shipyard(phase-16): backfill CPAI plugin-registrar tests (#30)
 64cae5b shipyard(phase-16): unify HttpClient registration in validator plugin registrars (#30)
