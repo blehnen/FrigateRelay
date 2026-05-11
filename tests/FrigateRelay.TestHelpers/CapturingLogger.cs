@@ -5,16 +5,29 @@ namespace FrigateRelay.TestHelpers;
 public sealed class CapturingLogger<T> : ILogger<T>
 {
     private const int PollIntervalMs = 25;
+    private readonly Lock _entriesLock = new();
 
+    // Direct access is preserved for assertions; reads outside the lock can race with
+    // background-thread writes, but `List<T>.Count` is an int field read (atomic on x86/x64).
+    // The contract is: tests should call WaitForEntriesAsync first, then read Entries
+    // synchronously from the test thread once the pump/dispatcher has been stopped.
     public List<LogEntry> Entries { get; } = new();
+
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
     public bool IsEnabled(LogLevel logLevel) => true;
+
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        => Entries.Add(new LogEntry(
+    {
+        var entry = new LogEntry(
             logLevel,
             eventId,
             formatter(state, exception),
-            state as IReadOnlyList<KeyValuePair<string, object?>>));
+            state as IReadOnlyList<KeyValuePair<string, object?>>);
+        lock (_entriesLock)
+        {
+            Entries.Add(entry);
+        }
+    }
 
     /// <summary>
     /// Polls <see cref="Entries"/> until at least <paramref name="count"/> entries have been
@@ -27,11 +40,17 @@ public sealed class CapturingLogger<T> : ILogger<T>
     public async Task WaitForEntriesAsync(int count, TimeSpan timeout, CancellationToken ct = default)
     {
         var deadline = DateTime.UtcNow + timeout;
-        while (Entries.Count < count)
+        while (true)
         {
+            int current;
+            lock (_entriesLock)
+            {
+                current = Entries.Count;
+            }
+            if (current >= count) return;
             if (DateTime.UtcNow >= deadline)
                 throw new TimeoutException(
-                    $"WaitForEntriesAsync: expected {count} log entries but only {Entries.Count} were recorded within {timeout}.");
+                    $"WaitForEntriesAsync: expected {count} log entries but only {current} were recorded within {timeout}.");
             await Task.Delay(TimeSpan.FromMilliseconds(PollIntervalMs), ct);
         }
     }

@@ -14,7 +14,7 @@ public sealed class CodeProjectAiPluginRegistrarTests
     [TestMethod]
     public void Register_OneCodeProjectAiEntry_RegistersKeyedValidatorAndNamedHttpClient()
     {
-        var sp = BuildProvider(new()
+        using var sp = BuildProvider(new()
         {
             ["Validators:cpai_persons:Type"] = "CodeProjectAi",
             ["Validators:cpai_persons:BaseUrl"] = "http://test.local:5000",
@@ -37,7 +37,7 @@ public sealed class CodeProjectAiPluginRegistrarTests
     [TestMethod]
     public void Register_TwoCodeProjectAiEntries_RegistersBothIndependently()
     {
-        var sp = BuildProvider(new()
+        using var sp = BuildProvider(new()
         {
             ["Validators:cpai_persons:Type"] = "CodeProjectAi",
             ["Validators:cpai_persons:BaseUrl"] = "http://test.local:5000",
@@ -64,7 +64,7 @@ public sealed class CodeProjectAiPluginRegistrarTests
     [TestMethod]
     public void Register_NonCodeProjectAiEntry_DoesNotRegisterIt()
     {
-        var sp = BuildProvider(new()
+        using var sp = BuildProvider(new()
         {
             ["Validators:doods2_persons:Type"] = "Doods2",
             ["Validators:doods2_persons:BaseUrl"] = "http://doods2.local:10200",
@@ -87,7 +87,7 @@ public sealed class CodeProjectAiPluginRegistrarTests
     public void Register_NoValidatorsSection_ReturnsCleanly()
     {
         // No 'Validators:*' keys at all.
-        var sp = BuildProvider(new()
+        using var sp = BuildProvider(new()
         {
             ["BlueIris:TriggerUrlTemplate"] = "http://example.local/trigger?camera={camera}",
         });
@@ -100,7 +100,7 @@ public sealed class CodeProjectAiPluginRegistrarTests
     [TestMethod]
     public void Register_AllowInvalidCertificatesTrue_ConfiguresTlsBypassHandler()
     {
-        var sp = BuildProvider(new()
+        using var sp = BuildProvider(new()
         {
             ["Validators:cpai_persons:Type"] = "CodeProjectAi",
             ["Validators:cpai_persons:BaseUrl"] = "https://self-signed.local:5000",

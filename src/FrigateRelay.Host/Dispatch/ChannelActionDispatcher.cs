@@ -276,12 +276,13 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             }
             catch (Exception ex)
             {
+                var normalizedCamera = _metricsTagWriter.NormalizeCameraTag(item.Context.Camera);
                 DispatcherDiagnostics.IncrementExhausted(
-                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    normalizedCamera,
                     item.Subscription,
                     item.Plugin.Name);
                 DispatcherDiagnostics.IncrementActionsFailed(
-                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    normalizedCamera,
                     item.Subscription,
                     item.Plugin.Name);
 

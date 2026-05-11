@@ -396,18 +396,11 @@ public sealed class ChannelActionDispatcherTests
     {
         logger ??= new CapturingLogger<ChannelActionDispatcher>();
         var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = capacity });
-        return new ChannelActionDispatcher(plugins, logger, options, CreatePassthroughTagWriter(), resolver);
+        return new ChannelActionDispatcher(plugins, logger, options, metricsTagWriter: CreatePassthroughTagWriter(), snapshotResolver: resolver);
     }
 
     private static MetricsTagWriter CreatePassthroughTagWriter() =>
         new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
-
-    private sealed class StaticOptionsMonitor<T>(T value) : Microsoft.Extensions.Options.IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 
     private sealed class ThrowingPlugin(string name) : IActionPlugin
     {

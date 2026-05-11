@@ -328,7 +328,7 @@ public sealed class CounterIncrementTests
 
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(
             new HostSubscriptionsOptions { Subscriptions = subs });
         var logger = new CapturingLogger<EventPump>();
         var source = new BatchSource("test", events);
@@ -340,7 +340,7 @@ public sealed class CounterIncrementTests
         {
             var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
             var dLogger = new CapturingLogger<ChannelActionDispatcher>();
-            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, CreatePassthroughTagWriter());
+            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, metricsTagWriter: CreatePassthroughTagWriter());
             await realDispatcher.StartAsync(CancellationToken.None);
             dispatcher = realDispatcher;
         }
@@ -354,7 +354,7 @@ public sealed class CounterIncrementTests
             var pump = new EventPump(
                 new[] { (IEventSource)source }, dedupe, monitor,
                 dispatcher, plugins, EmptyServiceProvider.Instance, logger,
-                CreatePassthroughTagWriter());
+                metricsTagWriter: CreatePassthroughTagWriter());
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
@@ -381,14 +381,14 @@ public sealed class CounterIncrementTests
     {
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(
             new HostSubscriptionsOptions { Subscriptions = subs });
         var logger = new CapturingLogger<EventPump>();
 
         var pump = new EventPump(
             new[] { source }, dedupe, monitor,
             NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(),
-            EmptyServiceProvider.Instance, logger, CreatePassthroughTagWriter());
+            EmptyServiceProvider.Instance, logger, metricsTagWriter: CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await pump.StartAsync(cts.Token);
@@ -410,7 +410,7 @@ public sealed class CounterIncrementTests
         var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
         var logger = new CapturingLogger<ChannelActionDispatcher>();
         using var dispatcher = new ChannelActionDispatcher(
-            new[] { plugin }, logger, opts, CreatePassthroughTagWriter());
+            new[] { plugin }, logger, opts, metricsTagWriter: CreatePassthroughTagWriter());
 
         await dispatcher.StartAsync(CancellationToken.None);
         try
@@ -542,20 +542,6 @@ public sealed class CounterIncrementTests
         public object? GetService(Type serviceType) => null;
     }
 
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
-
     private static MetricsTagWriter CreatePassthroughTagWriter() =>
         new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
-
-    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 }

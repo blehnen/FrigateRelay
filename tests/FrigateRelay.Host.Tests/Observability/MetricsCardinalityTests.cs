@@ -1,5 +1,4 @@
 using FrigateRelay.Host.Observability;
-using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace FrigateRelay.Host.Tests.Observability;
@@ -62,17 +61,6 @@ public sealed class MetricsCardinalityTests
     // Helpers
     // -----------------------------------------------------------------------
 
-    /// <summary>
-    /// Constructs a <see cref="MetricsTagWriter"/> with a static, non-reloading options snapshot.
-    /// Reuses the <see cref="StaticMonitor{T}"/> pattern from <see cref="CounterIncrementTests"/>.
-    /// </summary>
     private static MetricsTagWriter MakeWriter(MetricsTagsOptions options) =>
-        new(new StaticMonitor<MetricsTagsOptions>(options));
-
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(options));
 }

@@ -144,7 +144,7 @@ public sealed class EventPumpDispatchTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
         var opts = new HostSubscriptionsOptions { Subscriptions = subs };
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(opts);
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(opts);
         var source = new SingleBatchSource("test", events);
         var pump = new EventPump(
             new IEventSource[] { source },
@@ -154,7 +154,7 @@ public sealed class EventPumpDispatchTests
             plugins,
             Substitute.For<IServiceProvider>(),
             NullLogger<EventPump>.Instance,
-            CreatePassthroughTagWriter());
+            metricsTagWriter: CreatePassthroughTagWriter());
         return (pump, cache);
     }
 
@@ -182,20 +182,6 @@ public sealed class EventPumpDispatchTests
         }
     }
 
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
-
     private static MetricsTagWriter CreatePassthroughTagWriter() =>
         new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
-
-    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 }

@@ -256,7 +256,7 @@ public sealed class EventPumpSpanTests
 
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(subs);
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(subs);
         var logger = new CapturingLogger<EventPump>();
 
         ChannelActionDispatcher? realDispatcher = null;
@@ -270,7 +270,7 @@ public sealed class EventPumpSpanTests
         {
             var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
             var dLogger = new CapturingLogger<ChannelActionDispatcher>();
-            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, CreatePassthroughTagWriter());
+            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, metricsTagWriter: CreatePassthroughTagWriter());
             await realDispatcher.StartAsync(CancellationToken.None);
             dispatcher = realDispatcher;
         }
@@ -279,7 +279,7 @@ public sealed class EventPumpSpanTests
         {
             var pump = new EventPump(
                 new[] { source }, dedupe, monitor, dispatcher,
-                plugins, EmptyServiceProvider.Instance, logger, CreatePassthroughTagWriter());
+                plugins, EmptyServiceProvider.Instance, logger, metricsTagWriter: CreatePassthroughTagWriter());
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
@@ -339,20 +339,6 @@ public sealed class EventPumpSpanTests
         }
     }
 
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
-
     private static MetricsTagWriter CreatePassthroughTagWriter() =>
         new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
-
-    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 }

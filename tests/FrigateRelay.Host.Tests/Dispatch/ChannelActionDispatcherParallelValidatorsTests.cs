@@ -394,18 +394,11 @@ public sealed class ChannelActionDispatcherParallelValidatorsTests
     {
         logger ??= new CapturingLogger<ChannelActionDispatcher>();
         var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
-        return new ChannelActionDispatcher(plugins, logger, options, CreatePassthroughTagWriter(), snapshotResolver: null);
+        return new ChannelActionDispatcher(plugins, logger, options, metricsTagWriter: CreatePassthroughTagWriter(), snapshotResolver: null);
     }
 
     private static MetricsTagWriter CreatePassthroughTagWriter() =>
         new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
-
-    private sealed class StaticOptionsMonitor<T>(T value) : Microsoft.Extensions.Options.IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 
     /// <summary>
     /// Polls <paramref name="predicate"/> every 10 ms until it returns true or

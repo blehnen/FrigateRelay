@@ -103,7 +103,7 @@ FrigateRelay emits OpenTelemetry metrics and traces under `Meter "FrigateRelay"`
 
 See [docs/observability.md](docs/observability.md) for the full counter inventory, cardinality guidance, OTLP collector setup, and Grafana dashboard import. A reference compose stack lives in [docker/observability/](docker/observability/).
 
-- **Bounding camera-tag cardinality (v1.3.0+):** populate `Otel:MetricsTags:KnownCameras: string[]` to fold any unknown camera value to the literal `"other"` before it reaches the metrics SDK — defends against attacker-influenced or misconfigured camera names that would otherwise create unbounded time series. Default is empty (passthrough). Case-insensitive (`OrdinalIgnoreCase`). See [docs/observability.md#bounding-camera-tag-cardinality-otelmetricstagsknowncameras-v130](docs/observability.md) for the full config shape and rationale.
+- **Bounding camera-tag cardinality (v1.3.0+):** populate `Otel:MetricsTags:KnownCameras: string[]` to fold any unknown camera value to the literal `"other"` before it reaches the metrics SDK — defends against attacker-influenced or misconfigured camera names that would otherwise create unbounded time series. Default is empty (passthrough). Case-insensitive (`OrdinalIgnoreCase`). See [docs/observability.md#bounding-camera-tag-cardinality-otelmetricstagsknowncameras-v130](docs/observability.md#bounding-camera-tag-cardinality-otelmetricstagsknowncameras-v130) for the full config shape and rationale.
 
 ## Validator engine status
 

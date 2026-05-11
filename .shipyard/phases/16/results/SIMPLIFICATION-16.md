@@ -1,6 +1,6 @@
 # Simplification Report
 
-**Phase:** 16 (v1.3.0 — metrics cardinality + parallel validators)
+**Phase:** 16 (v1.3.0 — metrics cardinality + test polling + registrar unification)
 **Date:** 2026-05-08
 **Files analyzed:** 13 source + test files changed in phase
 **Findings:** 1 high, 2 medium, 2 low
