@@ -5,6 +5,7 @@ using FrigateRelay.Host;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -143,7 +144,7 @@ public sealed class EventPumpDispatchTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
         var opts = new HostSubscriptionsOptions { Subscriptions = subs };
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(opts);
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(opts);
         var source = new SingleBatchSource("test", events);
         var pump = new EventPump(
             new IEventSource[] { source },
@@ -152,7 +153,8 @@ public sealed class EventPumpDispatchTests
             dispatcher,
             plugins,
             Substitute.For<IServiceProvider>(),
-            NullLogger<EventPump>.Instance);
+            NullLogger<EventPump>.Instance,
+            metricsTagWriter: CreatePassthroughTagWriter());
         return (pump, cache);
     }
 
@@ -180,10 +182,6 @@ public sealed class EventPumpDispatchTests
         }
     }
 
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
 }

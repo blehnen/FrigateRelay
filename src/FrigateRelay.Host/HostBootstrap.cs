@@ -3,6 +3,7 @@ using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Health;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using FrigateRelay.Host.Snapshots;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -59,6 +60,12 @@ internal static class HostBootstrap
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                     b.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
             });
+
+        // Metrics tag cardinality guard (issue #18, CONTEXT-16 D1/D5).
+        // Bound from Otel:MetricsTags so it sits with the OTel block conceptually.
+        // Empty KnownCameras (default) = passthrough; non-empty = camera tag folded to "other".
+        builder.Services.Configure<MetricsTagsOptions>(builder.Configuration.GetSection("Otel:MetricsTags"));
+        builder.Services.AddSingleton<MetricsTagWriter>();
 
         // MQTT connection status singleton — registered before plugin registrars so DI can
         // resolve it when constructing FrigateMqttEventSource (which injects IMqttConnectionStatus).

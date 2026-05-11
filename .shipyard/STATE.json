@@ -1,8 +1,8 @@
 {
   "schema": 3,
-  "phase": 15,
-  "position": "v1.2.1 SHIPPED 2026-05-07. PR #45 merged at b294bb3; CHANGELOG promotion at c427b2b; v1.2.1 tag cut. release.yml completed SUCCESS (8m42s) — smoke gate green, multi-arch GHCR push complete (linux/amd64 + linux/arm64 to ghcr.io/blehnen/frigaterelay:1.2.1, :latest, :1). 151 Host tests passing (133 + 18 net-new across the full Phase 15 cycle). Phase 15 closed. Next: /shipyard:plan 16 for v1.3.0 (MetricsTags:KnownCameras + Task.Delay polling refactor + PluginRegistrar shape unification).",
-  "status": "shipped",
-  "updated_at": "2026-05-07T21:31:05Z",
+  "phase": 0,
+  "position": "Phase 16 (v1.3.0) build complete. 11 commits. 313 tests pass across 11 projects (151+3 Host, 8+5 CPAI, 16 Roboflow, 14 DOODS2, others unchanged). Quality gates: VERIFICATION PASS, AUDIT PASS_WITH_NOTES (3 advisory), SIMPLIFICATION MINOR_BLOAT (1 High deferred to Phase 17 — StaticOptionsMonitor extraction), DOCUMENTATION GAPS_NON_BLOCKING (5 recommendations all applied in commit 0d46303). Ready for /shipyard:ship to cut the v1.3.0 PR + tag.",
+  "status": "complete",
+  "updated_at": "2026-05-08T22:38:03Z",
   "blocker": null
 }

@@ -53,7 +53,12 @@ public sealed class PluginRegistrar : IPluginRegistrar
             // AddResilienceHandler — see remarks on this class.
             var clientName = $"Doods2:{instanceKey}";
             context.Services
-                .AddHttpClient(clientName)
+                .AddHttpClient(clientName, (sp, client) =>
+                {
+                    var opts = sp.GetRequiredService<IOptionsMonitor<Doods2Options>>().Get(instanceKey);
+                    client.BaseAddress = new Uri(opts.BaseUrl);
+                    client.Timeout = opts.Timeout;
+                })
                 .ConfigurePrimaryHttpMessageHandler(sp =>
                 {
                     var opts = sp.GetRequiredService<IOptionsMonitor<Doods2Options>>().Get(instanceKey);
@@ -77,8 +82,6 @@ public sealed class PluginRegistrar : IPluginRegistrar
                 var name = (string)key!;
                 var opts = sp.GetRequiredService<IOptionsMonitor<Doods2Options>>().Get(name);
                 var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient($"Doods2:{name}");
-                http.BaseAddress = new Uri(opts.BaseUrl);
-                http.Timeout = opts.Timeout;
                 var logger = sp.GetRequiredService<ILogger<Doods2Validator>>();
                 return new Doods2Validator(name, opts, http, logger);
             });

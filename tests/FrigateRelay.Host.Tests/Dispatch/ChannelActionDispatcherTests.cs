@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Host.Dispatch;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -395,8 +396,11 @@ public sealed class ChannelActionDispatcherTests
     {
         logger ??= new CapturingLogger<ChannelActionDispatcher>();
         var options = Options.Create(new DispatcherOptions { DefaultQueueCapacity = capacity });
-        return new ChannelActionDispatcher(plugins, logger, options, resolver);
+        return new ChannelActionDispatcher(plugins, logger, options, metricsTagWriter: CreatePassthroughTagWriter(), snapshotResolver: resolver);
     }
+
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
 
     private sealed class ThrowingPlugin(string name) : IActionPlugin
     {

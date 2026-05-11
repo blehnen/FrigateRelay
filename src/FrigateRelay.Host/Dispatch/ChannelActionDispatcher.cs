@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Threading.Channels;
 using FrigateRelay.Abstractions;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Options;
 
 namespace FrigateRelay.Host.Dispatch;
@@ -49,6 +50,7 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     private readonly ILogger<ChannelActionDispatcher> _logger;
     private readonly DispatcherOptions _dispatcherOpts;
     private readonly ISnapshotResolver? _snapshotResolver;
+    private readonly MetricsTagWriter _metricsTagWriter;
 
     private Dictionary<IActionPlugin, Channel<DispatchItem>> _channels = new();
     private readonly Dictionary<string, IActionPlugin> _actionsByName =
@@ -66,11 +68,13 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         IEnumerable<IActionPlugin> plugins,
         ILogger<ChannelActionDispatcher> logger,
         IOptions<DispatcherOptions> options,
+        MetricsTagWriter metricsTagWriter,
         ISnapshotResolver? snapshotResolver = null)
     {
         _plugins = plugins.ToList();
         _logger = logger;
         _dispatcherOpts = options.Value;
+        _metricsTagWriter = metricsTagWriter;
         _snapshotResolver = snapshotResolver;
     }
 
@@ -97,7 +101,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
 
             var channel = Channel.CreateBounded<DispatchItem>(channelOptions, evicted =>
             {
-                DispatcherDiagnostics.IncrementDrops(evicted, "channel_full");
+                DispatcherDiagnostics.IncrementDrops(
+                    _metricsTagWriter.NormalizeCameraTag(evicted.Context.Camera),
+                    evicted.Subscription,
+                    "channel_full");
                 LogDropped(_logger, evicted.Context.EventId, evicted.Plugin.Name, capacity, null);
             });
 
@@ -158,7 +165,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         var item = new DispatchItem(ctx, action, validators, Activity.Current?.Context ?? default,
             subscription, perActionSnapshotProvider, subscriptionDefaultSnapshotProvider,
             ParallelValidators: parallelValidators);
-        DispatcherDiagnostics.IncrementActionsDispatched(item);
+        DispatcherDiagnostics.IncrementActionsDispatched(
+            _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+            item.Subscription,
+            item.Plugin.Name);
 
         await channel.Writer.WriteAsync(item, ct).ConfigureAwait(false);
     }
@@ -252,7 +262,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
                 await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
                 actionActivity?.SetTag("outcome", "success");
                 actionActivity?.SetStatus(ActivityStatusCode.Ok);
-                DispatcherDiagnostics.IncrementActionsSucceeded(item);
+                DispatcherDiagnostics.IncrementActionsSucceeded(
+                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    item.Subscription,
+                    item.Plugin.Name);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -263,8 +276,15 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
             }
             catch (Exception ex)
             {
-                DispatcherDiagnostics.IncrementExhausted(item);
-                DispatcherDiagnostics.IncrementActionsFailed(item);
+                var normalizedCamera = _metricsTagWriter.NormalizeCameraTag(item.Context.Camera);
+                DispatcherDiagnostics.IncrementExhausted(
+                    normalizedCamera,
+                    item.Subscription,
+                    item.Plugin.Name);
+                DispatcherDiagnostics.IncrementActionsFailed(
+                    normalizedCamera,
+                    item.Subscription,
+                    item.Plugin.Name);
 
                 LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
                 actionActivity?.SetTag("outcome", "failure");
@@ -298,11 +318,19 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
 
             if (verdict.Passed)
             {
-                DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
+                DispatcherDiagnostics.IncrementValidatorsPassed(
+                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    item.Subscription,
+                    validator.Name,
+                    item.Plugin.Name);
             }
             else
             {
-                DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
+                DispatcherDiagnostics.IncrementValidatorsRejected(
+                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    item.Subscription,
+                    validator.Name,
+                    item.Plugin.Name);
                 LogValidatorRejected(
                     _logger,
                     item.Context.EventId,
@@ -342,11 +370,19 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         {
             if (verdict.Passed)
             {
-                DispatcherDiagnostics.IncrementValidatorsPassed(item, validator.Name);
+                DispatcherDiagnostics.IncrementValidatorsPassed(
+                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    item.Subscription,
+                    validator.Name,
+                    item.Plugin.Name);
             }
             else
             {
-                DispatcherDiagnostics.IncrementValidatorsRejected(item, validator.Name);
+                DispatcherDiagnostics.IncrementValidatorsRejected(
+                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                    item.Subscription,
+                    validator.Name,
+                    item.Plugin.Name);
                 LogValidatorRejected(
                     _logger,
                     item.Context.EventId,

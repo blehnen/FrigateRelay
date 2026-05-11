@@ -6,6 +6,7 @@ using FrigateRelay.Host;
 using FrigateRelay.Host.Configuration;
 using FrigateRelay.Host.Dispatch;
 using FrigateRelay.Host.Matching;
+using FrigateRelay.Host.Observability;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -327,7 +328,7 @@ public sealed class CounterIncrementTests
 
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(
             new HostSubscriptionsOptions { Subscriptions = subs });
         var logger = new CapturingLogger<EventPump>();
         var source = new BatchSource("test", events);
@@ -339,7 +340,7 @@ public sealed class CounterIncrementTests
         {
             var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
             var dLogger = new CapturingLogger<ChannelActionDispatcher>();
-            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts);
+            realDispatcher = new ChannelActionDispatcher(plugins, dLogger, opts, metricsTagWriter: CreatePassthroughTagWriter());
             await realDispatcher.StartAsync(CancellationToken.None);
             dispatcher = realDispatcher;
         }
@@ -352,11 +353,12 @@ public sealed class CounterIncrementTests
         {
             var pump = new EventPump(
                 new[] { (IEventSource)source }, dedupe, monitor,
-                dispatcher, plugins, EmptyServiceProvider.Instance, logger);
+                dispatcher, plugins, EmptyServiceProvider.Instance, logger,
+                metricsTagWriter: CreatePassthroughTagWriter());
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await pump.StartAsync(cts.Token);
-            await Task.Delay(400); // ID-22 polling improvement deferred
+            await logger.WaitForEntriesAsync(1, TimeSpan.FromSeconds(2));
             await cts.CancelAsync();
             await pump.StopAsync(CancellationToken.None);
         }
@@ -379,18 +381,18 @@ public sealed class CounterIncrementTests
     {
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var dedupe = new DedupeCache(cache);
-        var monitor = new StaticMonitor<HostSubscriptionsOptions>(
+        var monitor = new StaticOptionsMonitor<HostSubscriptionsOptions>(
             new HostSubscriptionsOptions { Subscriptions = subs });
         var logger = new CapturingLogger<EventPump>();
 
         var pump = new EventPump(
             new[] { source }, dedupe, monitor,
             NoOpDispatcher.Instance, Array.Empty<IActionPlugin>(),
-            EmptyServiceProvider.Instance, logger);
+            EmptyServiceProvider.Instance, logger, metricsTagWriter: CreatePassthroughTagWriter());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await pump.StartAsync(cts.Token);
-        await Task.Delay(300); // ID-22 polling improvement deferred
+        await logger.WaitForEntriesAsync(1, TimeSpan.FromSeconds(2));
         await cts.CancelAsync();
         await pump.StopAsync(CancellationToken.None);
     }
@@ -408,21 +410,45 @@ public sealed class CounterIncrementTests
         var opts = Options.Create(new DispatcherOptions { DefaultQueueCapacity = 64 });
         var logger = new CapturingLogger<ChannelActionDispatcher>();
         using var dispatcher = new ChannelActionDispatcher(
-            new[] { plugin }, logger, opts);
+            new[] { plugin }, logger, opts, metricsTagWriter: CreatePassthroughTagWriter());
 
         await dispatcher.StartAsync(CancellationToken.None);
         try
         {
             var ctx = MakeContext("e-disp");
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            // MeterListener fallback (issue #22 / PLAN-1.2): the dispatcher's success path emits no
+            // log message, so we cannot use logger.WaitForEntriesAsync for the success branch.
+            // A TaskCompletionSource triggered by the terminal metric provides a deterministic wait
+            // covering all three terminal states (PLAN-1.2 authorized fallback for this site only):
+            //   * happy path -> actions.succeeded
+            //   * action exception path -> actions.failed (with retries) or actions.exhausted (post-budget)
+            //   * validator rejected (short-circuit, no action runs) -> validators.rejected
+            var terminalSignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var terminalNames = new HashSet<string>
+            {
+                "frigaterelay.actions.succeeded",
+                "frigaterelay.actions.failed",
+                "frigaterelay.actions.exhausted",
+                "frigaterelay.validators.rejected",
+            };
+            using var meterListener = new MeterListener();
+            meterListener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == "FrigateRelay" && terminalNames.Contains(instrument.Name))
+                    listener.EnableMeasurementEvents(instrument);
+            };
+            meterListener.SetMeasurementEventCallback<long>((_, _, _, _) =>
+                terminalSignal.TrySetResult(true));
+            meterListener.Start();
+
             await dispatcher.EnqueueAsync(ctx, plugin, validators, subscription,
                 perActionSnapshotProvider: null,
                 subscriptionDefaultSnapshotProvider: null,
                 ct: cts.Token);
 
-            // Give consumer time to process: ThrowingPlugin fails immediately,
-            // StubPlugin succeeds immediately. (ID-22 polling improvement deferred.)
-            await Task.Delay(shouldThrow ? 200 : 100);
+            await terminalSignal.Task.WaitAsync(TimeSpan.FromSeconds(2), cts.Token);
         }
         finally
         {
@@ -516,10 +542,6 @@ public sealed class CounterIncrementTests
         public object? GetService(Type serviceType) => null;
     }
 
-    private sealed class StaticMonitor<T>(T value) : IOptionsMonitor<T>
-    {
-        public T CurrentValue { get; } = value;
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
+    private static MetricsTagWriter CreatePassthroughTagWriter() =>
+        new(new StaticOptionsMonitor<MetricsTagsOptions>(new MetricsTagsOptions()));
 }
