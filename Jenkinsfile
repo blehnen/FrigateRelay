@@ -64,8 +64,14 @@ pipeline {
                 // auto-discovers every tests/*.Tests/*.Tests.csproj and calls each via
                 // `dotnet run` with MTP coverage flags. Output lands at
                 //   coverage/<TestProjectName>/coverage.cobertura.xml
+                //   coverage/<TestProjectName>/<TestProjectName>.trx
                 // so adding a new test project requires no Jenkinsfile edit.
-                sh 'bash .github/scripts/run-tests.sh --coverage'
+                //
+                // catchError: keep the build moving on test failures so the post-always
+                // block can still publish JUnit results + the coverage HTML report.
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                    sh 'bash .github/scripts/run-tests.sh --coverage'
+                }
 
                 // Merge per-project cobertura XMLs into a single browsable HTML report
                 // (and a unified Cobertura.xml) using ReportGenerator. Mirrors the
@@ -108,6 +114,21 @@ pipeline {
 
             post {
                 always {
+                    // Convert MTP's TRX output to JUnit XML so Jenkins's built-in JUnit
+                    // publisher can populate the Tests tab with per-test pass/fail data.
+                    // MTP has no native JUnit reporter (JunitXml.TestLogger is VSTest-only),
+                    // so we go via TRX. trx2junit is a small global tool; pinning unnecessary
+                    // because the schema mapping is stable. `|| true` for both install
+                    // (already-cached) and convert (no TRX produced because test run
+                    // never started) so a fatal early failure still archives coverage.
+                    sh '''
+                        dotnet tool install --tool-path .dotnet-tools trx2junit || true
+                        mkdir -p junit-results
+                        find coverage -name '*.trx' -type f -print0 \
+                          | xargs -0 --no-run-if-empty .dotnet-tools/trx2junit --output junit-results || true
+                    '''
+                    junit allowEmptyResults: true, testResults: 'junit-results/**/*.xml'
+
                     // Archive raw per-project cobertura XML so it survives the workspace
                     // cleanup below. allowEmptyArchive: false — a missing XML means the
                     // coverage run silently failed; treat as a pipeline error.

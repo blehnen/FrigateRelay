@@ -450,3 +450,9 @@ coverage.cobertura.xml
 
 # Workspace-local NuGet cache (Jenkinsfile uses `dotnet restore --packages .nuget-cache`)
 .nuget-cache/
+
+# Workspace-local global tools (Jenkinsfile uses `dotnet tool install --tool-path .dotnet-tools`)
+.dotnet-tools/
+
+# JUnit XML test output (Jenkins junit publisher; converted from MTP TRX by trx2junit)
+junit-results/

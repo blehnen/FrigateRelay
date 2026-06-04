@@ -64,10 +64,20 @@ for proj in "${PROJECTS[@]}"; do
 
   if [[ "$COVERAGE" -eq 1 ]]; then
     mkdir -p "coverage/${name}"
+    # --report-trx is MTP's built-in TRX output; emit alongside cobertura so
+    # Jenkins (after TRX→JUnit conversion) can populate its Tests tab.
+    # Microsoft.Testing.Extensions.TrxReport is a transitive dep of MSTest 4.x,
+    # so no extra package reference is needed in the test projects.
+    # Deliberately NOT passing --results-directory: it would also re-root the
+    # cobertura output and break the canonical coverage/${name}/coverage.cobertura.xml
+    # path. TRX falls back to MTP's default TestResults dir; the fallback
+    # block below normalizes it to the canonical location.
     dotnet run --project "$proj" -c "$CONFIG" --no-build -- \
       --coverage \
       --coverage-output-format cobertura \
       --coverage-output "coverage/${name}/coverage.cobertura.xml" \
+      --report-trx \
+      --report-trx-filename "${name}.trx" \
       "${PASS_THROUGH_ARGS[@]}"
 
     # MTP's Microsoft.Testing.Extensions.CodeCoverage honors --coverage-output
@@ -81,6 +91,16 @@ for proj in "${PROJECTS[@]}"; do
       fallback=$(find "tests/${name}/bin/${CONFIG}" -name 'coverage.cobertura.xml' -type f 2>/dev/null | head -1)
       if [[ -n "${fallback}" ]]; then
         cp "${fallback}" "coverage/${name}/coverage.cobertura.xml"
+      fi
+    fi
+
+    # TRX lands at tests/<Name>.Tests/bin/<Config>/net10.0/TestResults/<Name>.Tests.trx
+    # because --report-trx-filename is filename-only (no path control). Copy to the
+    # canonical path so Jenkinsfile's `find coverage -name '*.trx'` picks it up.
+    if [[ ! -s "coverage/${name}/${name}.trx" ]]; then
+      trx_fallback=$(find "tests/${name}/bin/${CONFIG}" -name "${name}.trx" -type f 2>/dev/null | head -1)
+      if [[ -n "${trx_fallback}" ]]; then
+        cp "${trx_fallback}" "coverage/${name}/${name}.trx"
       fi
     fi
   else
