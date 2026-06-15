@@ -14,7 +14,7 @@
          (warnings-as-errors). Removed when SDK changed from Worker to Web (PLAN-1.1 Task 2). -->
 
     <!-- OpenTelemetry (D2 — registration always; export conditional on Otel:OtlpEndpoint / OTEL_EXPORTER_OTLP_ENDPOINT) -->
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
 
