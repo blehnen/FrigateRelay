@@ -15,7 +15,7 @@
 
     <!-- OpenTelemetry (D2 — registration always; export conditional on Otel:OtlpEndpoint / OTEL_EXPORTER_OTLP_ENDPOINT) -->
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
 
     <!-- Serilog Worker SDK host wiring (D7 — Seq is conditional on Serilog:Seq:ServerUrl) -->
