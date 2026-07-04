@@ -14,6 +14,18 @@
 pipeline {
     agent none
 
+    // Serialize all Jenkinsfile runs across the repository — only one pipeline
+    // (PR, main, or any branch) executes at a time. Each run launches the SDK
+    // sibling container plus a Testcontainers Mosquitto sidecar against the shared
+    // host Docker daemon; several concurrent runs (e.g. a burst of Dependabot
+    // merges) saturate the agent pool and contend on the daemon. Queued runs wait
+    // their turn instead of starving each other. The Lockable Resources plugin
+    // provides this — the named resource is created on first use, no pre-definition
+    // required. Mirrors the DotNetWorkQueue pipeline's 'dotnetworkqueue-ci' lock.
+    options {
+        lock(resource: 'frigaterelay-ci')
+    }
+
     environment {
         DOTNET_CLI_TELEMETRY_OPTOUT = '1'
         DOTNET_NOLOGO               = '1'
