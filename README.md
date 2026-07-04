@@ -9,6 +9,10 @@
   <a href="https://codecov.io/gh/blehnen/FrigateRelay"><img src="https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg" alt="codecov"></a>
 </p>
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=bugs)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
+
 FrigateRelay is a .NET 10 background service that listens to [Frigate NVR](https://frigate.video/) MQTT events and dispatches them to action plugins. Each action can sit behind its own pre-action validators, like a CodeProject.AI confidence check. If a validator fails, that action is skipped, but other actions on the same event still fire.
 
 Plugins ship for [Blue Iris](https://blueirissoftware.com/) (trigger + snapshot), [Pushover](https://pushover.net/) (notification + snapshot), [CodeProject.AI](https://www.codeproject.com/ai/docs/) (validation), and Frigate snapshot.
