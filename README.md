@@ -7,11 +7,10 @@
 <p align="center">
   <a href="https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml"><img src="https://github.com/blehnen/FrigateRelay/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://codecov.io/gh/blehnen/FrigateRelay"><img src="https://codecov.io/gh/blehnen/FrigateRelay/branch/main/graph/badge.svg" alt="codecov"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=alert_status" alt="Quality Gate Status"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=bugs" alt="Bugs"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=code_smells" alt="Code Smells"></a>
 </p>
-
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
-[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=bugs)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay)
 
 FrigateRelay is a .NET 10 background service that listens to [Frigate NVR](https://frigate.video/) MQTT events and dispatches them to action plugins. Each action can sit behind its own pre-action validators, like a CodeProject.AI confidence check. If a validator fails, that action is skipped, but other actions on the same event still fire.
 
