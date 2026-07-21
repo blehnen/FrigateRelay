@@ -10,6 +10,9 @@
   <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=alert_status" alt="Quality Gate Status"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=bugs" alt="Bugs"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=blehnen_FrigateRelay"><img src="https://sonarcloud.io/api/project_badges/measure?project=blehnen_FrigateRelay&metric=code_smells" alt="Code Smells"></a>
+  <a href="https://github.com/blehnen/FrigateRelay/releases"><img src="https://img.shields.io/github/v/release/blehnen/FrigateRelay?sort=semver" alt="Release"></a>
+  <a href="https://github.com/blehnen/FrigateRelay/pkgs/container/frigaterelay"><img src="https://img.shields.io/badge/ghcr.io-blehnen%2Ffrigaterelay-blue?logo=docker&amp;logoColor=white" alt="GHCR"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 </p>
 
 FrigateRelay is a .NET 10 background service that listens to [Frigate NVR](https://frigate.video/) MQTT events and dispatches them to action plugins. Each action can sit behind its own pre-action validators, like a CodeProject.AI confidence check. If a validator fails, that action is skipped, but other actions on the same event still fire.
