@@ -29,7 +29,7 @@ internal static class HealthzResponseWriter
             }),
         };
 
-        await JsonSerializer.SerializeAsync(context.Response.Body, payload, JsonOptions)
+        await JsonSerializer.SerializeAsync(context.Response.Body, payload, JsonOptions, context.RequestAborted)
             .ConfigureAwait(false);
     }
 }
