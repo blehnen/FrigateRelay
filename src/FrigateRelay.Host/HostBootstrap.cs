@@ -39,8 +39,8 @@ internal static class HostBootstrap
             ApplyLoggerConfiguration(lc, builder.Configuration, builder.Environment.EnvironmentName, services);
         });
 
-        // OpenTelemetry registration (D2 — ActivitySource + Meter always registered;
-        // OTLP exporter only when Otel:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT is set).
+        // OpenTelemetry registration (D2 — the ActivitySource and Meter are always registered,
+        // with the OTLP exporter added only when Otel:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT is set).
         // IConfiguration key takes precedence; env var is the fallback for container deployments.
         var otlpEndpoint = builder.Configuration["Otel:OtlpEndpoint"]
             ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");

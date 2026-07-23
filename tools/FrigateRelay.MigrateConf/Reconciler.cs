@@ -36,40 +36,63 @@ internal static class Reconciler
     {
         foreach (var line in File.ReadLines(path))
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            JsonDocument doc;
-            try { doc = JsonDocument.Parse(line); }
-            catch (JsonException) { continue; }
-
-            using (doc)
-            {
-                // @mt is the message template; @i is a hex Murmur3 hash (NOT the action name).
-                // Discriminate on whether @mt begins with the known plugin DryRun prefix.
-                if (!doc.RootElement.TryGetProperty("@mt", out var mtProp)) continue;
-                var mt = mtProp.GetString() ?? "";
-                var action = mt switch
-                {
-                    _ when mt.StartsWith("BlueIris DryRun", StringComparison.Ordinal) => "BlueIris",
-                    _ when mt.StartsWith("Pushover DryRun", StringComparison.Ordinal) => "Pushover",
-                    _ => null
-                };
-                if (action is null) continue;
-
-                if (!doc.RootElement.TryGetProperty("@t", out var tProp)) continue;
-                var ts = tProp.GetString();
-                if (ts is null) continue;
-
-                var camera = doc.RootElement.TryGetProperty("Camera", out var camProp)
-                    ? camProp.GetString() ?? "" : "";
-                var label = doc.RootElement.TryGetProperty("Label", out var labProp)
-                    ? labProp.GetString() ?? "" : "";
-
-                yield return new ActionRow(
-                    DateTimeOffset.Parse(ts, CultureInfo.InvariantCulture),
-                    camera, label, action);
-            }
+            if (TryParseNdjsonLine(line, out var row))
+                yield return row;
         }
     }
+
+    /// <summary>
+    /// Parses a single FrigateRelay NDJSON log line into an <see cref="ActionRow"/>. Returns
+    /// <see langword="false"/> (skipping the line) for blanks, non-JSON, non-DryRun messages, or
+    /// records missing a timestamp. The row's strings are copied out before the backing
+    /// <see cref="JsonDocument"/> is disposed, so it is safe to return.
+    /// </summary>
+    private static bool TryParseNdjsonLine(string line, out ActionRow row)
+    {
+        row = default!;
+        if (string.IsNullOrWhiteSpace(line)) return false;
+
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(line); }
+        catch (JsonException) { return false; }
+
+        using (doc)
+        {
+            // @mt is the message template; @i is a hex Murmur3 hash (NOT the action name).
+            // Discriminate on whether @mt begins with the known plugin DryRun prefix.
+            var mt = GetStringOrNull(doc.RootElement, "@mt") ?? "";
+            var action = mt switch
+            {
+                _ when mt.StartsWith("BlueIris DryRun", StringComparison.Ordinal) => "BlueIris",
+                _ when mt.StartsWith("Pushover DryRun", StringComparison.Ordinal) => "Pushover",
+                _ => null
+            };
+            if (action is null) return false;
+
+            // Skip (do not throw) on a missing/non-string/unparseable timestamp — one malformed
+            // log line must not abort the whole reconciliation (CodeRabbit PR #90).
+            var ts = GetStringOrNull(doc.RootElement, "@t");
+            if (ts is null ||
+                !DateTimeOffset.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var timestamp))
+            {
+                return false;
+            }
+
+            var camera = GetStringOrNull(doc.RootElement, "Camera") ?? "";
+            var label = GetStringOrNull(doc.RootElement, "Label") ?? "";
+
+            row = new ActionRow(timestamp, camera, label, action);
+            return true;
+        }
+    }
+
+    // Returns a property's string value, or null when the property is absent or is not a JSON
+    // string. JsonElement.GetString() throws on non-string kinds, so guarding on ValueKind keeps
+    // odd-but-valid NDJSON lines skippable rather than fatal (CodeRabbit PR #90).
+    private static string? GetStringOrNull(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
+            ? prop.GetString()
+            : null;
 
     public static IEnumerable<ActionRow> ReadLegacyCsv(string path)
     {

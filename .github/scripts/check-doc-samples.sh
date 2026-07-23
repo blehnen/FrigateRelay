@@ -18,6 +18,8 @@ DOC=${DOC:-docs/plugin-author-guide.md}
 SAMPLES_DIR=${SAMPLES_DIR:-samples/FrigateRelay.Samples.PluginGuide}
 
 if [[ ! -f "$DOC" ]]; then
+    # NOTE: GitHub Actions ::error:: workflow commands must go to stdout to be rendered as
+    # annotations — do NOT redirect to stderr (Sonar S7677 is a false positive here).
     echo "::error::Doc file not found: $DOC"
     exit 1
 fi

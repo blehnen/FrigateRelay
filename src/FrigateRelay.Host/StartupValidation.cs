@@ -45,67 +45,33 @@ internal static class StartupValidation
     {
         const string allowedDesc = "only [A-Za-z0-9_. -] are permitted (CRLF, control chars, slashes, colons, and at-signs are rejected).";
 
-        // Subscription names.
-        foreach (var sub in options.Subscriptions)
-        {
-            if (!string.IsNullOrEmpty(sub.Name) && (string.IsNullOrWhiteSpace(sub.Name) || !NameAllowlist.IsMatch(sub.Name)))
-                errors.Add($"Subscription name '{Sanitize(sub.Name)}' is invalid; {allowedDesc}");
-        }
+        // Every action entry referenced anywhere — subscriptions first, then profiles — so the
+        // plugin- and validator-name checks preserve the original per-source ordering.
+        var actionEntries = options.Subscriptions.SelectMany(s => s.Actions)
+            .Concat(options.Profiles.Values.SelectMany(p => p.Actions))
+            .ToList();
 
-        // Profile keys.
+        // Validate every operator-controlled name through one shared helper (D1 allowlist +
+        // D7 collect-all). Flattening the six original nested loops keeps complexity low.
+        foreach (var sub in options.Subscriptions)
+            ValidateName(sub.Name, "Subscription name", allowedDesc, errors);
         foreach (var key in options.Profiles.Keys)
-        {
-            if (!string.IsNullOrEmpty(key) && (string.IsNullOrWhiteSpace(key) || !NameAllowlist.IsMatch(key)))
-                errors.Add($"Profile name '{Sanitize(key)}' is invalid; {allowedDesc}");
-        }
+            ValidateName(key, "Profile name", allowedDesc, errors);
+        foreach (var entry in actionEntries)
+            ValidateName(entry.Plugin, "Plugin name", allowedDesc, errors);
+        foreach (var validatorKey in actionEntries.SelectMany(e => e.Validators ?? Enumerable.Empty<string>()))
+            ValidateName(validatorKey, "Validator name", allowedDesc, errors);
+    }
 
-        // Plugin names referenced in subscriptions.
-        foreach (var sub in options.Subscriptions)
-        {
-            foreach (var entry in sub.Actions)
-            {
-                if (!string.IsNullOrEmpty(entry.Plugin) && (string.IsNullOrWhiteSpace(entry.Plugin) || !NameAllowlist.IsMatch(entry.Plugin)))
-                    errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
-            }
-        }
-
-        // Plugin names referenced in profiles.
-        foreach (var profile in options.Profiles.Values)
-        {
-            foreach (var entry in profile.Actions)
-            {
-                if (!string.IsNullOrEmpty(entry.Plugin) && (string.IsNullOrWhiteSpace(entry.Plugin) || !NameAllowlist.IsMatch(entry.Plugin)))
-                    errors.Add($"Plugin name '{Sanitize(entry.Plugin)}' is invalid; {allowedDesc}");
-            }
-        }
-
-        // Validator instance keys in subscriptions.
-        foreach (var sub in options.Subscriptions)
-        {
-            foreach (var entry in sub.Actions)
-            {
-                if (entry.Validators is null) continue;
-                foreach (var validatorKey in entry.Validators)
-                {
-                    if (!string.IsNullOrEmpty(validatorKey) && (string.IsNullOrWhiteSpace(validatorKey) || !NameAllowlist.IsMatch(validatorKey)))
-                        errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
-                }
-            }
-        }
-
-        // Validator instance keys in profiles.
-        foreach (var profile in options.Profiles.Values)
-        {
-            foreach (var entry in profile.Actions)
-            {
-                if (entry.Validators is null) continue;
-                foreach (var validatorKey in entry.Validators)
-                {
-                    if (!string.IsNullOrEmpty(validatorKey) && (string.IsNullOrWhiteSpace(validatorKey) || !NameAllowlist.IsMatch(validatorKey)))
-                        errors.Add($"Validator name '{Sanitize(validatorKey)}' is invalid; {allowedDesc}");
-                }
-            }
-        }
+    /// <summary>
+    /// Adds a D1 allowlist violation for a single operator-controlled name to
+    /// <paramref name="errors"/>. Empty/absent names are skipped (they are validated elsewhere);
+    /// whitespace-only or off-allowlist names are rejected.
+    /// </summary>
+    private static void ValidateName(string? value, string category, string allowedDesc, List<string> errors)
+    {
+        if (!string.IsNullOrEmpty(value) && (string.IsNullOrWhiteSpace(value) || !NameAllowlist.IsMatch(value)))
+            errors.Add($"{category} '{Sanitize(value)}' is invalid; {allowedDesc}");
     }
 
     /// <summary>
@@ -254,15 +220,12 @@ internal static class StartupValidation
 
         foreach (var sub in subscriptions)
         {
-            foreach (var entry in sub.Actions)
+            foreach (var entry in sub.Actions.Where(e => !registeredNames.Contains(e.Plugin)))
             {
-                if (!registeredNames.Contains(entry.Plugin))
-                {
-                    errors.Add(
-                        $"Subscription '{Sanitize(sub.Name)}' references unknown action plugin '{Sanitize(entry.Plugin)}'. " +
-                        $"Registered plugins: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}]. " +
-                        $"Either register the plugin or remove the reference from appsettings.");
-                }
+                errors.Add(
+                    $"Subscription '{Sanitize(sub.Name)}' references unknown action plugin '{Sanitize(entry.Plugin)}'. " +
+                    $"Registered plugins: [{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}]. " +
+                    $"Either register the plugin or remove the reference from appsettings.");
             }
         }
     }
@@ -300,15 +263,13 @@ internal static class StartupValidation
                     $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}].");
             }
 
-            foreach (var entry in sub.Actions)
+            foreach (var entry in sub.Actions.Where(e =>
+                !string.IsNullOrEmpty(e.SnapshotProvider) && !registeredNames.Contains(e.SnapshotProvider)))
             {
-                if (!string.IsNullOrEmpty(entry.SnapshotProvider) && !registeredNames.Contains(entry.SnapshotProvider))
-                {
-                    errors.Add(
-                        $"Subscription '{Sanitize(sub.Name)}' action '{Sanitize(entry.Plugin)}' references unknown snapshot provider " +
-                        $"'{Sanitize(entry.SnapshotProvider)}'. Registered providers: " +
-                        $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}].");
-                }
+                errors.Add(
+                    $"Subscription '{Sanitize(sub.Name)}' action '{Sanitize(entry.Plugin)}' references unknown snapshot provider " +
+                    $"'{Sanitize(entry.SnapshotProvider)}'. Registered providers: " +
+                    $"[{string.Join(", ", registeredNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Select(Sanitize))}].");
             }
         }
     }

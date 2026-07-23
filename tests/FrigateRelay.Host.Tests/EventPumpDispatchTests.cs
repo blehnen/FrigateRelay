@@ -42,6 +42,9 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
+
+        // Exactly one enqueue total — guards against duplicate dispatch of the single action.
+        EnqueueCallCount(dispatcher).Should().Be(1);
     }
 
     [TestMethod]
@@ -71,6 +74,9 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
+
+        // Exactly one enqueue total — proves the second (deduped) event never dispatched.
+        EnqueueCallCount(dispatcher).Should().Be(1);
     }
 
     [TestMethod]
@@ -110,9 +116,17 @@ public sealed class EventPumpDispatchTests
             Arg.Any<string?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
+
+        // Exactly two enqueues total — one per action, no more.
+        EnqueueCallCount(dispatcher).Should().Be(2);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /// <summary>Counts the <see cref="IActionDispatcher.EnqueueAsync"/> calls recorded on a substitute.</summary>
+    private static int EnqueueCallCount(IActionDispatcher dispatcher) =>
+        dispatcher.ReceivedCalls()
+            .Count(c => c.GetMethodInfo().Name == nameof(IActionDispatcher.EnqueueAsync));
 
     private static EventContext MakeContext(string eventId) => new()
     {

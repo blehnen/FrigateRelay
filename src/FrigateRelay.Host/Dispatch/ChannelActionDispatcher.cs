@@ -128,8 +128,8 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         // Cancel the internal stopping CTS first so any in-flight ValidateAsync /
         // ExecuteAsync that respects cancellation (HttpClient calls, Task.Delay) is
         // interrupted promptly. This is the signal the consumer-loop's outer
-        // `catch (OperationCanceledException) when (ct.IsCancellationRequested)`
-        // handler relies on for graceful unwinding (CONTEXT-9 D4 / ID-6 fix).
+        // cancellation handler (the OperationCanceledException-when-token-cancelled
+        // filter) relies on for graceful unwinding (CONTEXT-9 D4 / ID-6 fix).
         // IHostedService.StopAsync receives the host's drain-window token, NOT a
         // signal to cancel internal work, so we must trigger _stoppingCts manually.
         await _stoppingCts.CancelAsync().ConfigureAwait(false);
@@ -192,117 +192,128 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
         {
             await foreach (var item in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-            // action.<name>.execute span — consumer-side, parented to the producer's ActivityContext
-            // captured across the Channel<T> boundary (PLAN-2.1 Task 2 / CONTEXT-9 D1).
-            var spanName = $"action.{plugin.Name.ToLowerInvariant()}.execute";
-            using var actionActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
-                spanName,
-                ActivityKind.Consumer,
-                parentContext: item.ParentContext);
-
-            actionActivity?.SetTag("event.id", item.Context.EventId);
-            actionActivity?.SetTag("action", plugin.Name);
-            actionActivity?.SetTag("subscription", item.Subscription);
-
-            try
-            {
-                // Build the initial resolver-backed SnapshotContext from per-action /
-                // per-subscription tiers carried on the DispatchItem.
-                // NOTE: ChannelActionDispatcher's field is `_snapshotResolver`;
-                // SnapshotContext's own backing field is `_resolver` — different files,
-                // do not confuse the two.
-                var initial = _snapshotResolver is null
-                    ? default
-                    : new SnapshotContext(_snapshotResolver, item.PerActionSnapshotProvider, item.SubscriptionSnapshotProvider);
-
-                // Pre-resolve ONCE when validators are present so the validator chain
-                // and the action observe the SAME SnapshotResult (RESEARCH §5).
-                // No validators → action plugin resolves lazily on its own; no fetch
-                // for BlueIris-only subscriptions that don't read the snapshot at all.
-                SnapshotContext shared;
-                if (item.Validators.Count > 0)
-                {
-                    var preResolved = await initial.ResolveAsync(item.Context, ct).ConfigureAwait(false);
-                    shared = new SnapshotContext(preResolved);
-
-                    // Validator chain — runs ABOVE the action's Polly retry pipeline (CONTEXT-7 D11).
-                    // A failing verdict short-circuits THIS action only; the consumer continues to
-                    // the next DispatchItem. Other actions in the same event proceed independently
-                    // because each is its own DispatchItem (CONTEXT-7 D6 / PROJECT.md V3).
-                    bool anyRejected;
-                    if (item.ParallelValidators)
-                    {
-                        // Parallel path (CONTEXT-14 D6): all validators run concurrently via Task.WhenAll.
-                        // No first-reject short-circuit — every validator runs to completion.
-                        // OperationCanceledException from host shutdown propagates out of Task.WhenAll
-                        // and up to the outer catch (OperationCanceledException) block at line ~261.
-                        anyRejected = await RunValidatorsInParallelAsync(item, plugin, shared, ct).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        // Sequential path (original behavior, back-compat invariant):
-                        // first-reject short-circuits THIS action only (PROJECT.md V3).
-                        anyRejected = await RunValidatorsSequentiallyAsync(item, plugin, shared, ct).ConfigureAwait(false);
-                    }
-
-                    if (anyRejected)
-                    {
-                        actionActivity?.SetTag("outcome", "validator_rejected");
-                        actionActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
-                        goto NextItem;
-                    }
-                }
-                else
-                {
-                    shared = initial;
-                }
-
-                // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
-                // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
-                await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
-                actionActivity?.SetTag("outcome", "success");
-                actionActivity?.SetStatus(ActivityStatusCode.Ok);
-                DispatcherDiagnostics.IncrementActionsSucceeded(
-                    _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
-                    item.Subscription,
-                    item.Plugin.Name);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                // Graceful shutdown — not an error (CONTEXT-9 D4 / ID-6 fix).
-                // Do NOT log, do NOT increment a failure counter.
-                actionActivity?.SetStatus(ActivityStatusCode.Unset);
-                return;
-            }
-            catch (Exception ex)
-            {
-                var normalizedCamera = _metricsTagWriter.NormalizeCameraTag(item.Context.Camera);
-                DispatcherDiagnostics.IncrementExhausted(
-                    normalizedCamera,
-                    item.Subscription,
-                    item.Plugin.Name);
-                DispatcherDiagnostics.IncrementActionsFailed(
-                    normalizedCamera,
-                    item.Subscription,
-                    item.Plugin.Name);
-
-                LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
-                actionActivity?.SetTag("outcome", "failure");
-                actionActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
-                // Do NOT rethrow — a poison item must not kill the consumer task.
-            }
-            NextItem:;
+                await ProcessItemAsync(plugin, item, ct).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // Graceful shutdown — the consumer's CT was cancelled either while ReadAllAsync was
-            // awaiting the next item OR during in-flight validator/action work that didn't reach
-            // the inner try/catch. Either way, exit cleanly without logging or counter-incrementing
-            // (matches the inner-catch behavior at the foreach-body try block — same intent,
-            // just at the loop scope so cancellation between items also unwinds gracefully).
+            // awaiting the next item OR during in-flight validator/action work (rethrown from
+            // ProcessItemAsync). Either way, exit cleanly without logging or counter-incrementing
+            // (CONTEXT-9 D4 / ID-6 fix).
         }
     }
+
+    /// <summary>
+    /// Processes a single dequeued <see cref="DispatchItem"/>: opens the consumer-side action span,
+    /// pre-resolves the shared snapshot when validators are present, runs the validator chain
+    /// (short-circuiting THIS action on rejection), then executes the plugin under its Polly
+    /// pipeline. A poison item is swallowed (logged + counted) so it cannot kill the consumer task;
+    /// a host-shutdown cancellation is rethrown so <see cref="ConsumeAsync"/> unwinds gracefully.
+    /// </summary>
+    private async Task ProcessItemAsync(IActionPlugin plugin, DispatchItem item, CancellationToken ct)
+    {
+        // action.<name>.execute span — consumer-side, parented to the producer's ActivityContext
+        // captured across the Channel<T> boundary (PLAN-2.1 Task 2 / CONTEXT-9 D1).
+        var spanName = $"action.{plugin.Name.ToLowerInvariant()}.execute";
+        using var actionActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+            spanName,
+            ActivityKind.Consumer,
+            parentContext: item.ParentContext);
+
+        actionActivity?.SetTag("event.id", item.Context.EventId);
+        actionActivity?.SetTag("action", plugin.Name);
+        actionActivity?.SetTag("subscription", item.Subscription);
+
+        try
+        {
+            // Build the initial resolver-backed SnapshotContext from per-action /
+            // per-subscription tiers carried on the DispatchItem.
+            // NOTE: this dispatcher stores the resolver in a field named
+            // snapshotResolver, whereas SnapshotContext's own backing field is
+            // named resolver — different files, do not confuse the two.
+            var initial = _snapshotResolver is null
+                ? default
+                : new SnapshotContext(_snapshotResolver, item.PerActionSnapshotProvider, item.SubscriptionSnapshotProvider);
+
+            // Pre-resolve ONCE when validators are present so the validator chain
+            // and the action observe the SAME SnapshotResult (RESEARCH §5).
+            // No validators → action plugin resolves lazily on its own; no fetch
+            // for BlueIris-only subscriptions that don't read the snapshot at all.
+            SnapshotContext shared;
+            if (item.Validators.Count > 0)
+            {
+                var preResolved = await initial.ResolveAsync(item.Context, ct).ConfigureAwait(false);
+                shared = new SnapshotContext(preResolved);
+
+                // Validator chain — runs ABOVE the action's Polly retry pipeline (CONTEXT-7 D11).
+                // A failing verdict short-circuits THIS action only; the consumer continues to
+                // the next DispatchItem. Other actions in the same event proceed independently
+                // because each is its own DispatchItem (CONTEXT-7 D6 / PROJECT.md V3).
+                if (await RunValidatorsAsync(item, plugin, shared, ct).ConfigureAwait(false))
+                {
+                    actionActivity?.SetTag("outcome", "validator_rejected");
+                    actionActivity?.SetStatus(ActivityStatusCode.Ok, "ValidatorRejected");
+                    return; // this action does not execute; ConsumeAsync moves to the next item.
+                }
+            }
+            else
+            {
+                shared = initial;
+            }
+
+            // BlueIrisActionPlugin's HttpClient wears the 3/6/9s Polly pipeline (PLAN-2.2).
+            // If all retries fail, ExecuteAsync rethrows the last exception; caught below.
+            await plugin.ExecuteAsync(item.Context, shared, ct).ConfigureAwait(false);
+            actionActivity?.SetTag("outcome", "success");
+            actionActivity?.SetStatus(ActivityStatusCode.Ok);
+            DispatcherDiagnostics.IncrementActionsSucceeded(
+                _metricsTagWriter.NormalizeCameraTag(item.Context.Camera),
+                item.Subscription,
+                item.Plugin.Name);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Graceful shutdown — not an error (CONTEXT-9 D4 / ID-6 fix). Do NOT log, do NOT
+            // increment a failure counter. Rethrow so ConsumeAsync's outer handler stops the
+            // consumer task instead of dequeuing the next item.
+            actionActivity?.SetStatus(ActivityStatusCode.Unset);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var normalizedCamera = _metricsTagWriter.NormalizeCameraTag(item.Context.Camera);
+            DispatcherDiagnostics.IncrementExhausted(
+                normalizedCamera,
+                item.Subscription,
+                item.Plugin.Name);
+            DispatcherDiagnostics.IncrementActionsFailed(
+                normalizedCamera,
+                item.Subscription,
+                item.Plugin.Name);
+
+            LogRetryExhausted(_logger, item.Context.EventId, plugin.Name, ex);
+            actionActivity?.SetTag("outcome", "failure");
+            actionActivity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
+            // Do NOT rethrow — a poison item must not kill the consumer task.
+        }
+    }
+
+    /// <summary>
+    /// Runs the validator chain for <paramref name="item"/> against the pre-resolved
+    /// <paramref name="shared"/> snapshot, dispatching to the parallel or sequential strategy.
+    /// Returns <see langword="true"/> if any validator rejected (the action must not execute).
+    /// </summary>
+    private Task<bool> RunValidatorsAsync(
+        DispatchItem item, IActionPlugin plugin, SnapshotContext shared, CancellationToken ct) =>
+        item.ParallelValidators
+            // Parallel path (CONTEXT-14 D6): all validators run concurrently via Task.WhenAll with
+            // strict-AND aggregation — no first-reject short-circuit. A host-shutdown cancellation
+            // propagates out of Task.WhenAll to the caller's graceful-shutdown handler.
+            ? RunValidatorsInParallelAsync(item, plugin, shared, ct)
+            // Sequential path (original behavior, back-compat invariant):
+            // first-reject short-circuits THIS action only (PROJECT.md V3).
+            : RunValidatorsSequentiallyAsync(item, plugin, shared, ct);
 
     /// <summary>
     /// Runs each validator in <paramref name="item"/> sequentially, short-circuiting on the first

@@ -23,10 +23,12 @@ public sealed partial class ExampleActionPlugin : IActionPlugin
 
     public Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
     {
-        LogEventReceived(_logger, ctx.EventId, ctx.Camera);
+        // Demonstrates consuming bound configuration: replace _options.Greeting with your
+        // plugin's own settings, and this ExecuteAsync body with its real behavior.
+        LogEventReceived(_logger, _options.Greeting, ctx.EventId, ctx.Camera);
         return Task.CompletedTask;
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Example plugin received event {EventId} for camera {Camera}")]
-    private static partial void LogEventReceived(ILogger logger, string eventId, string camera);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Example plugin ({Greeting}) received event {EventId} for camera {Camera}")]
+    private static partial void LogEventReceived(ILogger logger, string greeting, string eventId, string camera);
 }

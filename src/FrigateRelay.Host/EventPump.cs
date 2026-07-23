@@ -113,53 +113,7 @@ internal sealed class EventPump : BackgroundService
                 }
 
                 foreach (var sub in matches)
-                {
-                    if (!_dedupe.TryEnter(sub, context)) continue;
-                    LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
-
-                    DispatcherDiagnostics.IncrementEventsMatched(
-                        _metricsTagWriter.NormalizeCameraTag(context.Camera), context.Label, sub.Name);
-
-                    // Apply per-subscription EventContext augmentations before dispatch (#32).
-                    // Today only CameraShortName; future host-managed per-subscription overrides
-                    // would plug in here. The source-agnostic invariant on EventContext stays
-                    // intact because the originating source never set this field — only the
-                    // host's matcher does, after the source has handed off the event.
-                    var dispatchContext = sub.CameraShortName is { } shortName
-                        ? context with { CameraShortName = shortName }
-                        : context;
-
-                    // dispatch.enqueue span — wraps per-subscription action enqueue loop (PLAN-2.1 Task 1).
-                    using (var enqueueActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
-                        "dispatch.enqueue", ActivityKind.Producer))
-                    {
-                        enqueueActivity?.SetTag("event.id", context.EventId);
-                        enqueueActivity?.SetTag("subscription", sub.Name);
-                        enqueueActivity?.SetTag("action_count", sub.Actions.Count);
-
-                        foreach (var entry in sub.Actions)
-                        {
-                            // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
-                            // against registered plugins at startup. An IndexerKeyNotFoundException here
-                            // indicates a startup-validation bug — throw rather than silently drop.
-                            var plugin = _actionsByName[entry.Plugin];
-
-                            // Resolve per-action validator instances by key (CONTEXT-7 D2 / RESEARCH §2).
-                            // Treat null and empty Validators identically (PLAN-1.2 contract). Resolution is
-                            // safe at this point because StartupValidation.ValidateValidators ran in
-                            // HostBootstrap.ValidateStartup and confirmed every key resolves.
-                            IReadOnlyList<IValidationPlugin> validators = entry.Validators is { Count: > 0 } keys
-                                ? keys.Select(k => _services.GetRequiredKeyedService<IValidationPlugin>(k)).ToArray()
-                                : Array.Empty<IValidationPlugin>();
-
-                            await _dispatcher.EnqueueAsync(
-                                dispatchContext, plugin, validators,
-                                sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider,
-                                parallelValidators: entry.ParallelValidators, ct).ConfigureAwait(false);
-                            LogDispatchEnqueued(_logger, plugin.Name, sub.Name, dispatchContext.EventId, null);
-                        }
-                    }
-                }
+                    await DispatchMatchedSubscriptionAsync(source, sub, context, ct).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -174,6 +128,60 @@ internal sealed class EventPump : BackgroundService
         finally
         {
             LogPumpStopped(_logger, source.Name, null);
+        }
+    }
+
+    /// <summary>
+    /// Handles one matched (subscription, event) pair: applies dedupe, records the match, applies
+    /// per-subscription <see cref="EventContext"/> augmentations, then enqueues every configured
+    /// action to the dispatcher under a <c>dispatch.enqueue</c> span. Returns early (the caller's
+    /// loop moves to the next match) when the dedupe cache rejects the event.
+    /// </summary>
+    private async Task DispatchMatchedSubscriptionAsync(
+        IEventSource source, SubscriptionOptions sub, EventContext context, CancellationToken ct)
+    {
+        if (!_dedupe.TryEnter(sub, context)) return;
+        LogMatchedEvent(_logger, source.Name, sub.Name, context.Camera, context.Label, context.EventId, null);
+
+        DispatcherDiagnostics.IncrementEventsMatched(
+            _metricsTagWriter.NormalizeCameraTag(context.Camera), context.Label, sub.Name);
+
+        // Apply per-subscription EventContext augmentations before dispatch (#32).
+        // Today only CameraShortName; future host-managed per-subscription overrides
+        // would plug in here. The source-agnostic invariant on EventContext stays
+        // intact because the originating source never set this field — only the
+        // host's matcher does, after the source has handed off the event.
+        var dispatchContext = sub.CameraShortName is { } shortName
+            ? context with { CameraShortName = shortName }
+            : context;
+
+        // dispatch.enqueue span — wraps per-subscription action enqueue loop (PLAN-2.1 Task 1).
+        using var enqueueActivity = DispatcherDiagnostics.ActivitySource.StartActivity(
+            "dispatch.enqueue", ActivityKind.Producer);
+        enqueueActivity?.SetTag("event.id", context.EventId);
+        enqueueActivity?.SetTag("subscription", sub.Name);
+        enqueueActivity?.SetTag("action_count", sub.Actions.Count);
+
+        foreach (var entry in sub.Actions)
+        {
+            // Lookup is guaranteed to succeed: Program.cs validated all sub.Actions
+            // against registered plugins at startup. An IndexerKeyNotFoundException here
+            // indicates a startup-validation bug — throw rather than silently drop.
+            var plugin = _actionsByName[entry.Plugin];
+
+            // Resolve per-action validator instances by key (CONTEXT-7 D2 / RESEARCH §2).
+            // Treat null and empty Validators identically (PLAN-1.2 contract). Resolution is
+            // safe at this point because StartupValidation.ValidateValidators ran in
+            // HostBootstrap.ValidateStartup and confirmed every key resolves.
+            IReadOnlyList<IValidationPlugin> validators = entry.Validators is { Count: > 0 } keys
+                ? keys.Select(k => _services.GetRequiredKeyedService<IValidationPlugin>(k)).ToArray()
+                : Array.Empty<IValidationPlugin>();
+
+            await _dispatcher.EnqueueAsync(
+                dispatchContext, plugin, validators,
+                sub.Name, entry.SnapshotProvider, sub.DefaultSnapshotProvider,
+                parallelValidators: entry.ParallelValidators, ct).ConfigureAwait(false);
+            LogDispatchEnqueued(_logger, plugin.Name, sub.Name, dispatchContext.EventId, null);
         }
     }
 }
