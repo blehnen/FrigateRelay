@@ -12,14 +12,15 @@
   <ItemGroup>
     <!--
       Transitive security pin (test projects only).
-      WireMock.Net -> WireMock.Net.Minimal -> Scriban.Signed 7.2.0 carries a
-      parser-recursion DoS: GHSA-6q7j-xr26-3h2c / GHSA-q6rr-fm2g-g5x8
-      (affected >= 6.6.0, <= 7.2.0). 7.2.1 is the patched release. A direct
-      PackageReference overrides the transitive 7.2.0 and clears the NU1902
-      audit error that fails the warnings-as-errors build. Remove this pin once
-      WireMock.Net ships a build that references Scriban.Signed >= 7.2.1.
+      On a clean restore WireMock.Net -> WireMock.Net.Minimal still resolves the
+      transitive Scriban.Signed to a vulnerable 7.2.x (GHSA-6q7j-xr26-3h2c /
+      GHSA-q6rr-fm2g-g5x8; affected >= 6.6.0, <= 7.2.0). A direct PackageReference
+      forces the patched 7.2.5 (>= WireMock 2.13's floor, so no NU1605 downgrade)
+      and clears the NU1902 audit error under warnings-as-errors. Remove this pin
+      only once a WireMock.Net release resolves Scriban.Signed >= 7.2.1 on a clean
+      restore (verified in CI, not just a warm local cache).
     -->
-    <PackageReference Include="Scriban.Signed" Version="7.2.1" />
+    <PackageReference Include="Scriban.Signed" Version="7.2.5" />
   </ItemGroup>
 
 </Project>
