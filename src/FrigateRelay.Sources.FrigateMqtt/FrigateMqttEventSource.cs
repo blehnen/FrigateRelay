@@ -74,6 +74,11 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
     private int _started;
     private int _disposed;
 
+    // Subscription health is tracked separately from TCP connectivity: a SUBACK denial (#16)
+    // leaves the socket connected but with no granted topic, so the reconnect loop must be able
+    // to re-subscribe without waiting for the TCP link to drop (CodeRabbit review, PR #90).
+    private bool _subscriptionHealthy;
+
     /// <summary>Creates the event source with the supplied client, factory, options, logger, and connection-status tracker.</summary>
     public FrigateMqttEventSource(
         IMqttClient client,
@@ -122,31 +127,7 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
         {
             try
             {
-                // #19: short-circuit when already connected. Without this guard, a healthy
-                // connection still fired a TryPingAsync every 5s — and during slow CONNACK,
-                // a second ConnectAsync could race against the in-flight one and throw
-                // InvalidOperationException("Not allowed to connect while connect/disconnect
-                // is pending."). IsConnected first means we don't even ping when healthy.
-                if (!_client.IsConnected && !await _client.TryPingAsync(ct).ConfigureAwait(false))
-                {
-                    await _client.ConnectAsync(clientOptions, ct).ConfigureAwait(false);
-                    var subscribeResult = await _client.SubscribeAsync(subOptions, ct).ConfigureAwait(false);
-
-                    // #16: MQTTnet's SubscribeAsync does NOT throw when the broker returns
-                    // SUBACK with a failure reason code (e.g. ACL-denied SUBSCRIBE). Inspect
-                    // the per-topic result codes; if no topic was granted, treat the
-                    // connection as unhealthy so /healthz returns 503 and the reconnect
-                    // loop retries. Per-denial diagnostics are logged inside the helper.
-                    if (ProcessSubscribeResult(subscribeResult))
-                    {
-                        _connectionStatus.SetConnected(true);
-                        LogMqttConnected(_logger, null);
-                    }
-                    else
-                    {
-                        _connectionStatus.SetConnected(false);
-                    }
-                }
+                await EnsureConnectedAsync(clientOptions, subOptions, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -176,6 +157,40 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// Ensures both the TCP link AND the topic subscription are healthy. Short-circuits (no ping,
+    /// no connect, no subscribe) only when the client is connected and the last subscribe was
+    /// granted — issue #19. Reconnects the TCP link when it is down, then (re)subscribes whenever
+    /// the subscription is not confirmed healthy, so a SUBACK denial recovers without waiting for
+    /// the socket to drop — issue #16 / CodeRabbit PR #90.
+    /// </summary>
+    private async Task EnsureConnectedAsync(
+        MqttClientOptions clientOptions, MqttClientSubscribeOptions subOptions, CancellationToken ct)
+    {
+        // #19: fully healthy (connected AND subscribed) — do nothing. Checking this first means we
+        // don't even ping on the happy path, avoiding a redundant ConnectAsync race during slow
+        // CONNACK. Subscription health is tracked separately so a topic denial does not get stuck
+        // here just because the socket is still up.
+        if (_client.IsConnected && _subscriptionHealthy)
+            return;
+
+        // (Re)establish the TCP link only when it is actually down (and a ping doesn't prove it is
+        // still alive). A subscription-only failure — socket up, topic denied — skips this and
+        // falls straight through to the re-subscribe below.
+        if (!_client.IsConnected && !await _client.TryPingAsync(ct).ConfigureAwait(false))
+            await _client.ConnectAsync(clientOptions, ct).ConfigureAwait(false);
+
+        // #16: MQTTnet's SubscribeAsync does NOT throw when the broker returns a SUBACK failure
+        // reason code such as an ACL-denied subscribe. Inspect the per-topic result codes; if no
+        // topic was granted, mark the connection unhealthy so /healthz returns 503 and the next
+        // loop iteration retries the subscribe. Per-denial diagnostics are logged in the helper.
+        var subscribeResult = await _client.SubscribeAsync(subOptions, ct).ConfigureAwait(false);
+        _subscriptionHealthy = ProcessSubscribeResult(subscribeResult);
+        _connectionStatus.SetConnected(_subscriptionHealthy);
+        if (_subscriptionHealthy)
+            LogMqttConnected(_logger, null);
     }
 
     /// <summary>
@@ -281,10 +296,10 @@ public sealed class FrigateMqttEventSource : IEventSource, IAsyncDisposable
                 if (_reconnectTask is { } t)
                     await t.ConfigureAwait(false);
             }
-            catch (OperationCanceledException) { }
-            catch (ObjectDisposedException) { }
+            catch (OperationCanceledException) { /* expected: reconnect loop cancelled during shutdown */ }
+            catch (ObjectDisposedException) { /* linked source already torn down by host shutdown */ }
 
-            try { cts.Dispose(); } catch (ObjectDisposedException) { }
+            try { cts.Dispose(); } catch (ObjectDisposedException) { /* already disposed — Dispose is idempotent */ }
         }
 
         _channel.Writer.TryComplete();

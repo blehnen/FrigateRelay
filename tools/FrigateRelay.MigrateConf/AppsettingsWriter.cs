@@ -89,7 +89,13 @@ internal static class AppsettingsWriter
         => section?.Entries.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value ?? "";
 
     private static string AppendCameraToken(string baseUrl)
-        => string.IsNullOrEmpty(baseUrl) ? "" : (baseUrl.EndsWith('/') ? baseUrl + "{camera}" : baseUrl + "/{camera}");
+    {
+        if (string.IsNullOrEmpty(baseUrl))
+            return "";
+
+        var separator = baseUrl.EndsWith('/') ? "" : "/";
+        return baseUrl + separator + "{camera}";
+    }
 
     private static string Esc(string s)
         => JsonSerializer.Serialize(s)[1..^1];

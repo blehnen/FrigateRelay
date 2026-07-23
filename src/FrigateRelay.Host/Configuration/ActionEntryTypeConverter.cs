@@ -33,9 +33,10 @@ internal sealed class ActionEntryTypeConverter : TypeConverter
     {
         // Note: string shorthand "BlueIris" → ActionEntry("BlueIris"); ParallelValidators defaults to false.
         // No change needed here when ActionEntry gains new optional fields — default values handle back-compat.
-        // Object-form entries ({"Plugin":"X","ParallelValidators":true}) are NOT routed through this converter;
-        // IConfiguration.Bind maps them property-by-property via reflection (see ActionEntryJsonConverter for
-        // the JSON path — the two converters operate on disjoint code paths).
+        // Object-form entries — those with an explicit Plugin/ParallelValidators shape — are NOT
+        // routed through this converter; IConfiguration.Bind maps them property-by-property via
+        // reflection (see ActionEntryJsonConverter for the JSON path — the two converters operate
+        // on disjoint code paths).
         if (value is string s)
         {
             // #14: reject empty/whitespace names at the converter boundary.

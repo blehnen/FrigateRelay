@@ -56,7 +56,7 @@ Log.RunningValidator(logger, validationPlugin.Name, "person");
 var pass = await validationPlugin.ValidateAsync(ctx, default, CancellationToken.None).ConfigureAwait(false);
 if (!pass.Passed)
 {
-    Console.Error.WriteLine($"ERROR: validator expected Pass for label=person but got Fail({pass.Reason})");
+    await Console.Error.WriteLineAsync($"ERROR: validator expected Pass for label=person but got Fail({pass.Reason})");
     return 1;
 }
 
@@ -66,7 +66,7 @@ Log.RunningValidator(logger, validationPlugin.Name, "car");
 var fail = await validationPlugin.ValidateAsync(carCtx, default, CancellationToken.None).ConfigureAwait(false);
 if (fail.Passed)
 {
-    Console.Error.WriteLine("ERROR: validator expected Fail for label=car but got Pass");
+    await Console.Error.WriteLineAsync("ERROR: validator expected Fail for label=car but got Pass");
     return 1;
 }
 
@@ -77,33 +77,36 @@ var request = new SnapshotRequest { Context = ctx };
 var snapshot = await snapshotProvider.FetchAsync(request, CancellationToken.None).ConfigureAwait(false);
 if (snapshot is null)
 {
-    Console.Error.WriteLine("ERROR: snapshot provider returned null but was expected to return a stub result");
+    await Console.Error.WriteLineAsync("ERROR: snapshot provider returned null but was expected to return a stub result");
     return 1;
 }
 
 Log.AllSucceeded(logger, snapshot.Bytes.Length);
 return 0;
 
-/// <summary>LoggerMessage delegates for the entry-point program.</summary>
-internal static partial class Log
+namespace FrigateRelay.Samples.PluginGuide
 {
-    [LoggerMessage(
-        Level = LogLevel.Information,
-        Message = "Running {Contract} '{Name}'")]
-    internal static partial void RunningPlugin(ILogger logger, string contract, string name);
+    /// <summary>LoggerMessage delegates for the entry-point program.</summary>
+    internal static partial class Log
+    {
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Running {Contract} '{Name}'")]
+        internal static partial void RunningPlugin(ILogger logger, string contract, string name);
 
-    [LoggerMessage(
-        Level = LogLevel.Information,
-        Message = "Running IValidationPlugin '{Name}' with label={Label}")]
-    internal static partial void RunningValidator(ILogger logger, string name, string label);
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Running IValidationPlugin '{Name}' with label={Label}")]
+        internal static partial void RunningValidator(ILogger logger, string name, string label);
 
-    [LoggerMessage(
-        Level = LogLevel.Information,
-        Message = "Running ISnapshotProvider '{Name}'")]
-    internal static partial void RunningProvider(ILogger logger, string name);
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Running ISnapshotProvider '{Name}'")]
+        internal static partial void RunningProvider(ILogger logger, string name);
 
-    [LoggerMessage(
-        Level = LogLevel.Information,
-        Message = "All sample plugins exercised successfully. snapshot bytes={Bytes}")]
-    internal static partial void AllSucceeded(ILogger logger, int bytes);
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "All sample plugins exercised successfully. snapshot bytes={Bytes}")]
+        internal static partial void AllSucceeded(ILogger logger, int bytes);
+    }
 }

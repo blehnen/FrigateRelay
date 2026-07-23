@@ -49,17 +49,15 @@ internal static class EventContextProjector
         var after = evt.After;
         var before = evt.Before;
 
-        if (evt.Type is "update" or "end")
+        if (evt.Type is "update" or "end"
+            && (after?.Stationary == true || after?.FalsePositive == true))
         {
-            if (after?.Stationary == true || after?.FalsePositive == true)
-            {
-                context = default!;
-                return false;
-            }
+            context = default!;
+            return false;
         }
 
         // Build zone union from all four arrays (OQ4).
-        // HashSet with OrdinalIgnoreCase deduplicates case-insensitively;
+        // The set uses OrdinalIgnoreCase so entries deduplicate case-insensitively, while
         // insertion order is preserved implicitly by iterating arrays in a fixed order.
         var zones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         AddZones(zones, before?.CurrentZones);

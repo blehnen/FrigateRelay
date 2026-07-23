@@ -28,7 +28,7 @@ internal sealed class PushoverActionPlugin : IActionPlugin
 
     public string Name => "Pushover";
 
-    public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(EventContext ctx, SnapshotContext snapshot, CancellationToken ct)
     {
         if (_options.Value.DryRun)
         {
@@ -39,7 +39,7 @@ internal sealed class PushoverActionPlugin : IActionPlugin
         var opts = _options.Value;
         var client = _httpFactory.CreateClient("Pushover");
 
-        var snapshotResult = await snapshot.ResolveAsync(ctx, cancellationToken).ConfigureAwait(false);
+        var snapshotResult = await snapshot.ResolveAsync(ctx, ct).ConfigureAwait(false);
         if (snapshotResult is null)
         {
             Log.SnapshotUnavailable(_logger, ctx.EventId);
@@ -71,18 +71,18 @@ internal sealed class PushoverActionPlugin : IActionPlugin
             Content = content,
         };
 
-        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await client.SendAsync(request, ct).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
             // Polly's retry policy already exhausted (for 5xx) or skipped (for 4xx).
-            var errorBody = await TryReadErrorBodyAsync(response, cancellationToken).ConfigureAwait(false);
+            var errorBody = await TryReadErrorBodyAsync(response, ct).ConfigureAwait(false);
             Log.SendFailed(_logger, ctx.EventId, (int)response.StatusCode, errorBody);
             response.EnsureSuccessStatusCode(); // throws HttpRequestException
         }
 
         // Pushover returns 200 even for some application-level failures — body has status=0.
-        var body = await response.Content.ReadFromJsonAsync<PushoverResponse>(cancellationToken).ConfigureAwait(false);
+        var body = await response.Content.ReadFromJsonAsync<PushoverResponse>(ct).ConfigureAwait(false);
         if (body is null || body.Status != 1)
         {
             var errors = body?.Errors is null ? "(no detail)" : string.Join(", ", body.Errors);

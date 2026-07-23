@@ -1,0 +1,25 @@
+<Project>
+
+  <!--
+    Chain to the repo-root Directory.Build.props. MSBuild's default discovery
+    imports only the NEAREST Directory.Build.props walking up from the project,
+    and stops there. Without this explicit parent import, test projects would
+    lose the root settings (TargetFramework, Nullable, TreatWarningsAsErrors,
+    LangVersion, AnalysisLevel, ...).
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <ItemGroup>
+    <!--
+      Transitive security pin (test projects only).
+      WireMock.Net -> WireMock.Net.Minimal -> Scriban.Signed 7.2.0 carries a
+      parser-recursion DoS: GHSA-6q7j-xr26-3h2c / GHSA-q6rr-fm2g-g5x8
+      (affected >= 6.6.0, <= 7.2.0). 7.2.1 is the patched release. A direct
+      PackageReference overrides the transitive 7.2.0 and clears the NU1902
+      audit error that fails the warnings-as-errors build. Remove this pin once
+      WireMock.Net ships a build that references Scriban.Signed >= 7.2.1.
+    -->
+    <PackageReference Include="Scriban.Signed" Version="7.2.1" />
+  </ItemGroup>
+
+</Project>

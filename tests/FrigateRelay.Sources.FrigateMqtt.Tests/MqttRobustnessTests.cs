@@ -125,17 +125,49 @@ public sealed class MqttRobustnessTests
 
     [TestMethod]
     [Timeout(5_000)]
-    public async Task ReconnectLoop_AlreadyConnected_DoesNotPingOrConnect()
+    public async Task ReconnectLoop_ConnectedButNotYetSubscribed_SubscribesWithoutReconnecting()
     {
         var client = Substitute.For<IMqttClient>();
         client.IsConnected.Returns(true);
-        var (source, _) = NewSourceWithCapturingLogger(client);
+        client.SubscribeAsync(Arg.Any<MqttClientSubscribeOptions>(), Arg.Any<CancellationToken>())
+            .Returns(BuildSubscribeResult(("frigate/events", MqttClientSubscribeResultCode.GrantedQoS0)));
+        var connectionStatus = Substitute.For<IMqttConnectionStatus>();
+        var (source, _) = NewSourceWithCapturingLogger(client, connectionStatus);
 
         await DriveReconnectLoopOnceAsync(source);
 
+        // #19: no redundant ping/connect when the socket is already up …
         await client.DidNotReceive().PingAsync(Arg.Any<CancellationToken>());
         await client.DidNotReceive().ConnectAsync(
             Arg.Any<MqttClientOptions>(), Arg.Any<CancellationToken>());
+        // … but the subscription is still established, since it was never confirmed granted.
+        await client.Received().SubscribeAsync(
+            Arg.Any<MqttClientSubscribeOptions>(), Arg.Any<CancellationToken>());
+        connectionStatus.Received().SetConnected(true);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ReconnectLoop_ConnectedButSubscribeDenied_ReSubscribesAndMarksUnhealthy()
+    {
+        // Regression for the CodeRabbit PR #90 finding: after a SUBACK denial the socket stays
+        // connected, so a guard that short-circuits on IsConnected alone would never re-subscribe
+        // and the subscription would stay stuck denied until the TCP link happened to drop.
+        var client = Substitute.For<IMqttClient>();
+        client.IsConnected.Returns(true);
+        client.SubscribeAsync(Arg.Any<MqttClientSubscribeOptions>(), Arg.Any<CancellationToken>())
+            .Returns(BuildSubscribeResult(("frigate/events", MqttClientSubscribeResultCode.NotAuthorized)));
+        var connectionStatus = Substitute.For<IMqttConnectionStatus>();
+        var (source, _) = NewSourceWithCapturingLogger(client, connectionStatus);
+
+        await DriveReconnectLoopOnceAsync(source);
+
+        // The loop must attempt the subscribe even though the socket reports connected …
+        await client.Received().SubscribeAsync(
+            Arg.Any<MqttClientSubscribeOptions>(), Arg.Any<CancellationToken>());
+        // … and mark the connection unhealthy so /healthz reports 503 and the retry continues.
+        connectionStatus.Received().SetConnected(false);
+        connectionStatus.DidNotReceive().SetConnected(true);
     }
 
     [TestMethod]
