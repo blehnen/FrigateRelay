@@ -1,0 +1,84 @@
+# SonarQube Cloud analysis — FrigateRelay
+#
+# Replaces SonarCloud "Automatic Analysis" with CI-based (build-time) analysis.
+# CI-based analysis inspects the compiled MSBuild output, so it surfaces more
+# than Automatic Analysis can (e.g. Roslyn analyzer + full type-resolution
+# findings). Expect additional action items on the first run.
+#
+# D1 (see ci.yml / Jenkinsfile): coverage lives in Jenkins EXCLUSIVELY. This
+# workflow only builds — it does NOT run tests — so sonar.coverage.exclusions
+# tells Sonar not to expect coverage data and fail its "Coverage on New Code"
+# gate on every PR. Do not add --coverage here; that would duplicate Jenkins.
+
+name: SonarQube
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Scanner only reads the repo and uploads results to SonarCloud via SONAR_TOKEN;
+# it never uses GITHUB_TOKEN to write. Minimal read-only scope (matches ci.yml).
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and analyze
+    runs-on: windows-latest
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520  # v5.4.0
+        with:
+          java-version: 17
+          distribution: 'zulu'
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v6
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          persist-credentials: false  # don't write GITHUB_TOKEN to .git/config; scanner doesn't push
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1  # v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache SonarQube Cloud packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache SonarQube Cloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ runner.temp }}\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarQube Cloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        shell: powershell
+        run: |
+          New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
+          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
+
+      - name: Build and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: powershell
+        run: |
+          # The scanner auto-reads SONAR_TOKEN from the environment and defaults
+          # sonar.host.url to https://sonarcloud.io — no need to pass them here.
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"blehnen_FrigateRelay" /o:"blehnen" /d:sonar.exclusions="**/*.png,**/*.ico,**/*.jpg,**/*.jpeg,**/*.gif,**/*.webp,**/*.woff,**/*.woff2,**/*.ttf,**/*.eot" /d:sonar.coverage.exclusions="**/*"
+          dotnet build FrigateRelay.sln -c Release
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end
