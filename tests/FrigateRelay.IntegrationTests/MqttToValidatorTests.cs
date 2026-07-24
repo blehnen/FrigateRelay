@@ -294,7 +294,7 @@ public sealed class MqttToValidatorTests
     /// </summary>
     private sealed class CapturingLoggerProvider
     {
-        public ConcurrentBag<CapturedEntry> Entries { get; } = new();
+        public ConcurrentBag<CapturedEntry> Entries { get; } = [];
     }
 
     /// <summary>

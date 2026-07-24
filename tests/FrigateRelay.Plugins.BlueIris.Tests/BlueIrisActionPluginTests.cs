@@ -195,7 +195,7 @@ public class BlueIrisActionPluginTests
     public async Task Register_WithMissingTemplate_FailsAtStartup()
     {
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .AddInMemoryCollection([])
             .Build();
 
         var services = new ServiceCollection();

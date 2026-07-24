@@ -91,8 +91,8 @@ public sealed class BlueIrisSnapshotProviderTests
 
             Assert.IsNull(result);
             var warnings = logger.Entries.Where(e => e.Level == LogLevel.Warning).ToList();
-            Assert.AreEqual(1, warnings.Count, "Expected exactly one Warning log entry.");
-            StringAssert.Contains(warnings[0].Message, "404");
+            Assert.HasCount(1, warnings, "Expected exactly one Warning log entry.");
+            Assert.Contains("404", warnings[0].Message);
         }
     }
 
@@ -129,7 +129,7 @@ public sealed class BlueIrisSnapshotProviderTests
 
         Assert.IsNull(result, "Expected null on network error.");
         var warnings = logger.Entries.Where(e => e.Level == LogLevel.Warning).ToList();
-        Assert.IsTrue(warnings.Count >= 1, "Expected at least one Warning log entry on network error.");
+        Assert.IsGreaterThanOrEqualTo(1, warnings.Count, "Expected at least one Warning log entry on network error.");
     }
 
     [TestMethod]
@@ -150,7 +150,7 @@ public sealed class BlueIrisSnapshotProviderTests
 
             var matchedRequests = server.FindLogEntries(
                 Request.Create().WithPath("/image/front_door").UsingGet());
-            Assert.AreEqual(1, matchedRequests.Count, "WireMock should have received exactly 1 request to /image/front_door.");
+            Assert.HasCount(1, matchedRequests, "WireMock should have received exactly 1 request to /image/front_door.");
         }
     }
 }

@@ -15,8 +15,11 @@ namespace FrigateRelay.Host.Tests.Observability;
 /// diff of which side is missing the entry.
 /// </summary>
 [TestClass]
-public sealed class CounterInventoryDriftTests
+public sealed partial class CounterInventoryDriftTests
 {
+    [GeneratedRegex(@"`(frigaterelay\.[^`]+)`")]
+    private static partial Regex MetricPattern();
+
     [TestMethod]
     public void CounterInventory_DocAndMeter_AreInSync()
     {
@@ -87,8 +90,6 @@ public sealed class CounterInventoryDriftTests
                 $"Could not find the counter inventory table header row (containing 'Metric' and 'Tags') in {docPath}");
 
         // Skip the separator row (|---|---|---|) and parse data rows
-        var metricPattern = new Regex(@"`(frigaterelay\.[^`]+)`", RegexOptions.Compiled);
-
         for (var i = headerIndex + 1; i < lines.Length; i++)
         {
             var line = lines[i].Trim();
@@ -107,7 +108,7 @@ public sealed class CounterInventoryDriftTests
                 continue;
 
             var firstCol = parts[1];
-            var match = metricPattern.Match(firstCol);
+            var match = MetricPattern().Match(firstCol);
             if (match.Success)
                 metricNames.Add(match.Groups[1].Value);
         }

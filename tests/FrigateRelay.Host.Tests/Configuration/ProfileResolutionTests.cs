@@ -22,7 +22,7 @@ public sealed class ProfileResolutionTests
     {
         return new HostSubscriptionsOptions
         {
-            Profiles = profiles ?? new Dictionary<string, ProfileOptions>(),
+            Profiles = profiles ?? [],
             Subscriptions = (subscriptions ?? Array.Empty<SubscriptionOptions>()).ToArray(),
         };
     }

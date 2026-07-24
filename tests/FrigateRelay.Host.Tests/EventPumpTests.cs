@@ -241,8 +241,8 @@ public sealed class EventPumpTests
     /// </summary>
     private sealed class CapturingDispatcher : IActionDispatcher
     {
-        public List<EventContext> Captured { get; } = new();
-        public List<bool> CapturedParallelValidators { get; } = new();
+        public List<EventContext> Captured { get; } = [];
+        public List<bool> CapturedParallelValidators { get; } = [];
         public ValueTask EnqueueAsync(EventContext ctx, IActionPlugin action, IReadOnlyList<IValidationPlugin> validators, string subscription, string? perActionSnapshotProvider, string? subscriptionDefaultSnapshotProvider, bool parallelValidators, CancellationToken ct)
         {
             Captured.Add(ctx);
@@ -290,7 +290,7 @@ public sealed class EventPumpTests
 
     private sealed class CapturingLogger : ILogger<EventPump>
     {
-        public List<LogEntry> Entries { get; } = new();
+        public List<LogEntry> Entries { get; } = [];
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel level, EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
