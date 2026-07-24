@@ -281,7 +281,7 @@ public sealed class Doods2ValidatorTests
             left = 0.0,
             bottom = 100.0,
             right = 100.0,
-            label = d.label,
+            d.label,
             confidence = d.rawConfidence0to100,
         }).ToArray();
 

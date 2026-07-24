@@ -10,7 +10,7 @@ namespace FrigateRelay.Host;
 /// Startup validation helpers called from <c>Program.cs</c> before <c>app.RunAsync()</c>.
 /// Extracted so tests can exercise validation logic without spinning up the full host.
 /// </summary>
-internal static class StartupValidation
+internal static partial class StartupValidation
 {
     /// <summary>
     /// Escapes operator-controlled string values for safe inclusion in structured log
@@ -30,9 +30,10 @@ internal static class StartupValidation
     /// <summary>
     /// Permissive-printable allowlist: alphanumeric, space, dot, dash, underscore (D1).
     /// Rejects CRLF, null bytes, control chars, slashes, colons, and at-signs.
-    /// Not <c>[GeneratedRegex]</c> because <c>internal static class</c> cannot be <c>partial</c>.
+    /// Source-generated via <c>[GeneratedRegex]</c> (the class is <c>static partial</c>).
     /// </summary>
-    private static readonly Regex NameAllowlist = new("^[A-Za-z0-9_. -]+$", RegexOptions.Compiled);
+    [GeneratedRegex("^[A-Za-z0-9_. -]+$")]
+    private static partial Regex NameAllowlist();
 
     /// <summary>
     /// Validates that subscription names, profile keys, plugin names, and validator instance
@@ -70,7 +71,7 @@ internal static class StartupValidation
     /// </summary>
     private static void ValidateName(string? value, string category, string allowedDesc, List<string> errors)
     {
-        if (!string.IsNullOrEmpty(value) && (string.IsNullOrWhiteSpace(value) || !NameAllowlist.IsMatch(value)))
+        if (!string.IsNullOrEmpty(value) && (string.IsNullOrWhiteSpace(value) || !NameAllowlist().IsMatch(value)))
             errors.Add($"{category} '{Sanitize(value)}' is invalid; {allowedDesc}");
     }
 

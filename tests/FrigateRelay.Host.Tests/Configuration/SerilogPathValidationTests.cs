@@ -132,7 +132,7 @@ public sealed class SerilogPathValidationTests
     public void ValidateSerilogPath_NoWriteToSection_NoError()
     {
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .AddInMemoryCollection([])
             .Build();
         var errors = new List<string>();
 

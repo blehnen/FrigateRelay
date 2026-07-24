@@ -29,7 +29,7 @@ internal static class IniReader
                     sections.Add(new Section(currentName, current!));
                 }
                 currentName = line[1..^1].Trim();
-                current = new List<KeyValuePair<string, string>>();
+                current = [];
                 continue;
             }
             var eq = line.IndexOf('=');

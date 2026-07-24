@@ -11,7 +11,7 @@ public sealed class CapturingLogger<T> : ILogger<T>
     // background-thread writes, but `List<T>.Count` is an int field read (atomic on x86/x64).
     // The contract is: tests should call WaitForEntriesAsync first, then read Entries
     // synchronously from the test thread once the pump/dispatcher has been stopped.
-    public List<LogEntry> Entries { get; } = new();
+    public List<LogEntry> Entries { get; } = [];
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
     public bool IsEnabled(LogLevel logLevel) => true;

@@ -55,6 +55,6 @@ public sealed class MqttConnectionStatusTests
         threads.ForEach(t => t.Start());
         threads.ForEach(t => t.Join());
 
-        Assert.AreEqual(0, exceptions.Count, $"Concurrent access threw: {string.Join("; ", exceptions.Select(e => e.Message))}");
+        Assert.IsEmpty(exceptions, $"Concurrent access threw: {string.Join("; ", exceptions.Select(e => e.Message))}");
     }
 }

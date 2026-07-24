@@ -52,10 +52,10 @@ internal sealed class ChannelActionDispatcher : IActionDispatcher, IHostedServic
     private readonly ISnapshotResolver? _snapshotResolver;
     private readonly MetricsTagWriter _metricsTagWriter;
 
-    private Dictionary<IActionPlugin, Channel<DispatchItem>> _channels = new();
+    private Dictionary<IActionPlugin, Channel<DispatchItem>> _channels = [];
     private readonly Dictionary<string, IActionPlugin> _actionsByName =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Task> _consumerTasks = new();
+    private readonly List<Task> _consumerTasks = [];
     private CancellationTokenSource _stoppingCts = new();
 
     /// <summary>
