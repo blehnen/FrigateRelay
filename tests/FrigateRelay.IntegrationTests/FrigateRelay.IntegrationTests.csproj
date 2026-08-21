@@ -16,7 +16,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Testcontainers" Version="4.13.0" />
+    <!--
+      Testcontainers >= 4.14.0 required: 4.13.0 resolves the transitive SSH.NET to
+      2025.1.0, which is vulnerable to GHSA-q939-rpr3-3284 (high; ScpClient recursive
+      download allows arbitrary file write via server-controlled SCP filenames;
+      affected <= 2025.1.0). 4.14.0 bumps its own SSH.NET dependency to the patched
+      2026.0.0, so no transitive pin is needed here — do not downgrade.
+    -->
+    <PackageReference Include="Testcontainers" Version="4.14.0" />
     <PackageReference Include="WireMock.Net" Version="2.13.0" />
     <PackageReference Include="MQTTnet" Version="5.2.0.1603" />
     <!-- OpenTelemetry in-memory exporter — test-only, never in src/. Per PLAN-3.1 Task 3. -->
