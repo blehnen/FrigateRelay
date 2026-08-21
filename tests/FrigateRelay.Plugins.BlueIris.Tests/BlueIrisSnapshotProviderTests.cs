@@ -70,7 +70,7 @@ public sealed class BlueIrisSnapshotProviderTests
             var result = await sut.FetchAsync(request, CancellationToken.None);
 
             Assert.IsNotNull(result);
-            CollectionAssert.AreEqual(JpegMagic, result.Bytes);
+            Assert.AreSequenceEqual(JpegMagic, result.Bytes);
             Assert.AreEqual("image/jpeg", result.ContentType);
             Assert.AreEqual("BlueIris", result.ProviderName);
         }
