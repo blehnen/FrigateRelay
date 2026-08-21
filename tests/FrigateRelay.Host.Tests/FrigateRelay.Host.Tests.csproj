@@ -28,9 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Fixtures\legacy.conf">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="..\..\config\appsettings.Example.json" Link="Fixtures\appsettings.Example.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

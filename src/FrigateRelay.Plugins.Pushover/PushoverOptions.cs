@@ -37,8 +37,8 @@ internal sealed class PushoverOptions
     /// <summary>
     /// When true, the Pushover plugin emits a structured <c>would-execute</c> log entry
     /// at Info level (EventId 4, "PushoverDryRun") and returns success without
-    /// calling the Pushover API. Used during the parity-window (Phase 12) to log
-    /// would-be-actions without firing real notifications. Default false.
+    /// calling the Pushover API. Use it to verify subscription and profile wiring
+    /// against live events without firing real notifications. Default false.
     /// </summary>
     public bool DryRun { get; init; }
 }

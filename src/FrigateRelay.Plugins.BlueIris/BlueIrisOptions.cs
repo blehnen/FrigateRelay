@@ -26,8 +26,8 @@ public sealed record BlueIrisOptions
     /// <summary>
     /// When true, the BlueIris plugin emits a structured <c>would-execute</c> log entry
     /// at Info level (EventId 203, "BlueIrisDryRun") and returns success without
-    /// calling the BlueIris HTTP trigger endpoint. Used during the parity-window
-    /// (Phase 12) to log would-be-actions without firing real triggers. Default false.
+    /// calling the BlueIris HTTP trigger endpoint. Use it to verify subscription and
+    /// profile wiring against live events without firing real triggers. Default false.
     /// </summary>
     public bool DryRun { get; init; }
 }
