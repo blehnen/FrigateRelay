@@ -61,7 +61,7 @@ RUN RID=$(cat /tmp/rid) && \
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 # Alpine runtime-deps: only the native musl libc + ICU; no .NET runtime (bundled in publish).
 # Digest-pinned for supply-chain integrity (B3). Tag retained for human readability.
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine@sha256:379b17d7d388a2a1b5330bfc2429a01091f85e255d3bce7981d65927d786c000 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine@sha256:329aa4dd9bcb5e9c3f7b249738170a0313c6b57837067faae430db5b0d991fc8 AS runtime
 
 # Dedicated non-root user + group (UID/GID 10001) — ROADMAP Phase 10 + B1.
 # RUN before USER so addgroup/adduser execute as root.
