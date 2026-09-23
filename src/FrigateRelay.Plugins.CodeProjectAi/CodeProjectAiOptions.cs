@@ -46,7 +46,11 @@ public sealed class CodeProjectAiOptions
     [Required, Url]
     public string BaseUrl { get; set; } = "";
 
-    /// <summary>Minimum prediction confidence (0.0-1.0) to be accepted as a positive match.</summary>
+    /// <summary>
+    /// Minimum prediction confidence (0.0-1.0) to be accepted as a positive match. Sent to the
+    /// backend as the <c>min_confidence</c> form field so its server-side default does not
+    /// discard detections below it, and re-checked client-side for backends that ignore it.
+    /// </summary>
     [Range(0.0, 1.0)]
     public double MinConfidence { get; set; } = 0.5;
 

@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Plugins.CodeProjectAi;
@@ -186,8 +188,93 @@ public sealed class CodeProjectAiValidatorTests
     }
 
     // -------------------------------------------------------------------------
+    // Test 9: configured MinConfidence is sent as the min_confidence form field (#133)
+    // -------------------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_Multipart_SendsMinConfidenceFormField()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create().WithPath("/v1/vision/detection").UsingPost())
+            .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(
+                new { success = true, code = 200, predictions = Array.Empty<object>() }));
+
+        var validator = NewValidator(stub.Url!, minConfidence: 0.25);
+        await validator.ValidateAsync(MakeEvent(), MakeSnapshot(), CancellationToken.None);
+
+        var body = stub.LogEntries.Single().RequestMessage?.BodyAsBytes
+            ?? throw new InvalidOperationException("WireMock recorded no body bytes");
+        ReadMinConfidenceField(body).Should().Be("0.25");
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 10: min_confidence is culture-invariant — a de-DE host must not send "0,25"
+    // -------------------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_CommaDecimalCulture_SendsInvariantMinConfidence()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create().WithPath("/v1/vision/detection").UsingPost())
+            .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(
+                new { success = true, code = 200, predictions = Array.Empty<object>() }));
+
+        var validator = NewValidator(stub.Url!, minConfidence: 0.25);
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            await validator.ValidateAsync(MakeEvent(), MakeSnapshot(), CancellationToken.None);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+
+        var body = stub.LogEntries.Single().RequestMessage?.BodyAsBytes
+            ?? throw new InvalidOperationException("WireMock recorded no body bytes");
+        ReadMinConfidenceField(body).Should().Be("0.25");
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 11: MinConfidence below the server's default is reachable (#133 regression).
+    // The stub mimics a CPAI-shape backend with a 0.4 server-side floor that is only
+    // lowered when the request carries min_confidence — as blueiris-ai-gateway does.
+    // -------------------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_MinConfidenceBelowServerDefault_ReturnsPass()
+    {
+        using var stub = WireMockServer.Start();
+        stub.Given(Request.Create().WithPath("/v1/vision/detection").UsingPost()
+                .WithBody((byte[]? b) => b is not null
+                    && double.TryParse(ReadMinConfidenceField(b), NumberStyles.Float, CultureInfo.InvariantCulture, out var min)
+                    && min <= 0.3))
+            .AtPriority(1)
+            .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(
+                new { success = true, code = 200, predictions = new[] {
+                    new { label = "person", confidence = 0.30, x_min = 1, y_min = 2, x_max = 3, y_max = 4 } } }));
+        stub.Given(Request.Create().WithPath("/v1/vision/detection").UsingPost())
+            .AtPriority(2)
+            .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(
+                new { success = true, code = 200, predictions = Array.Empty<object>() }));
+
+        var validator = NewValidator(stub.Url!, minConfidence: 0.25, allowedLabels: ["person"]);
+        var verdict = await validator.ValidateAsync(MakeEvent(), MakeSnapshot(), CancellationToken.None);
+
+        verdict.Passed.Should().BeTrue("the server must be told the configured threshold, not apply its own 0.4 default");
+        verdict.Score.Should().BeApproximately(0.30, 0.001);
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>Extracts the <c>min_confidence</c> form-field value from a raw multipart body, or null if absent.</summary>
+    private static string? ReadMinConfidenceField(byte[] body)
+    {
+        var match = Regex.Match(
+            Encoding.UTF8.GetString(body),
+            @"name=""?min_confidence""?\r\n(?:[^\r\n]+\r\n)*\r\n(?<value>[^\r\n]*)\r\n");
+        return match.Success ? match.Groups["value"].Value : null;
+    }
 
     private static readonly byte[] FakeJpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
 

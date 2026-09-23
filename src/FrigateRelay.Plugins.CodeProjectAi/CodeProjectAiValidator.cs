@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FrigateRelay.Abstractions;
@@ -84,7 +85,7 @@ public sealed partial class CodeProjectAiValidator : IValidationPlugin
         }
     }
 
-    private static MultipartFormDataContent BuildMultipart(ReadOnlyMemory<byte> bytes)
+    private MultipartFormDataContent BuildMultipart(ReadOnlyMemory<byte> bytes)
     {
         // Phase 6 D12: .NET 10 emits unquoted name= in multipart by default. DO NOT
         // manually quote — keeps wire format consistent with other plugins.
@@ -92,6 +93,16 @@ public sealed partial class CodeProjectAiValidator : IValidationPlugin
         var image = new ByteArrayContent(bytes.ToArray());
         image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
         content.Add(image, "image", "snapshot.jpg");
+
+        // #133: without min_confidence every CPAI-shape backend applies its own server-side
+        // default (e.g. 0.4 on blueiris-ai-gateway) and drops lower-confidence
+        // boxes before we see them, silently flooring any MinConfidence below it. Sending it
+        // makes the configured threshold authoritative; EvaluatePredictions still filters
+        // client-side for backends that ignore the field. Invariant culture — a comma-decimal
+        // host locale would otherwise send "0,25", which the backends reject or misparse.
+        var minConfidence = new StringContent(_opts.MinConfidence.ToString(CultureInfo.InvariantCulture));
+        minConfidence.Headers.ContentType = null; // plain form field, as a browser would send it
+        content.Add(minConfidence, "min_confidence");
         return content;
     }
 
