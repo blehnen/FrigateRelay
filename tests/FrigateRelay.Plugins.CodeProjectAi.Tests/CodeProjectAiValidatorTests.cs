@@ -1,10 +1,11 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using FluentAssertions;
 using FrigateRelay.Abstractions;
 using FrigateRelay.Plugins.CodeProjectAi;
 using Microsoft.Extensions.Logging;
+using WireMock;
+using WireMock.Matchers;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
@@ -201,9 +202,7 @@ public sealed class CodeProjectAiValidatorTests
         var validator = NewValidator(stub.Url!, minConfidence: 0.25);
         await validator.ValidateAsync(MakeEvent(), MakeSnapshot(), CancellationToken.None);
 
-        var body = stub.LogEntries.Single().RequestMessage?.BodyAsBytes
-            ?? throw new InvalidOperationException("WireMock recorded no body bytes");
-        ReadMinConfidenceField(body).Should().Be("0.25");
+        ReadFormField(stub.LogEntries.Single().RequestMessage, "min_confidence").Should().Be("0.25");
     }
 
     // -------------------------------------------------------------------------
@@ -229,24 +228,26 @@ public sealed class CodeProjectAiValidatorTests
             CultureInfo.CurrentCulture = original;
         }
 
-        var body = stub.LogEntries.Single().RequestMessage?.BodyAsBytes
-            ?? throw new InvalidOperationException("WireMock recorded no body bytes");
-        ReadMinConfidenceField(body).Should().Be("0.25");
+        ReadFormField(stub.LogEntries.Single().RequestMessage, "min_confidence").Should().Be("0.25");
     }
 
     // -------------------------------------------------------------------------
     // Test 11: MinConfidence below the server's default is reachable (#133 regression).
-    // The stub mimics a CPAI-shape backend with a 0.4 server-side floor that is only
-    // lowered when the request carries min_confidence — as blueiris-ai-gateway does.
+    // The stub mimics a CPAI-shape backend with a server-side floor (0.4 on
+    // blueiris-ai-gateway): the 0.30 detection is only returned when the request
+    // carries min_confidence=0.25; otherwise the backend reports nothing.
     // -------------------------------------------------------------------------
     [TestMethod]
     public async Task ValidateAsync_MinConfidenceBelowServerDefault_ReturnsPass()
     {
         using var stub = WireMockServer.Start();
         stub.Given(Request.Create().WithPath("/v1/vision/detection").UsingPost()
-                .WithBody((byte[]? b) => b is not null
-                    && double.TryParse(ReadMinConfidenceField(b), NumberStyles.Float, CultureInfo.InvariantCulture, out var min)
-                    && min <= 0.3))
+                .WithMultiPart(new MimePartMatcher(
+                    MatchBehaviour.AcceptOnMatch,
+                    contentTypeMatcher: null,
+                    contentDispositionMatcher: new WildcardMatcher("*name=\"min_confidence\"*"),
+                    contentTransferEncodingMatcher: null,
+                    contentMatcher: new ExactMatcher("0.25"))))
             .AtPriority(1)
             .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(
                 new { success = true, code = 200, predictions = new[] {
@@ -259,7 +260,7 @@ public sealed class CodeProjectAiValidatorTests
         var validator = NewValidator(stub.Url!, minConfidence: 0.25, allowedLabels: ["person"]);
         var verdict = await validator.ValidateAsync(MakeEvent(), MakeSnapshot(), CancellationToken.None);
 
-        verdict.Passed.Should().BeTrue("the server must be told the configured threshold, not apply its own 0.4 default");
+        verdict.Passed.Should().BeTrue("the server must be told the configured threshold, not apply its own default");
         verdict.Score.Should().BeApproximately(0.30, 0.001);
     }
 
@@ -267,13 +268,19 @@ public sealed class CodeProjectAiValidatorTests
     // Helpers
     // -------------------------------------------------------------------------
 
-    /// <summary>Extracts the <c>min_confidence</c> form-field value from a raw multipart body, or null if absent.</summary>
-    private static string? ReadMinConfidenceField(byte[] body)
+    /// <summary>
+    /// Returns the text value of the named multipart form field, as parsed by WireMock
+    /// (MimeKit under the hood), or null if the request carried no such field.
+    /// </summary>
+    private static string? ReadFormField(IRequestMessage? request, string name)
     {
-        var match = Regex.Match(
-            Encoding.UTF8.GetString(body),
-            @"name=""?min_confidence""?\r\n(?:[^\r\n]+\r\n)*\r\n(?<value>[^\r\n]*)\r\n");
-        return match.Success ? match.Groups["value"].Value : null;
+        var part = request?.BodyAsMimeMessage?.BodyParts.SingleOrDefault(p =>
+            p.ContentDisposition?.Parameters.Contains($"name=\"{name}\"") == true);
+        if (part is null)
+            return null;
+
+        using var reader = new StreamReader(part.Open());
+        return reader.ReadToEnd();
     }
 
     private static readonly byte[] FakeJpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
