@@ -88,7 +88,7 @@ jobs:
       # `load: true` is incompatible with multi-platform push, so this is a
       # separate build step from the final multi-arch push below.
       - name: Build amd64 image for smoke
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7
         with:
           context: .
           file: docker/Dockerfile
@@ -149,7 +149,7 @@ jobs:
       # Build both platforms via QEMU + buildx and push the multi-arch manifest.
       # Uses the metadata-action tags computed above.
       - name: Build and push multi-arch image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7
         with:
           context: .
           file: docker/Dockerfile
