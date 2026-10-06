@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CodeProject.AI validator now sends `MinConfidence` to the backend as the `min_confidence` form field (issue #133). Previously it was never sent, so each CPAI-shape backend (CodeProject.AI, Blue Onyx, blueiris-ai-gateway) applied its own server-side default and discarded lower-confidence detections before FrigateRelay saw them — any `MinConfidence` below that default was silently unreachable. The value is formatted culture-invariantly, and the client-side confidence check remains as a backstop for backends that ignore the field. Roboflow and DOODS2 already sent their thresholds and are unaffected.
+
 ## [1.3.0] — 2026-05-11
 
 Minor release. Adds a new operator-visible config key for bounding metrics
