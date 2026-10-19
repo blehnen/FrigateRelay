@@ -20,7 +20,7 @@
       only once a WireMock.Net release resolves Scriban.Signed >= 7.2.1 on a clean
       restore (verified in CI, not just a warm local cache).
     -->
-    <PackageReference Include="Scriban.Signed" Version="7.2.5" />
+    <PackageReference Include="Scriban.Signed" Version="7.5.1" />
   </ItemGroup>
 
 </Project>
