@@ -14,7 +14,7 @@
 # Debian SDK that RESEARCH.md C3 originally recommended — the -r RID flag
 # determines the publish target, not the build host's libc. Empirically verified
 # 2026-04-27: docker build succeeded on amd64 producing a 106 MB runtime image.)
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:3cc3bbbbf93d82104892f42aa9106b6be4d120346dea0649643a97c801525256 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-alpine@sha256:52556c0fb9d0f609ae9aeab9efeeba96f4acc2f7038f7696f2235ccbdbb8e290 AS build
 
 # BuildKit TARGETARCH is injected by `docker buildx build --platform linux/amd64|arm64`.
 # Map Docker arch names to .NET musl RIDs.
